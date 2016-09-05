@@ -1,0 +1,4 @@
+
+
+class JsonSchemaModelMeta(type):
+    pass
