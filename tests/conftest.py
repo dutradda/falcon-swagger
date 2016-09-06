@@ -21,27 +21,8 @@
 # SOFTWARE.
 
 
-MODEL_BASE_CLASS_NAME = 'ModelBase'
+import os
+import sys
 
-
-from sqlalchemy.ext.declarative import declarative_base as declarative_base_sa
-from sqlalchemy.ext.declarative.base import _declarative_constructor
-
-from myreco.base.models.json_schema import JsonSchemaModelMeta
-from myreco.base.models.sqlalchemy import SQLAlchemyModelMeta, SQLAlchemyModel
-
-
-class BaseMeta(JsonSchemaModelMeta, SQLAlchemyModelMeta):
-    pass
-
-
-def declarative_base(
-        bind=None, metadata=None, mapper=None,
-        constructor=_declarative_constructor,
-        class_registry=None):
-    return declarative_base_sa(
-    name=MODEL_BASE_CLASS_NAME, metaclass=BaseMeta,
-    cls=SQLAlchemyModel, bind=bind, metadata=metadata,
-    mapper=mapper, constructor=constructor)
-
-ModelBase = declarative_base()
+ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(os.path.join(ROOT_PATH, '..'))
