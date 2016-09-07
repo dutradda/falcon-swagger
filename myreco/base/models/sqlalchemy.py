@@ -33,6 +33,7 @@ from sqlalchemy.exc import InvalidRequestError
 from weakref import WeakValueDictionary
 
 from myreco.base.models.base import MODEL_BASE_CLASS_NAME
+from myreco.exceptions import BaseClassError
 
 
 class SQLAlchemyModelMeta(DeclarativeMeta):
@@ -50,13 +51,18 @@ class SQLAlchemyModelMeta(DeclarativeMeta):
                     base_class = base
                     break
 
-            cls.backrefs = set()
-            cls.relationships = dict()
-            cls.columns = cls.__table__.c
-            cls.tablename = str(cls.__table__.name)
-            base.all_models.add(cls)
+            if base_class is None:
+                raise BaseClassError(
+                    "'{}' class must inherit from '{}'".format(
+                        name, MODEL_BASE_CLASS_NAME))
 
-            cls._build_backrefs_for_all_models(base.all_models)
+            cls.backrefs = set()
+            cls.relationships = set()
+            cls.columns = set(cls.__table__.c)
+            cls.tablename = str(cls.__table__.name)
+            base_class.all_models.add(cls)
+
+            cls._build_backrefs_for_all_models(base_class.all_models)
         else:
             cls.all_models = set()
 
@@ -64,35 +70,47 @@ class SQLAlchemyModelMeta(DeclarativeMeta):
         return getattr(cls, cls.id_name)
 
     def _build_backrefs_for_all_models(cls, all_models):
-        all_relationships = {}
+        all_relationships = set()
 
         for model in all_models:
-            model._build_relationships(all_models)
-            all_relationships[model] = [i for i in model.relationships.values()]
+            model._build_relationships()
+            all_relationships.update(model.relationships)
 
         for model in all_models:
-            for model_rel, rels in all_relationships.items():
-                if model in rels:
-                    model.backrefs.add(model_rel)
+            for relationship in all_relationships:
+                if model != cls.get_model_from_rel(relationship, all_models, parent=True) and \
+                    model == cls.get_model_from_rel(relationship, all_models):
+                    model.backrefs.add(relationship)
 
-    def _build_relationships(cls, all_models):
+    def _build_relationships(cls):
+        if cls.relationships:
+            return
+
         for attr_name in cls.__dict__:
-            rel_model = cls._get_relationship_model(attr_name, all_models)
-            if rel_model:
-                cls.relationships[attr_name] = rel_model
+            relationship = cls._get_relationship(attr_name)
+            if relationship:
+                cls.relationships.add(relationship)
 
-    def _get_relationship_model(cls, attr_name, all_models):
+    def _get_relationship(cls, attr_name):
         attr = getattr(cls, attr_name)
-
         if isinstance(attr, InstrumentedAttribute) and isinstance(attr.prop, RelationshipProperty):
-            attr_model = attr.prop.argument
+            return attr
 
-            if isinstance(attr_model, _class_resolver):
-                for model in all_models:
-                    if model.tablename == attr_model.arg:
-                        return model
+    def get_model_from_rel(cls, relationship, all_models=None, parent=False):
+        if parent:
+            return relationship.prop.parent.class_
 
-            return attr_model
+        if isinstance(relationship.prop.argument, _class_resolver):
+            if all_models is None:
+                return relationship.prop.argument()
+
+            for model in all_models:
+                if model.__name__ == relationship.prop.argument.arg:
+                    return model
+
+            return
+
+        return relationship.prop.argument
 
 
 class SQLAlchemyModel(object):
@@ -103,29 +121,23 @@ class SQLAlchemyModel(object):
         related = set()
         cls = type(self)
 
-        for related_model in cls.relationships:
-            related_model_insts = self._get_related_model_insts(session, related_model)
+        for relationship in cls.relationships:
+            related_model_insts = self._get_related_model_insts(session, relationship)
             related.update(related_model_insts)
 
-        for related_model in cls.backrefs:
-            related_model_insts = self._get_related_model_insts(session, related_model)
+        for relationship in cls.backrefs:
+            related_model_insts = self._get_related_model_insts(session, relationship, parent=True)
             related.update(related_model_insts)
 
         return related
 
-    def _get_related_model_insts(self, session, related_model):
+    def _get_related_model_insts(self, session, relationship, parent=False):
         cls = type(self)
+        rel_model = cls.get_model_from_rel(relationship, parent=parent)
 
-        try:
-            insts = self._build_related_query(session, related_model, cls)
-        except InvalidRequestError:
-            insts = self._build_related_query(session, cls, related_model)
-
-        return set(insts)
-
-    def _build_related_query(self, session, model1, model2):
-        return session.query(model1).join(model2).filter(
-            type(self).get_model_id() == self.get_id()).all()
+        result = set(session.query(rel_model).join(relationship).filter(
+            cls.get_model_id() == self.get_id()).all())
+        return result
 
     def todict(self):
         dict_inst = dict()
@@ -134,13 +146,14 @@ class SQLAlchemyModel(object):
             col_name = str(col.name)
             dict_inst[col_name] = getattr(self, col_name)
 
-        for rel_name in type(self).relationships:
-            attr = getattr(self, rel_name)
-            if isinstance(attr, InstrumentedList):
+        for rel in type(self).relationships:
+            attr = getattr(self, rel.prop.key)
+            if rel.prop.uselist is True:
                 relationships = [rel.todict() for rel in attr]
-            else:
+            elif attr is not None:
                 relationships = attr.todict()
 
-            dict_inst[rel_name] = relationships
+            if attr is not None:
+                dict_inst[rel.key] = relationships
 
         return dict_inst
