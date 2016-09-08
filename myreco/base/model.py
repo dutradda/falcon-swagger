@@ -164,13 +164,13 @@ class _SQLAlchemyModel(object):
                 rel_schema = schema.get(rel_name)
                 rel_schema = rel_schema if isinstance(rel_schema, dict) else None
                 attr = getattr(self, rel.prop.key)
+                relationships = None
                 if rel.prop.uselist is True:
                     relationships = [rel.todict(rel_schema) for rel in attr]
                 elif attr is not None:
                     relationships = attr.todict(rel_schema)
 
-                if attr is not None:
-                    dict_inst[rel_name] = relationships
+                dict_inst[rel_name] = relationships
 
 
 def model_base_builder(
