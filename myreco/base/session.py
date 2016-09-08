@@ -28,7 +28,7 @@ from sqlalchemy import event
 from collections import defaultdict
 
 
-class SessionBase(SessionSA):
+class _SessionBase(SessionSA):
     def __init__(
             self, bind=None, autoflush=True,
             expire_on_commit=True, _enable_transaction_accounting=True,
@@ -48,13 +48,14 @@ class SessionBase(SessionSA):
 
     def commit(self):
         SessionSA.commit(self)
-        try:
-            self._update_objects_on_redis()
-            self._update_back_references_on_redis()
-        except:
-            raise
-        finally:
-            self._clean_redis_sets()
+        if self.redis_bind is not None:
+            try:
+                self._update_objects_on_redis()
+                self._update_back_references_on_redis()
+            except:
+                raise
+            finally:
+                self._clean_redis_sets()
 
     def _update_objects_on_redis(self):
         self._exec_hdel(self._insts_to_hdel)
@@ -103,14 +104,16 @@ class SessionBase(SessionSA):
         self._insts_to_hmset.add(inst)
 
 
-Session = sessionmaker(class_=SessionBase)
+Session = sessionmaker(class_=_SessionBase)
 
 
 @event.listens_for(Session, 'persistent_to_deleted')
 def deleted_from_database(session, instance):
-    session.mark_for_hdel(instance)
+    if session.redis_bind is not None:
+        session.mark_for_hdel(instance)
 
 
 @event.listens_for(Session, 'pending_to_persistent')
 def added_to_database(session, instance):
-    session.mark_for_hmset(instance)
+    if session.redis_bind is not None:
+        session.mark_for_hmset(instance)

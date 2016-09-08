@@ -21,5 +21,9 @@
 # SOFTWARE.
 
 
-class BaseClassError(Exception):
+class MyrecoError(Exception):
+    pass
+
+
+class BaseClassError(MyrecoError):
 	pass

@@ -25,11 +25,16 @@ from sqlalchemy.ext.declarative import declarative_base
 from unittest import mock
 
 from myreco.base.session import Session
-from myreco.base.models.base import ModelBase
+from myreco.base.model import model_base_builder
 
 import pytest
 
 import sqlalchemy as sa
+
+
+@pytest.fixture
+def model_base():
+    return model_base_builder()
 
 
 @pytest.fixture
@@ -48,34 +53,34 @@ def session(engine, redis):
 
 
 @pytest.fixture
-def model1(engine, request):
+def model1(engine, request, model_base):
     def tear_down():
-        ModelBase.metadata = sa.schema.MetaData()
+        model_base.metadata = sa.schema.MetaData()
     request.addfinalizer(tear_down)
 
-    ModelBase.metadata.bind = engine
+    model_base.metadata.bind = engine
 
-    class model_(ModelBase):
+    class model_(model_base):
         __tablename__ = 'test1'
         id = sa.Column(sa.Integer, primary_key=True)
 
-    ModelBase.metadata.create_all()
+    model_base.metadata.create_all()
     return model_
 
 
 @pytest.fixture
-def model2(engine, request):
+def model2(engine, request, model_base):
     def tear_down():
-        ModelBase.metadata = sa.schema.MetaData()
+        model_base.metadata = sa.schema.MetaData()
     request.addfinalizer(tear_down)
 
-    ModelBase.metadata.bind = engine
+    model_base.metadata.bind = engine
 
-    class model_(ModelBase):
+    class model_(model_base):
         __tablename__ = 'test2'
         id = sa.Column(sa.Integer, primary_key=True)
 
-    ModelBase.metadata.create_all()
+    model_base.metadata.create_all()
     return model_
 
 

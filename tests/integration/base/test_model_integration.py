@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.base.models.base import declarative_base
+from myreco.base.model import model_base_builder
 from myreco.base.session import Session
 from unittest import mock
 
@@ -31,7 +31,7 @@ import sqlalchemy as sa
 
 @pytest.fixture
 def model_base():
-    return declarative_base()
+    return model_base_builder()
 
 
 @pytest.fixture
@@ -70,75 +70,6 @@ def model3(model_base, model1, model2):
         model2 = sa.orm.relationship(model2_)
 
     return model3
-
-
-@pytest.fixture
-def model2_string(model_base):
-    class model2(model_base):
-        __tablename__ = 'model2'
-        id = sa.Column(sa.Integer, primary_key=True)
-        model1_id = sa.Column(sa.ForeignKey('model1.id'))
-        model1 = sa.orm.relationship('model1')
-
-    return model2
-
-
-@pytest.fixture
-def model3_string(model_base, model1, model2):
-    class model3(model_base):
-        __tablename__ = 'model3'
-        id = sa.Column(sa.Integer, primary_key=True)
-        model1_id = sa.Column(sa.ForeignKey('model1.id'))
-        model2_id = sa.Column(sa.ForeignKey('model2.id'))
-        model1 = sa.orm.relationship('model1')
-        model2 = sa.orm.relationship('model2')
-
-    return model3
-
-
-class TestModelBaseInit(object):
-    def test_builds_no_relationships(self, model1):
-        assert model1.relationships == set()
-
-    def test_builds_no_backrefs(self, model1):
-        assert model1.backrefs == set()
-
-    def test_if_builds_relationships_correctly_with_one_model(self, model1, model2):
-        assert model2.relationships == {model2.model1}
-
-    def test_if_builds_relationships_correctly_with_two_models(self, model1, model2, model3):
-        assert model3.relationships == {model3.model1, model3.model2}
-
-    def test_if_builds_relationships_correctly_with_one_model_set_with_string(
-            self, model1, model2_string):
-        assert model2_string.relationships == {model2_string.model1}
-
-    def test_if_builds_relationships_correctly_with_two_models_set_with_string(
-            self, model1, model2, model3_string):
-        assert model3_string.relationships == {model3_string.model1, model3_string.model2}
-
-    def test_if_builds_backrefs_correctly_with_one_model(self, model2, model3):
-        assert model2.backrefs == {model3.model2}
-
-    def test_if_builds_backrefs_correctly_with_two_models(self, model1, model2, model3):
-        assert model1.backrefs == {model2.model1, model3.model1}
-
-
-@pytest.fixture
-def engine():
-    return sa.create_engine('sqlite://')
-
-
-@pytest.fixture
-def redis():
-    return mock.MagicMock()
-
-
-@pytest.fixture
-def session(engine, redis, model_base):
-    model_base.metadata.bind = engine
-    model_base.metadata.create_all()
-    return Session(bind=engine, redis_bind=redis)
 
 
 @pytest.fixture
@@ -210,7 +141,15 @@ def model2_mto(model_base):
     return model2
 
 
-class TestModelBase(object):
+@pytest.fixture
+def session(model_base):
+    engine = sa.create_engine('sqlite://')
+    model_base.metadata.bind = engine
+    model_base.metadata.create_all()
+    return Session(bind=engine, redis_bind=mock.MagicMock())
+
+
+class TestModelBaseGetRelated(object):
     def test_get_related_with_one_model(self, model1, model2, session):
         m11 = model1(id=1)
         m21 = model2(id=1)

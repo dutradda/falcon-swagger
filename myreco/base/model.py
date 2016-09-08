@@ -21,22 +21,20 @@
 # SOFTWARE.
 
 
-from sqlalchemy.ext.declarative.api import DeclarativeMeta as DeclarativeMeta
-from sqlalchemy.ext.declarative.clsregistry import (_class_resolver, _MultipleClassMarker)
-from sqlalchemy.sql.base import ImmutableColumnCollection
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.ext.declarative.api import DeclarativeMeta
+from sqlalchemy.ext.declarative.base import _declarative_constructor
+from sqlalchemy.ext.declarative.clsregistry import _class_resolver
 from sqlalchemy.orm.properties import RelationshipProperty
 from sqlalchemy.orm.attributes import InstrumentedAttribute
-from sqlalchemy.orm.collections import InstrumentedList
-from sqlalchemy.sql.expression import or_
-from sqlalchemy.exc import InvalidRequestError
 
-from weakref import WeakValueDictionary
-
-from myreco.base.models.base import MODEL_BASE_CLASS_NAME
 from myreco.exceptions import BaseClassError
 
 
-class SQLAlchemyModelMeta(DeclarativeMeta):
+MODEL_BASE_CLASS_NAME = 'ModelBase'
+
+
+class _SQLAlchemyModelMeta(DeclarativeMeta):
     def __init__(cls, name, bases_classes, attributes):
         DeclarativeMeta.__init__(cls, name, bases_classes, attributes)
 
@@ -60,6 +58,7 @@ class SQLAlchemyModelMeta(DeclarativeMeta):
             cls.relationships = set()
             cls.columns = set(cls.__table__.c)
             cls.tablename = str(cls.__table__.name)
+            cls.todict_schema = {}
             base_class.all_models.add(cls)
 
             cls._build_backrefs_for_all_models(base_class.all_models)
@@ -113,7 +112,7 @@ class SQLAlchemyModelMeta(DeclarativeMeta):
         return relationship.prop.argument
 
 
-class SQLAlchemyModel(object):
+class _SQLAlchemyModel(object):
     def get_id(self):
         return getattr(self, type(self).id_name)
 
@@ -139,21 +138,46 @@ class SQLAlchemyModel(object):
             cls.get_model_id() == self.get_id()).all())
         return result
 
-    def todict(self):
+    def todict(self, schema=None):
         dict_inst = dict()
-        
-        for col in type(self).columns:
-            col_name = str(col.name)
-            dict_inst[col_name] = getattr(self, col_name)
+        if schema is None:
+            schema = type(self).todict_schema
 
-        for rel in type(self).relationships:
-            attr = getattr(self, rel.prop.key)
-            if rel.prop.uselist is True:
-                relationships = [rel.todict() for rel in attr]
-            elif attr is not None:
-                relationships = attr.todict()
-
-            if attr is not None:
-                dict_inst[rel.key] = relationships
+        self._todict_columns(dict_inst, schema)
+        self._todict_relationships(dict_inst, schema)
 
         return dict_inst
+
+    def _todict_columns(self, dict_inst, schema):
+        for col in type(self).columns:
+            col_name = str(col.name)
+            if self._attribute_in_schema(col_name, schema):
+                dict_inst[col_name] = getattr(self, col_name)
+
+    def _attribute_in_schema(self, attr_name, schema):
+        return (attr_name in schema and schema[attr_name]) or (not attr_name in schema)
+
+    def _todict_relationships(self, dict_inst, schema):
+        for rel in type(self).relationships:
+            rel_name = rel.key
+            if self._attribute_in_schema(rel_name, schema):
+                rel_schema = schema.get(rel_name)
+                rel_schema = rel_schema if isinstance(rel_schema, dict) else None
+                attr = getattr(self, rel.prop.key)
+                if rel.prop.uselist is True:
+                    relationships = [rel.todict(rel_schema) for rel in attr]
+                elif attr is not None:
+                    relationships = attr.todict(rel_schema)
+
+                if attr is not None:
+                    dict_inst[rel_name] = relationships
+
+
+def model_base_builder(
+        bind=None, metadata=None, mapper=None,
+        constructor=_declarative_constructor,
+        class_registry=None):
+    return declarative_base(
+        name=MODEL_BASE_CLASS_NAME, metaclass=_SQLAlchemyModelMeta,
+        cls=_SQLAlchemyModel, bind=bind, metadata=metadata,
+        mapper=mapper, constructor=constructor)
