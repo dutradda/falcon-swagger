@@ -26,9 +26,9 @@ from unittest import mock
 
 from myreco.base.session import Session
 from myreco.base.model import model_base_builder
+from myreco.exceptions import QueryError
 
 import pytest
-
 import sqlalchemy as sa
 
 
@@ -54,10 +54,6 @@ def session(engine, redis):
 
 @pytest.fixture
 def model1(engine, request, model_base):
-    def tear_down():
-        model_base.metadata = sa.schema.MetaData()
-    request.addfinalizer(tear_down)
-
     model_base.metadata.bind = engine
 
     class model_(model_base):
@@ -70,10 +66,6 @@ def model1(engine, request, model_base):
 
 @pytest.fixture
 def model2(engine, request, model_base):
-    def tear_down():
-        model_base.metadata = sa.schema.MetaData()
-    request.addfinalizer(tear_down)
-
     model_base.metadata.bind = engine
 
     class model_(model_base):
@@ -84,7 +76,7 @@ def model2(engine, request, model_base):
     return model_
 
 
-class TestSessionBaseCommitRedisSet(object):
+class TestSessionCommitRedisSet(object):
     def test_if_instance_is_seted_on_redis(self, session, model1, redis):
         session.add(model1(id=1))
         session.commit()
@@ -158,7 +150,7 @@ class TestSessionBaseCommitRedisSet(object):
             assert call_ in expected
 
 
-class TestSessionBaseCommitRedisDelete(object):
+class TestSessionCommitRedisDelete(object):
     def test_if_instance_is_deleted_from_redis(self, session, model1, redis):
         inst1 = model1(id=1)
         session.add(inst1)
@@ -234,7 +226,6 @@ class TestSessionBaseCommitRedisDelete(object):
             assert call[0][1] == '1' or call[0][1] == '2'
             assert call[0][2] == '1' or call[0][2] == '2'
 
-
     def test_if_two_commits_delete_redis_with_two_models_correctly(
             self, session, model1, model2, redis):
         inst1 = model1(id=1)
@@ -258,3 +249,52 @@ class TestSessionBaseCommitRedisDelete(object):
             assert call[1] == {}
             assert call[0][0] == 'test1' or call[0][0] == 'test2'
             assert call[0][1] == '1' or call[0][1] == '2'
+
+
+class TestSessionQueryGet(object):
+    def test_query_get_more_than_one_model_error(self, session, redis, model1):
+        with pytest.raises(QueryError):
+            session.query(model1, model1).get(1)
+
+    def test_if_query_get_calls_hmget_correctly(self, session, redis, model1):
+        session.query(model1).get(1)
+        assert redis.hmget.call_args_list == [mock.call('test1', ['1'])]
+
+    def test_if_query_get_calls_hmget_correctly_with_two_ids(self, session, redis, model1):
+        session.query(model1).get([1, 2])
+        assert redis.hmget.call_args_list == [mock.call('test1', ['1', '2'])]
+
+    def test_if_query_get_builds_redis_left_ids_correctly_with_result_found_on_redis_with_one_id(
+            self, session, redis, model1):
+        session.add(model1(id=1))
+        session.commit()
+        redis.hmget.return_value = [None]
+        assert session.query(model1).get(1) == [{'id': 1}]
+
+    def test_if_query_get_builds_redis_left_ids_correctly_with_no_result_found_on_redis_with_two_ids(
+            self, session, redis, model1):
+        session.add_all([model1(id=1), model1(id=2)])
+        session.commit()
+        redis.hmget.return_value = [None, None]
+        assert session.query(model1).get([1, 2]) == [{'id': 1}, {'id': 2}]
+
+    def test_if_query_get_builds_redis_left_ids_correctly_with_no_result_found_on_redis_with_three_ids(
+            self, session, redis, model1):
+        session.add_all([model1(id=1), model1(id=2), model1(id=3)])
+        session.commit()
+        redis.hmget.return_value = [None, None, None]
+        assert session.query(model1).get([1, 2, 3]) == [{'id': 1}, {'id': 2}, {'id': 3}]
+
+    def test_if_query_get_builds_redis_left_ids_correctly_with_no_result_found_on_redis_with_four_ids(
+            self, session, redis, model1):
+        session.add_all([model1(id=1), model1(id=2), model1(id=3), model1(id=4)])
+        session.commit()
+        redis.hmget.return_value = [None, None, None, None]
+        assert session.query(model1).get([1, 2, 3, 4]) == [{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}]
+        
+    def test_if_query_get_builds_redis_left_ids_correctly_with_one_not_found_on_redis(
+            self, session, redis, model1):
+        session.add(model1(id=1))
+        session.commit()
+        redis.hmget.return_value = [None, '{"id": 2}']
+        assert session.query(model1).get([1, 2]) == [{'id': 2}, {'id': 1}]

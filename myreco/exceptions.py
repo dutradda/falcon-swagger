@@ -25,5 +25,9 @@ class MyrecoError(Exception):
     pass
 
 
-class BaseClassError(MyrecoError):
+class ModelBaseError(MyrecoError):
 	pass
+
+
+class QueryError(MyrecoError):
+    pass

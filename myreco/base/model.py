@@ -27,8 +27,9 @@ from sqlalchemy.ext.declarative.base import _declarative_constructor
 from sqlalchemy.ext.declarative.clsregistry import _class_resolver
 from sqlalchemy.orm.properties import RelationshipProperty
 from sqlalchemy.orm.attributes import InstrumentedAttribute
+from sqlalchemy import or_
 
-from myreco.exceptions import BaseClassError
+from myreco.exceptions import ModelBaseError
 
 
 MODEL_BASE_CLASS_NAME = 'ModelBase'
@@ -50,7 +51,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
                     break
 
             if base_class is None:
-                raise BaseClassError(
+                raise ModelBaseError(
                     "'{}' class must inherit from '{}'".format(
                         name, MODEL_BASE_CLASS_NAME))
 
@@ -111,6 +112,108 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
         return relationship.prop.argument
 
+    def insert(cls, session, objs, commit=True):
+        objs = cls._to_list(objs)
+
+        for obj in ojbs:
+            cls._do_operations_in_relationships(session, obj)
+
+        objs = [cls(*obj) for obj in objs]
+
+        session.add_all(objs)
+
+        if commit:
+            session.commit()
+
+        return objs
+
+    def _to_list(cls, objs):
+        return objs if isinstance(objs, list) else [objs]
+
+    def update(cls, session, ids_objs_map, commit=True):
+        for id_, values in ids_objs_map.items():
+            cls._do_operations_in_relationships(session, values)
+
+            session.query(cls).filter(cls.get_model_id() == id_).update(values)
+
+        if commit:
+            session.commit()
+
+    def _do_operations_in_relationships(cls, session, values):
+        for attr_name in values.keys():
+            relationship = cls._get_relationship(attr_name)
+
+            if relationship is not None:
+                rel_model = cls.get_model_from_rel(relationship)
+                rels_values = values.pop(attr_name)
+                new_rels = []
+
+                if relationship.uselist is not True:
+                    rels_values = [rels_values]
+
+                cls._do_operations_in_relationships_values(
+                    session, rel_model, rels_values, new_rels, values)
+
+                if new_rels:
+                    values[attr_name] = new_rels if relationship.uselist is True else new_rels[0]
+
+    def _do_operations_in_relationships_values(
+            cls, session, rel_model,
+            rels_values, new_rels, values):
+        for rel_values in rels_values:
+            to_update = rel_values.pop('_update', None)
+            to_delete = rel_values.pop('_delete', None)
+            rel_id = rel_values.get(rel_model.id_name)
+
+            if to_update is not None and to_delete is not None:
+                raise ModelBaseError(
+                    "ambiguous operations 'delete'"\
+                    " and 'update' for values {}".format(values))
+
+            if to_update is not None:
+                self._raise_id_not_found_error(rel_id, 'update', values)
+                rel_id = rel_values.pop(rel_model.id_name)
+                rel_model.update(session, {rel_id: rel_values}, commit=False)
+
+            elif to_delete is not None:
+                self._raise_id_not_found_error(rel_id, 'delete', values)
+                rel_model.delete(session, rel_id, commit=False)
+
+            else:
+                objs = rel_model.insert(session, rel_values, commit=False)
+                new_rels.extend(objs)
+
+    def _raise_id_not_found_error(cls, rel_id, type_, values):
+        if rel_id is None:
+            rel_error_message = "can't execute '{}' without '{}' for values {}"
+            raise ModelBaseError(rel_error_message.format(type_, cls.id_name, values))
+
+    def delete(cls, ids, commit=True):
+        ids = cls._to_list(ids)
+        for id_ in ids:
+            session.query(cls).filter(cls.get_model_id() == id_).delete()
+
+        if commit:
+            session.commit()
+
+    def get(cls, session, ids=None, limit=None, offset=None):
+        if (ids is not None) and (limit is not None or offset is not None):
+            raise ModelBaseError(
+                "'get' method can't be called with 'ids' and with 'offset' or 'limit'")
+
+        if ids is None:
+            query = session.query(cls)
+
+            if limit is not None:
+                query = query.limit(limit)
+
+            if offset is not None:
+                query = query.offset(limit)
+
+            return query.all(todict=True)
+
+        return session.query(cls).get(ids)
+
 
 class _SQLAlchemyModel(object):
     def get_id(self):
@@ -135,7 +238,8 @@ class _SQLAlchemyModel(object):
         rel_model = cls.get_model_from_rel(relationship, parent=parent)
 
         result = set(session.query(rel_model).join(relationship).filter(
-            cls.get_model_id() == self.get_id()).all())
+            cls.get_model_id() == self.get_id()).all(todict=False))
+            # cls.get_model_id() == self.get_id()).all())
         return result
 
     def todict(self, schema=None):
