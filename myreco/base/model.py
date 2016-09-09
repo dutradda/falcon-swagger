@@ -114,112 +114,173 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
     def insert(cls, session, objs, commit=True, todict=True):
         objs = cls._to_list(objs)
+        new_insts = set()
 
         for obj in objs:
-            cls._do_operations_in_relationships(session, obj)
+            instance = cls()
+            cls._update_instance(session, instance, obj)
+            new_insts.add(instance)
 
-        objs = [cls(**obj) for obj in objs]
-
-        session.add_all(objs)
+        session.add_all(new_insts)
 
         if commit:
             session.commit()
 
         if todict:
-            objs = [o.todict() for o in objs]
+            new_insts = [inst.todict() for inst in new_insts]
 
-        return objs
+        return list(new_insts)
 
     def _to_list(cls, objs):
         return objs if isinstance(objs, list) else [objs]
 
-    def _do_operations_in_relationships(cls, session, values):
+    def _update_instance(cls, session, instance, values):
         for attr_name in set(values.keys()):
             relationship = cls._get_relationship(attr_name)
 
             if relationship is not None:
                 rel_model = cls.get_model_from_rel(relationship)
+                insts_to_update = dict()
+                insts_to_delete = dict()
+                insts_to_remove = dict()
                 rels_values = values.pop(attr_name)
-                new_rels = []
-                alreadly_rels_ids = set()
 
                 if relationship.prop.uselist is not True:
                     rels_values = [rels_values]
 
-                cls._do_operations_in_relationships_values(
-                    session, values, rel_model, rels_values, new_rels, alreadly_rels_ids)
+                rel_insts = cls._build_relationship_instances(
+                    session, rel_model, attr_name, rels_values, instance)
 
-                if new_rels:
-                    values[attr_name] = \
-                        new_rels if relationship.prop.uselist is True else new_rels[0]
+                for rel_values in rels_values:
+                    to_update = rel_values.pop('_update', None)
+                    to_delete = rel_values.pop('_delete', None)
+                    to_remove = rel_values.pop('_remove', None)
+                    rel_id = rel_values.get(rel_model.id_name)
+                    op_count = [op for op in (to_update, to_delete, to_remove) if op is not None]
 
-                if alreadly_rels_ids:
-                    alreadly_rels = cls._get_alreadly_insts(session, rel_model, alreadly_rels_ids)
-                    if new_rels:
-                        values[attr_name].extend(alreadly_rels)
-                    elif relationship.prop.uselist is True:
-                        values[attr_name] = alreadly_rels
+                    if len(op_count) > 1:
+                        raise ModelBaseError(
+                            "ambiguous operations 'update'"\
+                            ", 'delete' or 'remove' for values {}".format(values))
+
+                    if to_update:
+                        cls._exec_update_on_instance(
+                            session, rel_model, attr_name, relationship, rel_id,
+                            rel_values, rel_insts, instance, values)
+
+                    elif to_delete:
+                        cls._raise_id_not_found_error(rel_id, 'delete', values)
+                        rel_model.delete(session, rel_id, commit=False)
+                        insts_to_delete[rel_id] = rel_values
+
+                    elif to_remove:
+                        cls._exec_remove_on_instance(
+                            rel_model, attr_name, relationship, rel_id, rel_insts, values)
                     else:
-                        values[attr_name] = alreadly_rels[0]
+                        cls._exec_insert_on_instance(
+                            session, rel_model, attr_name, relationship, rel_values, values)
 
-    def _get_alreadly_insts(cls, session, rel_model, alreadly_rels_ids):
-        return session.query(rel_model).get(list(alreadly_rels_ids), todict=False)
+        instance.update_(**values)
 
-    def _do_operations_in_relationships_values(
-            cls, session, values, rel_model,
-            rels_values, new_rels, alreadly_rels_ids):
-        for rel_values in rels_values:
-            to_update = rel_values.pop('_update', None)
-            to_delete = rel_values.pop('_delete', None)
-            rel_id = rel_values.get(rel_model.id_name)
+    def _build_relationship_instances(cls, session, rel_model, attr_name, rels_values, instance):
+        if not instance in session.identity_map.values():
+            ids_to_get = cls._get_ids_from_rels_values(rel_model, rels_values)
+            rel_insts = rel_model.get(session, ids_to_get, todict=False)
+        else:
+            rel_insts = getattr(instance, attr_name)
+            if not rel_insts:
+                ids_to_get = cls._get_ids_from_rels_values(rel_model, rels_values)
+                rel_insts = rel_model.get(session, ids_to_get, todict=False)
 
-            if to_update is not None and to_delete is not None:
-                raise ModelBaseError(
-                    "ambiguous operations 'delete'"\
-                    " and 'update' for values {}".format(values))
+        return rel_insts
 
-            if to_update is not None:
-                cls._raise_id_not_found_error(rel_id, 'update', values)
-                rel_id = rel_values.pop(rel_model.id_name)
-                rel_model.update(session, {rel_id: rel_values}, commit=False)
-                alreadly_rels_ids.add(rel_id)
+    def _get_ids_from_rels_values(cls, rel_model, rels_values):
+        return [rel_value.get(rel_model.id_name) for rel_value in rels_values \
+            if rel_value.get(rel_model.id_name) is not None]
 
-            elif to_delete is not None:
-                cls._raise_id_not_found_error(rel_id, 'delete', values)
-                rel_model.delete(session, rel_id, commit=False)
+    def _exec_update_on_instance(
+            cls, session, rel_model, attr_name, relationship,
+            rel_id, rel_values, rel_insts, instance, values):
+        updated = False
 
-            else:
-                objs = rel_model.insert(session, rel_values, commit=False, todict=False)
-                new_rels.extend(objs)
+        if relationship.prop.uselist is True:
+            cls._raise_id_not_found_error(rel_id, 'update', values)
+            for rel_inst in rel_insts:
+                if rel_inst.get_id() == rel_id:
+                    rel_model._update_instance(session, rel_inst, rel_values)
+                    setattr(instance, attr_name, rel_insts)
+                    updated = True
+                    break
 
-    def update(cls, session, ids_objs_map, commit=True):
-        for id_, values in ids_objs_map.items():
-            cls._do_operations_in_relationships(session, values)
-            orm_update = [True for key in values.keys() if cls._get_relationship(key)]
+        else:
+            if rel_insts:
+                rel_model._update_instance(session, rel_insts[0], rel_values)
+                setattr(instance, attr_name, rel_insts[0])
+                updated = True
 
-            if orm_update:
-                cls._do_orm_update(session, ids_objs_map)
-            else:
-                session.query(cls).filter(cls.get_model_id() == id_).update(values)
-
-        if commit:
-            session.commit()
-
-        return set(ids_objs_map.keys())
-
-    def _do_orm_update(cls, session, ids_objs_map):
-        insts = cls._get_alreadly_insts(session, cls, ids_objs_map.keys())
-        id_insts_map = {inst.get_id(): inst for inst in insts}
-
-        for id_, inst in id_insts_map.items():
-            inst.update_(**ids_objs_map[id_])
+        if not updated:
+            raise ModelBaseError(
+                "can't update model '{}' with column '{}' with value"\
+                " '{}' for update with values {}".format(
+                    rel_model.tablename, rel_model.id_name, rel_id, values
+                )
+            )
 
     def _raise_id_not_found_error(cls, rel_id, type_, values):
         if rel_id is None:
             rel_error_message = "can't execute '{}' without '{}' for values {}"
             raise ModelBaseError(rel_error_message.format(type_, cls.id_name, values))
 
-    def delete(cls, ids, commit=True):
+    def _exec_remove_on_instance(
+            cls, rel_model, attr_name, relationship,
+            rel_id, rel_insts, values):
+        rel_to_remove = None
+        if relationship.prop.uselist is True:
+            cls._raise_id_not_found_error(rel_id, 'remove', values)
+            for rel_inst in rel_insts:
+                if rel_inst.get_id() == rel_id:
+                    rel_to_remove = rel_inst
+                    break
+
+            if rel_to_remove is not None:
+                rel_insts.remove(rel_to_remove)
+
+            else:
+                raise ModelBaseError(
+                    "can't update model '{}' with column '{}' with value"\
+                    " '{}' for update with values {}".format(
+                        rel_model.tablename, rel_model.id_name, rel_id, values
+                    )
+                )
+
+        else:
+            setattr(instance, attr_name, None)
+
+    def _exec_insert_on_instance(
+            cls, session, rel_model, attr_name,
+            relationship, rel_values, values):
+        inserted_objs = rel_model.insert(
+                session, rel_values, commit=False, todict=False)
+        if relationship.prop.uselist is not True:
+            values[attr_name] = inserted_objs[0]
+        else:
+            rels_ = values.get(attr_name, [])
+            rels_.extend(inserted_objs)
+            values[attr_name] = rels_
+
+    def update(cls, session, ids_objs_map, commit=True):
+        insts = cls.get(session, list(ids_objs_map.keys()), todict=False)
+        id_insts_map = {inst.get_id(): inst for inst in insts}
+
+        for id_, inst in id_insts_map.items():
+            cls._update_instance(session, inst, ids_objs_map[id_])
+
+        if commit:
+            session.commit()
+
+        return set(ids_objs_map.keys())
+
+    def delete(cls, session, ids, commit=True):
         ids = cls._to_list(ids)
         for id_ in ids:
             session.query(cls).filter(cls.get_model_id() == id_).delete()
@@ -229,7 +290,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
         return set(ids)
 
-    def get(cls, session, ids=None, limit=None, offset=None):
+    def get(cls, session, ids=None, limit=None, offset=None, todict=True):
         if (ids is not None) and (limit is not None or offset is not None):
             raise ModelBaseError(
                 "'get' method can't be called with 'ids' and with 'offset' or 'limit'")
@@ -243,9 +304,9 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
             if offset is not None:
                 query = query.offset(limit)
 
-            return query.all(todict=True)
+            return query.all(todict=todict)
 
-        return session.query(cls).get(ids)
+        return session.query(cls).get(ids, todict=todict)
 
 
 class _SQLAlchemyModel(object):

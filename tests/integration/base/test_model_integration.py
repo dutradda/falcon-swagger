@@ -24,9 +24,11 @@
 from myreco.base.model import model_base_builder
 from myreco.base.session import Session
 from unittest import mock
+from subprocess import call
 
 import pytest
 import sqlalchemy as sa
+import pymysql
 
 
 @pytest.fixture
@@ -38,6 +40,7 @@ def model_base():
 def model1(model_base):
     class model1(model_base):
         __tablename__ = 'model1'
+        __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
 
     return model1
@@ -48,7 +51,7 @@ def model1_nested(model_base):
     class model1(model_base):
         __tablename__ = 'model1'
         id = sa.Column(sa.Integer, primary_key=True)
-        test = sa.Column(sa.Integer)
+        test = sa.Column(sa.String(100))
 
     return model1
 
@@ -57,6 +60,7 @@ def model1_nested(model_base):
 def model2(model_base):
     class model2(model_base):
         __tablename__ = 'model2'
+        __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
         model1_id = sa.Column(sa.ForeignKey('model1.id'))
         model1 = sa.orm.relationship('model1')
@@ -68,9 +72,10 @@ def model2(model_base):
 def model3(model_base):
     class model3(model_base):
         __tablename__ = 'model3'
+        __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
-        model1_id = sa.Column(sa.ForeignKey('model1.id'))
-        model2_id = sa.Column(sa.ForeignKey('model2.id'))
+        model1_id = sa.Column(sa.ForeignKey('model1.id', ondelete='CASCADE'))
+        model2_id = sa.Column(sa.ForeignKey('model2.id', ondelete='CASCADE'))
         model1 = sa.orm.relationship('model1')
         model2 = sa.orm.relationship('model2')
 
@@ -81,12 +86,14 @@ def model3(model_base):
 def model2_mtm(model_base):
     mtm_table = sa.Table(
         'mtm', model_base.metadata,
-        sa.Column('model1_id', sa.Integer, sa.ForeignKey('model1.id')),
-        sa.Column('model2_id', sa.Integer, sa.ForeignKey('model2.id'))
+        sa.Column('model1_id', sa.Integer, sa.ForeignKey('model1.id', ondelete='CASCADE')),
+        sa.Column('model2_id', sa.Integer, sa.ForeignKey('model2.id', ondelete='CASCADE')),
+        mysql_engine='memory'
     )
 
     class model2(model_base):
         __tablename__ = 'model2'
+        __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
         model1 = sa.orm.relationship(
             'model1', secondary='mtm', uselist=True)
@@ -100,9 +107,10 @@ def model3_mtm(model_base, model1, model2_mtm):
 
     class model3(model_base):
         __tablename__ = 'model3'
+        __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
-        model1_id = sa.Column(sa.ForeignKey('model1.id'))
-        model2_id = sa.Column(sa.ForeignKey('model2.id'))
+        model1_id = sa.Column(sa.ForeignKey('model1.id', ondelete='CASCADE'))
+        model2_id = sa.Column(sa.ForeignKey('model2.id', ondelete='CASCADE'))
         model1 = sa.orm.relationship(model1_)
         model2 = sa.orm.relationship(model2_mtm)
 
@@ -115,9 +123,10 @@ def model2_primary_join(model_base, model1):
 
     class model2(model_base):
         __tablename__ = 'model2'
+        __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
         id2 = sa.Column(sa.Integer)
-        model1_id = sa.Column(sa.ForeignKey('model1.id'))
+        model1_id = sa.Column(sa.ForeignKey('model1.id', ondelete='CASCADE'))
         model1 = sa.orm.relationship(
             model1_,
             primaryjoin='and_(model2.model1_id==model1.id, model2.id2==model1.id)')
@@ -129,6 +138,7 @@ def model2_primary_join(model_base, model1):
 def model1_mto(model_base):
     class model1(model_base):
         __tablename__ = 'model1'
+        __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
 
         model2 = sa.orm.relationship('model2', uselist=True)
@@ -140,8 +150,9 @@ def model1_mto(model_base):
 def model2_mto(model_base):
     class model2(model_base):
         __tablename__ = 'model2'
+        __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
-        model1_id = sa.Column(sa.ForeignKey('model1.id'))
+        model1_id = sa.Column(sa.ForeignKey('model1.id', ondelete='CASCADE'))
 
     return model2
 
@@ -150,19 +161,34 @@ def model2_mto(model_base):
 def model2_mto_nested(model_base):
     class model2(model_base):
         __tablename__ = 'model2'
+        __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
-        model1_id = sa.Column(sa.ForeignKey('model1.id'))
-        test = sa.Column(sa.Integer)
+        model1_id = sa.Column(sa.ForeignKey('model1.id', ondelete='CASCADE'))
+        test = sa.Column(sa.String(100))
 
     return model2
 
 
 @pytest.fixture
-def session(model_base):
-    engine = sa.create_engine('sqlite://')
+def session(model_base, request):
+    conn = pymysql.connect(user='root', password='root')
+    with conn.cursor() as cursor:
+        cursor.execute('drop database myreco_test;')
+        cursor.execute('create database myreco_test;')
+    conn.commit()
+    conn.close()
+
+    engine = sa.create_engine('mysql+pymysql://root:root@localhost/myreco_test')
     model_base.metadata.bind = engine
     model_base.metadata.create_all()
-    return Session(bind=engine, redis_bind=mock.MagicMock())
+
+    session = Session(bind=engine, redis_bind=mock.MagicMock())
+
+    def tear_down():
+        session.close()
+
+    request.addfinalizer(tear_down)
+    return session
 
 
 class TestModelBaseTodict(object):
@@ -323,7 +349,7 @@ class TestModelBaseInsert(object):
 
     def test_insert_with_two_objects(self, model1, session):
         objs = model1.insert(session, [{'id': 1}, {'id': 2}])
-        assert objs == [{'id': 1}, {'id': 2}]
+        assert objs == [{'id': 1}, {'id': 2}] or objs == [{'id': 2}, {'id': 1}]
 
     def test_insert_with_two_nested_objects(self, model1, model2, session):
         objs = model2.insert(session, {'id': 1, 'model1': {'id': 1}})
@@ -504,6 +530,97 @@ class TestModelBaseInsert(object):
         }
         assert objs == [expected]
 
+    def test_insert_with_mtm_update_and_delete(self, model1, model2_mtm, model3, session):
+        m1 = {'id': 1}
+        m2 = {'id': 1, 'model1': [m1]}
+        model2_mtm.insert(session, m2)
+        m3_insert = {
+            'id': 1,
+            'model2': {
+                'id': 1,
+                '_update': True,
+                'model1': [{
+                    'id': 1,
+                    '_delete': True
+                }]
+            }
+        }
+        objs = model3.insert(session, m3_insert)
+        assert session.query(model1).all() == []
+
+        expected = {
+            'id': 1,
+            'model1_id': None,
+            'model1': None,
+            'model2_id': 1,
+            'model2': {
+                'id': 1,
+                'model1': []
+            }
+        }
+        assert objs == [expected]
+
+    def test_insert_with_mtm_update_and_remove(self, model1, model2_mtm, model3, session):
+        m1 = {'id': 1}
+        m2 = {'id': 1, 'model1': [m1]}
+        model2_mtm.insert(session, m2)
+        m3_insert = {
+            'id': 1,
+            'model2': {
+                'id': 1,
+                '_update': True,
+                'model1': [{
+                    'id': 1,
+                    '_remove': True
+                }]
+            }
+        }
+        objs = model3.insert(session, m3_insert)
+        assert session.query(model1).one().todict() == {'id': 1}
+
+        expected = {
+            'id': 1,
+            'model1_id': None,
+            'model1': None,
+            'model2_id': 1,
+            'model2': {
+                'id': 1,
+                'model1': []
+            }
+        }
+        assert objs == [expected]
+
+    def test_insert_with_mto_update_and_remove(
+            self, model1_mto, model2_mto, model3, session):
+        m2 = {'id': 1}
+        m1 = {'id': 1, 'model2': [m2]}
+        model1_mto.insert(session, m1)
+        m3_insert = {
+            'id': 1,
+            'model1': {
+                'id': 1,
+                '_update': True,
+                'model2': [{
+                    'id': 1,
+                    '_remove': True
+                }]
+            }
+        }
+        objs = model3.insert(session, m3_insert)
+        assert session.query(model2_mto).one().todict() == {'id': 1, 'model1_id': None}
+
+        expected = {
+            'id': 1,
+            'model1_id': 1,
+            'model2_id': None,
+            'model1': {
+                'id': 1,
+                'model2': []
+            },
+            'model2': None
+        }
+        assert objs == [expected]
+
 
 class TestModelBaseUpdate(object):
     def test_update_with_one_object(self, model1_nested, session):
@@ -641,8 +758,8 @@ class TestModelBaseUpdate(object):
             'model2': {
                 'id': 1,
                 'model1': [
-                    {'id': 1},
-                    {'id': 2}
+                    {'id': 2},
+                    {'id': 1}
                 ]
             }
         }
