@@ -44,30 +44,35 @@ def model1(model_base):
 
 
 @pytest.fixture
-def model2(model_base, model1):
-    model1_ = model1
+def model1_nested(model_base):
+    class model1(model_base):
+        __tablename__ = 'model1'
+        id = sa.Column(sa.Integer, primary_key=True)
+        test = sa.Column(sa.Integer)
 
+    return model1
+
+
+@pytest.fixture
+def model2(model_base):
     class model2(model_base):
         __tablename__ = 'model2'
         id = sa.Column(sa.Integer, primary_key=True)
         model1_id = sa.Column(sa.ForeignKey('model1.id'))
-        model1 = sa.orm.relationship(model1_)
+        model1 = sa.orm.relationship('model1')
 
     return model2
 
 
 @pytest.fixture
-def model3(model_base, model1, model2):
-    model1_ = model1
-    model2_ = model2
-
+def model3(model_base):
     class model3(model_base):
         __tablename__ = 'model3'
         id = sa.Column(sa.Integer, primary_key=True)
         model1_id = sa.Column(sa.ForeignKey('model1.id'))
         model2_id = sa.Column(sa.ForeignKey('model2.id'))
-        model1 = sa.orm.relationship(model1_)
-        model2 = sa.orm.relationship(model2_)
+        model1 = sa.orm.relationship('model1')
+        model2 = sa.orm.relationship('model2')
 
     return model3
 
@@ -142,11 +147,53 @@ def model2_mto(model_base):
 
 
 @pytest.fixture
+def model2_mto_nested(model_base):
+    class model2(model_base):
+        __tablename__ = 'model2'
+        id = sa.Column(sa.Integer, primary_key=True)
+        model1_id = sa.Column(sa.ForeignKey('model1.id'))
+        test = sa.Column(sa.Integer)
+
+    return model2
+
+
+@pytest.fixture
 def session(model_base):
     engine = sa.create_engine('sqlite://')
     model_base.metadata.bind = engine
     model_base.metadata.create_all()
     return Session(bind=engine, redis_bind=mock.MagicMock())
+
+
+class TestModelBaseTodict(object):
+    def test_todict_after_get_from_database(self, model1, model2, session):
+        session.add(model2(id=1, model1=model1(id=1)))
+        session.commit()
+        expected = {
+            'id': 1,
+            'model1_id': 1,
+            'model1': {'id': 1}
+        }
+        session.query(model2).filter_by(id=1).one().todict() == expected
+
+    def test_todict_after_get_from_database_with_mtm(self, model1, model2_mtm, session):
+        session.add(model2_mtm(id=1, model1=[model1(id=1)]))
+        session.commit()
+        expected = {
+            'id': 1,
+            'model1': [{'id': 1}]
+        }
+        session.query(model2_mtm).filter_by(id=1).one().todict() == expected
+
+    def test_todict_after_get_from_database_with_mtm_with_two_relations(
+            self, model1, model2_mtm, session):
+        session.add(model2_mtm(id=1, model1=[model1(id=1), model1(id=2)]))
+        session.commit()
+        expected = {
+            'id': 1,
+            'model1': [{'id': 1}, {'id': 2}]
+        }
+        session.query(model2_mtm).filter_by(id=1).one().todict() == expected
 
 
 class TestModelBaseGetRelated(object):
@@ -263,3 +310,196 @@ class TestModelBaseGetRelated(object):
         assert m11.model2 == [m21, m22]
         assert m11.get_related(session) == {m21, m22}
         assert m21.get_related(session) == {m11}
+
+
+class TestModelBaseInsert(object):
+    def test_insert_with_one_object(self, model1, session):
+        objs = model1.insert(session, {'id': 1})
+        assert objs == [{'id': 1}]
+
+    def test_insert_without_todict(self, model1, session):
+        objs = model1.insert(session, {'id': 1}, todict=False)
+        assert [o.todict() for o in objs] == [{'id': 1}]
+
+    def test_insert_with_two_objects(self, model1, session):
+        objs = model1.insert(session, [{'id': 1}, {'id': 2}])
+        assert objs == [{'id': 1}, {'id': 2}]
+
+    def test_insert_with_two_nested_objects(self, model1, model2, session):
+        objs = model2.insert(session, {'id': 1, 'model1': {'id': 1}})
+        assert objs == [{'id': 1, 'model1_id': 1, 'model1': {'id': 1}}]
+
+    def test_insert_with_three_nested_objects(self, model1, model2, model3, session):
+        m1 = {'id': 1}
+        m2 = {'id': 1, 'model1': m1}
+        objs = model3.insert(session, {'id': 1, 'model2': m2})
+
+        expected = {
+            'id': 1,
+            'model1_id': None,
+            'model1': None,
+            'model2_id': 1,
+            'model2': {
+                'id': 1,
+                'model1_id': 1,
+                'model1': {
+                    'id': 1
+                }
+            }
+        }
+        assert objs == [expected]
+
+    def test_insert_with_nested_update(self, model1, model2, model3, session):
+        model1.insert(session, {'id': 1})
+        model2.insert(session, {'id': 1})
+
+        m3 = {
+            'id': 1,
+            'model2': {
+                'id': 1,
+                '_update': True,
+                'model1_id': 1
+            }
+        }
+        objs = model3.insert(session, m3)
+
+        expected = {
+            'id': 1,
+            'model1_id': None,
+            'model1': None,
+            'model2_id': 1,
+            'model2': {
+                'id': 1,
+                'model1_id': 1,
+                'model1': {
+                    'id': 1
+                }
+            }
+        }
+        assert objs == [expected]
+
+    def test_insert_with_two_nested_update(self, model1_nested, model2, model3, session):
+        model1_nested.insert(session, {'id': 1})
+        model2.insert(session, {'id': 1})
+
+        m3 = {
+            'id': 1,
+            'model2': {
+                'id': 1,
+                '_update': True,
+                'model1': {
+                    'id': 1,
+                    '_update': True,
+                    'test': 'test_updated'
+                }
+            }
+        }
+        objs = model3.insert(session, m3)
+
+        expected = {
+            'id': 1,
+            'model1_id': None,
+            'model1': None,
+            'model2_id': 1,
+            'model2': {
+                'id': 1,
+                'model1_id': 1,
+                'model1': {
+                    'id': 1,
+                    'test': 'test_updated'
+                }
+            }
+        }
+        assert objs == [expected]
+
+    def test_insert_with_two_nested_update_with_mtm(
+            self, model1_nested, model2_mtm, model3, session):
+        model1_nested.insert(session, [{'id': 1}, {'id': 2}])
+        model2_mtm.insert(session, {'id': 1})
+
+        m3 = {
+            'id': 1,
+            'model2': {
+                'id': 1,
+                '_update': True,
+                'model1': [
+                    {
+                        'id': 1,
+                        '_update': True,
+                        'test': 'test_updated'
+                    }, {
+                        'id': 2,
+                        '_update': True,
+                        'test': 'test_updated2'
+                    }
+                ]
+            }
+        }
+        objs = model3.insert(session, m3)
+
+        expected = {
+            'id': 1,
+            'model1_id': None,
+            'model1': None,
+            'model2_id': 1,
+            'model2': {
+                'id': 1,
+                'model1': [
+                    {
+                        'id': 1,
+                        'test': 'test_updated'
+                    },{
+                        'id': 2,
+                        'test': 'test_updated2'
+                    }
+                ]
+            }
+        }
+        assert objs == [expected]
+
+    def test_insert_with_two_nested_update_with_mto(
+            self, model1_mto, model2_mto_nested, model3, session):
+        model1_mto.insert(session, {'id': 1})
+        model2_mto_nested.insert(session, [{'id': 1}, {'id': 2}])
+
+        m3 = {
+            'id': 1,
+            'model1': {
+                'id': 1,
+                '_update': True,
+                'model2': [
+                    {
+                        'id': 1,
+                        '_update': True,
+                        'test': 'test_updated'
+                    }, {
+                        'id': 2,
+                        '_update': True,
+                        'test': 'test_updated2'
+                    }
+                ]
+            }
+        }
+        objs = model3.insert(session, m3)
+
+        expected = {
+            'id': 1,
+            'model2_id': None,
+            'model2': None,
+            'model1_id': 1,
+            'model1': {
+                'id': 1,
+                'model2': [
+                    {
+                        'id': 1,
+                        'model1_id': 1,
+                        'test': 'test_updated'
+                    },{
+                        'id': 2,
+                        'model1_id': 1,
+                        'test': 'test_updated2'
+                    }
+                ]
+            }
+        }
+        assert objs == [expected]

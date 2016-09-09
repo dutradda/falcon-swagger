@@ -112,54 +112,62 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
         return relationship.prop.argument
 
-    def insert(cls, session, objs, commit=True):
+    def insert(cls, session, objs, commit=True, todict=True):
         objs = cls._to_list(objs)
 
-        for obj in ojbs:
+        for obj in objs:
             cls._do_operations_in_relationships(session, obj)
 
-        objs = [cls(*obj) for obj in objs]
+        objs = [cls(**obj) for obj in objs]
 
         session.add_all(objs)
 
         if commit:
             session.commit()
 
+        if todict:
+            objs = [o.todict() for o in objs]
+
         return objs
 
     def _to_list(cls, objs):
         return objs if isinstance(objs, list) else [objs]
 
-    def update(cls, session, ids_objs_map, commit=True):
-        for id_, values in ids_objs_map.items():
-            cls._do_operations_in_relationships(session, values)
-
-            session.query(cls).filter(cls.get_model_id() == id_).update(values)
-
-        if commit:
-            session.commit()
-
     def _do_operations_in_relationships(cls, session, values):
-        for attr_name in values.keys():
+        for attr_name in set(values.keys()):
             relationship = cls._get_relationship(attr_name)
 
             if relationship is not None:
                 rel_model = cls.get_model_from_rel(relationship)
                 rels_values = values.pop(attr_name)
                 new_rels = []
+                alreadly_rels_ids = set()
 
-                if relationship.uselist is not True:
+                if relationship.prop.uselist is not True:
                     rels_values = [rels_values]
 
                 cls._do_operations_in_relationships_values(
-                    session, rel_model, rels_values, new_rels, values)
+                    session, values, rel_model, rels_values, new_rels, alreadly_rels_ids)
 
                 if new_rels:
-                    values[attr_name] = new_rels if relationship.uselist is True else new_rels[0]
+                    values[attr_name] = \
+                        new_rels if relationship.prop.uselist is True else new_rels[0]
+
+                if alreadly_rels_ids:
+                    alreadly_rels = cls._get_alreadly_insts(session, rel_model, alreadly_rels_ids)
+                    if new_rels:
+                        values[attr_name].extend(alreadly_rels)
+                    elif relationship.prop.uselist is True:
+                        values[attr_name] = alreadly_rels
+                    else:
+                        values[attr_name] = alreadly_rels[0]
+
+    def _get_alreadly_insts(cls, session, rel_model, alreadly_rels_ids):
+        return session.query(rel_model).get(list(alreadly_rels_ids), todict=False)
 
     def _do_operations_in_relationships_values(
-            cls, session, rel_model,
-            rels_values, new_rels, values):
+            cls, session, values, rel_model,
+            rels_values, new_rels, alreadly_rels_ids):
         for rel_values in rels_values:
             to_update = rel_values.pop('_update', None)
             to_delete = rel_values.pop('_delete', None)
@@ -171,17 +179,40 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
                     " and 'update' for values {}".format(values))
 
             if to_update is not None:
-                self._raise_id_not_found_error(rel_id, 'update', values)
+                cls._raise_id_not_found_error(rel_id, 'update', values)
                 rel_id = rel_values.pop(rel_model.id_name)
                 rel_model.update(session, {rel_id: rel_values}, commit=False)
+                alreadly_rels_ids.add(rel_id)
 
             elif to_delete is not None:
-                self._raise_id_not_found_error(rel_id, 'delete', values)
+                cls._raise_id_not_found_error(rel_id, 'delete', values)
                 rel_model.delete(session, rel_id, commit=False)
 
             else:
-                objs = rel_model.insert(session, rel_values, commit=False)
+                objs = rel_model.insert(session, rel_values, commit=False, todict=False)
                 new_rels.extend(objs)
+
+    def update(cls, session, ids_objs_map, commit=True):
+        for id_, values in ids_objs_map.items():
+            cls._do_operations_in_relationships(session, values)
+            orm_update = [True for key in values.keys() if cls._get_relationship(key)]
+
+            if orm_update:
+                cls._do_orm_update(session, ids_objs_map)
+            else:
+                session.query(cls).filter(cls.get_model_id() == id_).update(values)
+
+        if commit:
+            session.commit()
+
+        return set(ids_objs_map.keys())
+
+    def _do_orm_update(cls, session, ids_objs_map):
+        insts = cls._get_alreadly_insts(session, cls, ids_objs_map.keys())
+        id_insts_map = {inst.get_id(): inst for inst in insts}
+
+        for id_, inst in id_insts_map.items():
+            inst.update_(**ids_objs_map[id_])
 
     def _raise_id_not_found_error(cls, rel_id, type_, values):
         if rel_id is None:
@@ -195,6 +226,8 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
         if commit:
             session.commit()
+
+        return set(ids)
 
     def get(cls, session, ids=None, limit=None, offset=None):
         if (ids is not None) and (limit is not None or offset is not None):
@@ -239,7 +272,6 @@ class _SQLAlchemyModel(object):
 
         result = set(session.query(rel_model).join(relationship).filter(
             cls.get_model_id() == self.get_id()).all(todict=False))
-            # cls.get_model_id() == self.get_id()).all())
         return result
 
     def todict(self, schema=None):
@@ -275,6 +307,9 @@ class _SQLAlchemyModel(object):
                     relationships = attr.todict(rel_schema)
 
                 dict_inst[rel_name] = relationships
+
+    def update_(self, **kwargs):
+        type(self).__init__(self, **kwargs)
 
 
 def model_base_builder(

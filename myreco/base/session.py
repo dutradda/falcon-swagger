@@ -33,7 +33,7 @@ import json
 
 
 class _Query(Query):
-    def get(self, ids):
+    def get(self, ids, todict=True):
         ids = ids if isinstance(ids, list) else [ids]
 
         len_entities = len(self._entities)
@@ -44,12 +44,15 @@ class _Query(Query):
 
         model = self._entities[0].entity_zero.class_
 
-        if self.session.redis_bind:
-            model_redis_key = self.session.build_model_redis_key(model)
-            ids_redis_keys = [str(id_) for id_ in ids]
-            objs = self.session.redis_bind.hmget(model_redis_key, ids_redis_keys)
-            ids = [id_ for id_, obj in zip(ids, objs) if obj is None]
-            objs = [json.loads(obj) for obj in objs if obj is not None]
+        if not todict or self.session.redis_bind is None:
+            filters_ids = self._build_filters_by_ids(model, ids)
+            return self.filter(filters_ids).all()
+
+        model_redis_key = self.session.build_model_redis_key(model)
+        ids_redis_keys = [str(id_) for id_ in ids]
+        objs = self.session.redis_bind.hmget(model_redis_key, ids_redis_keys)
+        ids = [id_ for id_, obj in zip(ids, objs) if obj is None]
+        objs = [json.loads(obj) for obj in objs if obj is not None]
 
         if ids:
             filters_ids = self._build_filters_by_ids(model, ids)
@@ -58,7 +61,6 @@ class _Query(Query):
         return objs
 
     def _build_filters_by_ids(self, model, ids, or_clause=None):
-        print(ids)
         if len(ids) == 0:
             return or_clause
 
@@ -174,11 +176,11 @@ Session = sessionmaker(class_=_SessionBase)
 
 @event.listens_for(Session, 'persistent_to_deleted')
 def deleted_from_database(session, instance):
-    if session.redis_bind is not None:
+    if session.redis_bind is not None and instance is not None:
         session.mark_for_hdel(instance)
 
 
 @event.listens_for(Session, 'pending_to_persistent')
 def added_to_database(session, instance):
-    if session.redis_bind is not None:
+    if session.redis_bind is not None and instance is not None:
         session.mark_for_hmset(instance)

@@ -57,6 +57,35 @@ def model2(model_base, model1):
 
 
 @pytest.fixture
+def model2_uselist(model_base, model1):
+    model1_ = model1
+
+    class model2(model_base):
+        __tablename__ = 'model2'
+        id = sa.Column(sa.Integer, primary_key=True)
+        model1_id = sa.Column(sa.ForeignKey('model1.id'))
+        model1 = sa.orm.relationship(model1_, uselist=True)
+
+    return model2
+
+
+@pytest.fixture
+def model2_mtm(model_base):
+    mtm_table = sa.Table(
+        'mtm', model_base.metadata,
+        sa.Column('model1_id', sa.Integer, sa.ForeignKey('model1.id')),
+        sa.Column('model2_id', sa.Integer, sa.ForeignKey('model2.id'))
+    )
+
+    class model2(model_base):
+        __tablename__ = 'model2'
+        id = sa.Column(sa.Integer, primary_key=True)
+        model1 = sa.orm.relationship('model1', secondary='mtm', uselist=True)
+
+    return model2
+
+
+@pytest.fixture
 def model3(model_base, model1, model2):
     model1_ = model1
     model2_ = model2
@@ -105,6 +134,12 @@ class TestModelBaseInit(object):
 
     def test_if_builds_relationships_correctly_with_one_model(self, model1, model2):
         assert model2.relationships == {model2.model1}
+
+    def test_if_builds_relationships_correctly_with_one_model_and_uselist(self, model1, model2_uselist):
+        assert model2_uselist.relationships == {model2_uselist.model1}
+
+    def test_if_builds_relationships_correctly_with_one_model_and_mtm(self, model1, model2_mtm):
+        assert model2_mtm.relationships == {model2_mtm.model1}
 
     def test_if_builds_relationships_correctly_with_two_models(self, model1, model2, model3):
         assert model3.relationships == {model3.model1, model3.model2}
