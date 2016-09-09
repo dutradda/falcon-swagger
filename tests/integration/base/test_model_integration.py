@@ -170,15 +170,19 @@ def model2_mto_nested(model_base):
 
 
 @pytest.fixture
-def session(model_base, request):
-    conn = pymysql.connect(user='root', password='root')
+def session(model_base, request, variables):
+    conn = pymysql.connect(
+        user=variables['database']['user'], password=variables['database']['password'])
+
     with conn.cursor() as cursor:
-        cursor.execute('drop database myreco_test;')
-        cursor.execute('create database myreco_test;')
+        cursor.execute('drop database {};'.format(variables['database']['database']))
+        cursor.execute('create database {};'.format(variables['database']['database']))
     conn.commit()
     conn.close()
 
-    engine = sa.create_engine('mysql+pymysql://root:root@localhost/myreco_test')
+    url = 'mysql+pymysql://{user}:{password}'\
+        '@{host}:{port}/{database}'.format(**variables['database'])
+    engine = sa.create_engine(url)
     model_base.metadata.bind = engine
     model_base.metadata.create_all()
 
