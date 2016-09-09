@@ -31,3 +31,7 @@ class ModelBaseError(MyrecoError):
 
 class QueryError(MyrecoError):
     pass
+
+
+class JSONError(MyrecoError):
+    pass
