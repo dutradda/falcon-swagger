@@ -31,6 +31,8 @@ from sqlalchemy import or_
 
 from myreco.exceptions import ModelBaseError
 
+import json
+
 
 MODEL_BASE_CLASS_NAME = 'ModelBase'
 
@@ -304,9 +306,56 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
             if offset is not None:
                 query = query.offset(limit)
 
-            return query.all(todict=todict)
+            return [each.todict() for each in query.all()] if todict else query.all()
 
-        return session.query(cls).get(ids, todict=todict)
+        return cls._get_many(session, ids, todict=todict)
+
+    def _get_many(cls, session, ids, todict=True):
+        ids = ids if isinstance(ids, list) else [ids]
+
+        if not todict or session.redis_bind is None:
+            filters_ids = cls._build_filters_by_ids(ids)
+            return session.query(cls).filter(filters_ids).all()
+
+        model_redis_key = session.build_model_redis_key(cls)
+        ids_redis_keys = [str(id_) for id_ in ids]
+        objs = session.redis_bind.hmget(model_redis_key, ids_redis_keys)
+        ids = [id_ for id_, obj in zip(ids, objs) if obj is None]
+        objs = [json.loads(obj) for obj in objs if obj is not None]
+
+        if ids:
+            filters_ids = cls._build_filters_by_ids(ids)
+            objs.extend([each.todict() for each in session.query(cls).filter(filters_ids).all()])
+
+        return objs
+
+    def _build_filters_by_ids(cls, ids, or_clause=None):
+        if len(ids) == 0:
+            return or_clause
+
+        if len(ids) == 1:
+            comparison = cls._get_obj_i_comparison(0, ids)
+            if or_clause is None:
+                return comparison
+            else:
+                return or_(or_clause, comparison)
+
+        if or_clause is None:
+            comparison1 = cls._get_obj_i_comparison(0, ids)
+            comparison2 = cls._get_obj_i_comparison(1, ids)
+            or_clause = or_(comparison1, comparison2)
+
+        last_i = 2
+        for i in range(2, len(ids)):
+            comparison = cls._get_obj_i_comparison(i, ids)
+            or_clause = or_(or_clause, comparison)
+            last_i = i
+
+        ids = ids[last_i+1:]
+        return cls._build_filters_by_ids(ids, or_clause)
+
+    def _get_obj_i_comparison(cls, i, ids):
+        return (cls.get_model_id() == ids[i])
 
 
 class _SQLAlchemyModel(object):
@@ -332,7 +381,7 @@ class _SQLAlchemyModel(object):
         rel_model = cls.get_model_from_rel(relationship, parent=parent)
 
         result = set(session.query(rel_model).join(relationship).filter(
-            cls.get_model_id() == self.get_id()).all(todict=False))
+            cls.get_model_id() == self.get_id()).all())
         return result
 
     def todict(self, schema=None):

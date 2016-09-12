@@ -170,7 +170,12 @@ def model2_mto_nested(model_base):
 
 
 @pytest.fixture
-def session(model_base, request, variables):
+def redis():
+    return mock.MagicMock()
+
+
+@pytest.fixture
+def session(model_base, request, variables, redis):
     conn = pymysql.connect(
         user=variables['database']['user'], password=variables['database']['password'])
 
@@ -186,7 +191,7 @@ def session(model_base, request, variables):
     model_base.metadata.bind = engine
     model_base.metadata.create_all()
 
-    session = Session(bind=engine, redis_bind=mock.MagicMock())
+    session = Session(bind=engine, redis_bind=redis)
 
     def tear_down():
         session.close()
@@ -800,3 +805,48 @@ class TestModelBaseUpdate(object):
             'model2': None
         }
         assert session.query(model3).one().todict() == expected
+
+
+class TestModelBaseGet(object):
+    def test_if_query_get_calls_hmget_correctly(self, session, redis, model1):
+        model1.get(session, 1)
+        assert redis.hmget.call_args_list == [mock.call('model1', ['1'])]
+
+    def test_if_query_get_calls_hmget_correctly_with_two_ids(self, session, redis, model1):
+        model1.get(session, [1, 2])
+        assert redis.hmget.call_args_list == [mock.call('model1', ['1', '2'])]
+
+    def test_if_query_get_builds_redis_left_ids_correctly_with_result_found_on_redis_with_one_id(
+            self, model1, session, redis):
+        session.add(model1(id=1))
+        session.commit()
+        redis.hmget.return_value = [None]
+        assert model1.get(session, 1) == [{'id': 1}]
+
+    def test_if_query_get_builds_redis_left_ids_correctly_with_no_result_found_on_redis_with_two_ids(
+            self, model1, session, redis):
+        session.add_all([model1(id=1), model1(id=2)])
+        session.commit()
+        redis.hmget.return_value = [None, None]
+        assert model1.get(session, [1, 2]) == [{'id': 1}, {'id': 2}]
+
+    def test_if_query_get_builds_redis_left_ids_correctly_with_no_result_found_on_redis_with_three_ids(
+            self, model1, session, redis):
+        session.add_all([model1(id=1), model1(id=2), model1(id=3)])
+        session.commit()
+        redis.hmget.return_value = [None, None, None]
+        assert model1.get(session, [1, 2, 3]) == [{'id': 1}, {'id': 2}, {'id': 3}]
+
+    def test_if_query_get_builds_redis_left_ids_correctly_with_no_result_found_on_redis_with_four_ids(
+            self, model1, session, redis):
+        session.add_all([model1(id=1), model1(id=2), model1(id=3), model1(id=4)])
+        session.commit()
+        redis.hmget.return_value = [None, None, None, None]
+        assert model1.get(session, [1, 2, 3, 4]) == [{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}]
+
+    def test_if_query_get_builds_redis_left_ids_correctly_with_one_not_found_on_redis(
+            self, model1, session, redis):
+        session.add(model1(id=1))
+        session.commit()
+        redis.hmget.return_value = [None, '{"id": 2}']
+        assert model1.get(session, [1, 2]) == [{'id': 2}, {'id': 1}]
