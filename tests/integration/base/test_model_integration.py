@@ -24,16 +24,9 @@
 from myreco.base.model import model_base_builder
 from myreco.base.session import Session
 from unittest import mock
-from subprocess import call
 
 import pytest
 import sqlalchemy as sa
-import pymysql
-
-
-@pytest.fixture
-def model_base():
-    return model_base_builder()
 
 
 @pytest.fixture
@@ -88,7 +81,7 @@ def model2_mtm(model_base):
         'mtm', model_base.metadata,
         sa.Column('model1_id', sa.Integer, sa.ForeignKey('model1.id', ondelete='CASCADE')),
         sa.Column('model2_id', sa.Integer, sa.ForeignKey('model2.id', ondelete='CASCADE')),
-        mysql_engine='memory'
+        mysql_engine='innodb'
     )
 
     class model2(model_base):
@@ -167,37 +160,6 @@ def model2_mto_nested(model_base):
         test = sa.Column(sa.String(100))
 
     return model2
-
-
-@pytest.fixture
-def redis():
-    return mock.MagicMock()
-
-
-@pytest.fixture
-def session(model_base, request, variables, redis):
-    conn = pymysql.connect(
-        user=variables['database']['user'], password=variables['database']['password'])
-
-    with conn.cursor() as cursor:
-        cursor.execute('drop database {};'.format(variables['database']['database']))
-        cursor.execute('create database {};'.format(variables['database']['database']))
-    conn.commit()
-    conn.close()
-
-    url = 'mysql+pymysql://{user}:{password}'\
-        '@{host}:{port}/{database}'.format(**variables['database'])
-    engine = sa.create_engine(url)
-    model_base.metadata.bind = engine
-    model_base.metadata.create_all()
-
-    session = Session(bind=engine, redis_bind=redis)
-
-    def tear_down():
-        session.close()
-
-    request.addfinalizer(tear_down)
-    return session
 
 
 class TestModelBaseTodict(object):
@@ -767,8 +729,8 @@ class TestModelBaseUpdate(object):
             'model2': {
                 'id': 1,
                 'model1': [
-                    {'id': 2},
-                    {'id': 1}
+                    {'id': 1},
+                    {'id': 2}
                 ]
             }
         }
