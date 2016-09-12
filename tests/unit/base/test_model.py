@@ -21,8 +21,9 @@
 # SOFTWARE.
 
 
-from myreco.base.model import model_base_builder
+from myreco.base.model import model_base_builder, _SQLAlchemyModelMeta
 from myreco.base.session import Session
+from myreco.exceptions import ModelBaseError
 from unittest import mock
 
 import pytest
@@ -158,6 +159,20 @@ class TestModelBaseInit(object):
     def test_if_builds_backrefs_correctly_with_two_models(self, model1, model2, model3):
         assert model1.backrefs == {model2.model1, model3.model1}
 
+    def test_builds_with_id_name(self, model_base):
+        class test(model_base):
+            __tablename__ = 'test'
+            id_name = 'id2'
+
+            id2 = sa.Column(sa.Integer, primary_key=True)
+
+    def test_raises_model_error_with_invalid_base_class(self):
+        class model(object):
+            id = sa.Column(sa.Integer, primary_key=True)
+
+        with pytest.raises(ModelBaseError):
+            sa.ext.declarative.declarative_base(metaclass=_SQLAlchemyModelMeta, cls=model)
+
 
 class TestModelBaseTodict(object):
     def test_todict_without_schema(self, model1, model2):
@@ -239,3 +254,17 @@ class TestModelBaseTodict(object):
                 'model1': {}
             }
         }
+
+
+class TestModelBaseNestedOperations(object):
+    def test_raises_model_error_with_update_and_delete(self, model1, model2):
+        with pytest.raises(ModelBaseError):
+            model2.insert(mock.MagicMock(), {'model1': {'_update': True, '_delete': True}})
+
+    def test_raises_model_error_with_update_and_remove(self, model1, model2):
+        with pytest.raises(ModelBaseError):
+            model2.insert(mock.MagicMock(), {'model1': {'_update': True, '_remove': True}})
+
+    def test_raises_model_error_with_remove_and_delete(self, model1, model2):
+        with pytest.raises(ModelBaseError):
+            model2.insert(mock.MagicMock(), {'model1': {'_delete': True, '_remove': True}})

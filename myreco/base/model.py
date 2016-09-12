@@ -280,7 +280,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
         if commit:
             session.commit()
 
-        return set(ids_objs_map.keys())
+        return list(id_insts_map.keys())
 
     def delete(cls, session, ids, commit=True):
         ids = cls._to_list(ids)
@@ -289,8 +289,6 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
         if commit:
             session.commit()
-
-        return set(ids)
 
     def get(cls, session, ids=None, limit=None, offset=None, todict=True):
         if (ids is not None) and (limit is not None or offset is not None):

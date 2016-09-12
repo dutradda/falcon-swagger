@@ -1,1 +1,4 @@
 SQLAlchemy==1.1.0b3
+Cython==0.24.1
+falcon==1.0.0
+jsonschema==2.5.1

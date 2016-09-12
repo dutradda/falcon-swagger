@@ -21,8 +21,8 @@
 # SOFTWARE.
 
 
-from jsonschema import ValidationError
 from myreco.exceptions import JSONError
+from myreco.base.session import Session
 import json
 
 
@@ -33,29 +33,28 @@ class FalconJsonSchemaMiddleware(object):
     def _process_resource(self, req, resource):
         method = req.method.upper()
         if method in resource.allowed_methods:
-            if req.body:
+            body = req.stream.read().decode()
+            if body:
                 try:
-                    req.body = json.loads(req.body)
+                    req.context['body'] = json.loads(body)
                 except ValueError as error:
+                    req.context['body'] = body
                     raise JSONError(*error.args)
+            else:
+                req.context['body'] = {}
 
-            validator = getattr(resource, 'on_{}_validator'.format(method), None)
+            validator = getattr(resource, 'on_{}_validator'.format(method.lower()), None)
 
             if validator is not None:
-                try:
-                    validator.validate(req.body)
-                except ValidationError as error:
-                    raise JSONError(*error.args)
+                validator.validate(req.context['body'])
 
     def process_response(self, req, resp, resource):
-        try:
+        if resp.body is not None or not isinstance(resp.body, str):
             resp.body = json.dumps(resp.body)
-        except ValueError as error:
-            raise JSONError(*error.args)
 
 
 class FalconSQLAlchemyRedisMiddleware(object):
-    def __int__(self, bind, redis_bind):
+    def __init__(self, bind, redis_bind=None):
         self._bind = bind
         self._redis_bind = redis_bind
 
@@ -64,5 +63,6 @@ class FalconSQLAlchemyRedisMiddleware(object):
         resource.session = session
 
     def process_response(self, req, resp, resource):
-        resource.session.close()
-        resource.session = None
+        if resource and resource.session:
+            resource.session.close()
+            resource.session = None

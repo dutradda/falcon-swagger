@@ -768,6 +768,16 @@ class TestModelBaseUpdate(object):
         }
         assert session.query(model3).one().todict() == expected
 
+    def test_with_missing_id(
+            self, model1, session):
+        session.add(model1(id=1))
+        session.commit()
+        assert model1.update(session, {1: {'id': 3}, 2: {'id': 1}}) == [1]
+
+    def test_with_missing_all_ids(
+            self, model1, session, redis):
+        assert model1.update(session, {1: {'id': 3}, 2: {'id': 1}}) == []
+
 
 class TestModelBaseGet(object):
     def test_if_query_get_calls_hmget_correctly(self, session, redis, model1):
@@ -812,3 +822,29 @@ class TestModelBaseGet(object):
         session.commit()
         redis.hmget.return_value = [None, '{"id": 2}']
         assert model1.get(session, [1, 2]) == [{'id': 2}, {'id': 1}]
+
+    def test_with_missing_id(
+            self, model1, session, redis):
+        session.add(model1(id=1))
+        session.commit()
+        redis.hmget.return_value = [None, None]
+        assert model1.get(session, [1, 2]) == [{'id': 1}]
+
+    def test_with_missing_all_ids(
+            self, model1, session, redis):
+        redis.hmget.return_value = [None, None]
+        assert model1.get(session, [1, 2]) == []
+
+
+class TestModelBaseDelete(object):
+    def test_delete(self, model1, session, redis):
+        model1.insert(session, {})
+        assert model1.get(session) == [{'id': 1}]
+
+        model1.delete(session, 1)
+        assert model1.get(session) == []
+
+    def test_delete_with_invalid_id(self, model1, session, redis):
+        model1.insert(session, {})
+        model1.delete(session , [2, 3])
+        assert model1.get(session) == [{'id': 1}]

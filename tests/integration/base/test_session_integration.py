@@ -76,6 +76,25 @@ def model2(engine, request, model_base):
     return model_
 
 
+class TestSessionCommitWithoutRedis(object):
+    def test_set_without_redis(self, session, model1, redis):
+        session.redis_bind = None
+        session.add(model1(id=1))
+        session.commit()
+
+        assert redis.hmset.call_args_list == []
+
+    def test_delete_without_redis(self, session, model1, redis):
+        session.redis_bind = None
+        m1 = model1(id=1)
+        session.add(m1)
+        session.commit()
+        session.delete(m1)
+        session.commit()
+
+        assert redis.hmdel.call_args_list == []
+
+
 class TestSessionCommitRedisSet(object):
     def test_if_instance_is_seted_on_redis(self, session, model1, redis):
         session.add(model1(id=1))

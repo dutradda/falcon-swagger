@@ -47,7 +47,11 @@ def session(model_base, request, variables, redis):
         user=variables['database']['user'], password=variables['database']['password'])
 
     with conn.cursor() as cursor:
-        cursor.execute('drop database {};'.format(variables['database']['database']))
+        try:
+            cursor.execute('drop database {};'.format(variables['database']['database']))
+        except:
+            pass
+
         cursor.execute('create database {};'.format(variables['database']['database']))
     conn.commit()
     conn.close()
