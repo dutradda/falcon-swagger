@@ -23,7 +23,7 @@
 
 from jsonschema import Draft4Validator
 from falcon.errors import HTTPMethodNotAllowed, HTTPNotFound
-from falcon import after as hook_after, before as hook_before, HTTP_CREATED, HTTP_NO_CONTENT
+from falcon import HTTP_CREATED, HTTP_NO_CONTENT
 from myreco.base.session import Session
 from myreco.exceptions import JSONError
 
@@ -60,7 +60,7 @@ class FalconJsonSchemaResource(object):
             self.on_put_validator = Draft4Validator(put_input_json_schema)
 
         if patch_input_json_schema:
-            self.on_post_validator = Draft4Validator(patch_input_json_schema)
+            self.on_patch_validator = Draft4Validator(patch_input_json_schema)
 
         if delete_input_json_schema:
             self.on_delete_validator = Draft4Validator(delete_input_json_schema)
@@ -72,8 +72,7 @@ class FalconJsonSchemaResource(object):
 class FalconModelResource(FalconJsonSchemaResource):
     def __init__(
             self, api, allowed_methods,
-            model, api_prefix='',
-            api_sufix=None, session=None,
+            model, api_prefix='/',
             post_input_json_schema={},
             post_output_json_schema={},
             put_input_json_schema={},
@@ -86,8 +85,7 @@ class FalconModelResource(FalconJsonSchemaResource):
             get_output_json_schema={}):
         self.allowed_methods = [am.upper() for am in allowed_methods]
         self.model = model
-        self.session = session
-        self._add_route(api, api_prefix, api_sufix)
+        self._add_route(api, api_prefix)
         FalconJsonSchemaResource.__init__(
             self, post_input_json_schema,
             post_output_json_schema,
@@ -100,19 +98,21 @@ class FalconModelResource(FalconJsonSchemaResource):
             get_input_json_schema,
             get_output_json_schema)
 
-    def _add_route(self, api, api_prefix, api_sufix):
-        uri = os.path.join(api_prefix, '/{}/'.format(self.model.tablename))
-
-        if api_sufix is None:
-            uri += '{' + self.model.id_name + '}/'
-        else:
-            uri = os.path.join(uri, api_sufix)
-
+    def _add_route(self, api, api_prefix):
+        uri = uri_single = os.path.join(api_prefix, '{}/'.format(self.model.tablename))
+        uri_single += '{' + self.model.id_name + '}/'
         api.add_route(uri, self)
+        api.add_route(uri_single, self)
 
     def on_post(self, req, resp, **kwargs):
         self._raise_method_not_allowed('POST')
-        resp.body = self.model.insert(self.session, req.context['body'])
+
+        if self.model.id_name in kwargs:
+            raise HTTPNotFound()
+
+        session = req.context['session']
+        resp.body = self.model.insert(session, req.context['body'])
+        resp.body = resp.body if isinstance(req.context['body'], list) else resp.body[0]
         resp.status = HTTP_CREATED
 
     def _raise_method_not_allowed(self, method):
@@ -120,27 +120,79 @@ class FalconModelResource(FalconJsonSchemaResource):
             raise HTTPMethodNotAllowed(self.allowed_methods)
 
     def on_put(self, req, resp, **kwargs):
-        self._update(req, resp, **kwargs)
+        self._raise_method_not_allowed('PUT')
+        session = req.context['session']
 
-    def _update(self, req, resp, **kwargs):
-        self._raise_method_not_allowed(req.method.upper())
-        id_ = self._get_id_from_kwargs(kwargs)
-        ids = self.model.update(self.session, {id_: req.context['body']})
-        if not ids:
-            raise HTTPNotFound()
+        if self.model.id_name in kwargs:
+            id_ = self._get_id_from_kwargs(kwargs)
+            ids = self.model.update(session, {id_: req.context['body']})
+
+            if not ids:
+                req.context['body'][self.model.id_name] = id_
+                self.model.insert(session, req.context['body'])
+                resp.status = HTTP_CREATED
+
+            else:
+                id_ = ids[0]
+
+            resp.body = id_
+
+        else:
+            ids = self.model.update(session, req.context['body'])
+
+            if ids:
+                resp.body = ids
+            else:
+                raise HTTPNotFound()
 
     def _get_id_from_kwargs(self, kwargs):
         return kwargs.pop(self.model.id_name)
 
     def on_patch(self, req, resp, **kwargs):
-        self._update(req, resp, **kwargs)
+        self._raise_method_not_allowed('PATCH')
+        session = req.context['session']
+
+        if self.model.id_name in kwargs:
+            id_ = self._get_id_from_kwargs(kwargs)
+            ids = self.model.update(session, {id_: req.context['body']})
+            if ids:
+                ids = ids[0]
+
+        else:
+            ids = self.model.update(session, req.context['body'])
+
+        if ids:
+            resp.body = ids
+        else:
+            raise HTTPNotFound()
 
     def on_delete(self, req, resp, **kwargs):
         self._raise_method_not_allowed('DELETE')
-        id_ = self._get_id_from_kwargs(kwargs)
-        self.model.delete(self.session, id_)
+        session = req.context['session']
+
+        if self.model.id_name in kwargs:
+            id_ = self._get_id_from_kwargs(kwargs)
+            self.model.delete(session, id_)
+        else:
+            self.model.delete(session, req.context['body'])
+
+        resp.status = HTTP_NO_CONTENT
 
     def on_get(self, req, resp, **kwargs):
         self._raise_method_not_allowed('GET')
-        id_ = self._get_id_from_kwargs(kwargs)
-        resp.body = self.model.get(self.session, id_)
+        session = req.context['session']
+
+        if self.model.id_name in kwargs:
+            id_ = self._get_id_from_kwargs(kwargs)
+            resp.body = self.model.get(session, id_)
+            if resp.body:
+                resp.body = resp.body[0]
+
+        elif req.context['body']:
+            resp.body = self.model.get(session, req.context['body'])
+
+        else:
+            resp.body = self.model.get(session)
+
+        if not resp.body:
+            raise HTTPNotFound()

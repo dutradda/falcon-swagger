@@ -268,3 +268,9 @@ class TestModelBaseNestedOperations(object):
     def test_raises_model_error_with_remove_and_delete(self, model1, model2):
         with pytest.raises(ModelBaseError):
             model2.insert(mock.MagicMock(), {'model1': {'_delete': True, '_remove': True}})
+
+    def test_raises_model_error_with_invalid_nested_id(self, model1, model2_mtm):
+        with pytest.raises(ModelBaseError) as exc_info:
+            model2_mtm.insert(mock.MagicMock(), {'model1': [{'id': 1, '_remove': True}]})
+        assert exc_info.value.args == \
+            ("can't remove model 'model1' on column 'id' with value '1'",)

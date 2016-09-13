@@ -49,20 +49,21 @@ class FalconJsonSchemaMiddleware(object):
                 validator.validate(req.context['body'])
 
     def process_response(self, req, resp, resource):
-        if resp.body is not None or not isinstance(resp.body, str):
+        if resp.body and resp.body != 0:
             resp.body = json.dumps(resp.body)
 
 
-class FalconSQLAlchemyRedisMiddleware(object):
+class FalconSQLAlchemyRedisMiddleware(FalconJsonSchemaMiddleware):
     def __init__(self, bind, redis_bind=None):
         self._bind = bind
         self._redis_bind = redis_bind
 
     def process_resource(self, req, resp, resource, params):
-        session = Session(bind=self._bind, redis_bind=self._redis_bind)
-        resource.session = session
+        FalconJsonSchemaMiddleware.process_resource(self, req, resp, resource, params)
+        req.context['session'] = Session(bind=self._bind, redis_bind=self._redis_bind)
 
     def process_response(self, req, resp, resource):
-        if resource and resource.session:
-            resource.session.close()
-            resource.session = None
+        FalconJsonSchemaMiddleware.process_response(self, req, resp, resource)
+        session = req.context.pop('session', None)
+        if session is not None:
+            session.close()

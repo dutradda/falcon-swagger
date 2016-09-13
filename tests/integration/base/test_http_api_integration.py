@@ -1,5 +1,6 @@
 from myreco.base.http_api import HttpAPI
 from myreco.base.resource import FalconModelResource
+from unittest import mock
 
 import pytest
 import sqlalchemy as sa
@@ -31,19 +32,12 @@ def model1(model_base):
 
 @pytest.fixture
 def resource1(model1, app):
-    return FalconModelResource(app, ['post', 'get'], model1, api_sufix='')
-
-
-@pytest.fixture
-def resource1_single(model1, app):
-    return FalconModelResource(app, ['delete', 'put', 'patch'], model1)
+    return FalconModelResource(app, ['post', 'get'], model1)
 
 
 @pytest.fixture
 def resource1_with_schema(model1, app):
-    return FalconModelResource(
-        app, ['post'], model1, api_sufix='',
-        post_input_json_schema={'type': 'object'})
+    return FalconModelResource(app, ['post'], model1, post_input_json_schema={'type': 'object'})
 
 
 class TestHttpAPIErrorHandlingPOST(object):
@@ -106,5 +100,16 @@ class TestHttpAPIErrorHandlingPOST(object):
             'error': {
                 'instance': 'test',
                 'message': 'Expecting value: line 1 column 1 (char 0)'
+            }
+        }
+
+    def test_generic_error_handling(self, client, resource1):
+        resource1.model.insert = mock.MagicMock(side_effect=Exception)
+        resp = client.post('/model1/', data='"test"')
+
+        assert resp.status_code == 500
+        assert json.loads(resp.body) == {
+            'error': {
+                'message': 'Something unexpected happened'
             }
         }

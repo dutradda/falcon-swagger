@@ -159,6 +159,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
                     to_remove = rel_values.pop('_remove', None)
                     rel_id = rel_values.get(rel_model.id_name)
                     op_count = [op for op in (to_update, to_delete, to_remove) if op is not None]
+                    no_rel_insts_message = "Can't execute nested '_{}' with values {}"
 
                     if len(op_count) > 1:
                         raise ModelBaseError(
@@ -166,18 +167,27 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
                             ", 'delete' or 'remove' for values {}".format(values))
 
                     if to_update:
+                        if not rel_insts:
+                            raise ModelBaseError(no_rel_insts_message.format('update', values))
+
                         cls._exec_update_on_instance(
                             session, rel_model, attr_name, relationship, rel_id,
                             rel_values, rel_insts, instance, values)
 
                     elif to_delete:
-                        cls._raise_id_not_found_error(rel_id, 'delete', values)
+                        if not rel_insts:
+                            raise ModelBaseError(no_rel_insts_message.format('delete', values))
+
                         rel_model.delete(session, rel_id, commit=False)
                         insts_to_delete[rel_id] = rel_values
 
                     elif to_remove:
+                        if not rel_insts:
+                            raise ModelBaseError(no_rel_insts_message.format('remove', values))
+
                         cls._exec_remove_on_instance(
-                            rel_model, attr_name, relationship, rel_id, rel_insts, values)
+                            rel_model, attr_name, relationship,
+                            rel_id, rel_insts, instance, values)
                     else:
                         cls._exec_insert_on_instance(
                             session, rel_model, attr_name, relationship, rel_values, values)
@@ -187,7 +197,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
     def _build_relationship_instances(cls, session, rel_model, attr_name, rels_values, instance):
         if not instance in session.identity_map.values():
             ids_to_get = cls._get_ids_from_rels_values(rel_model, rels_values)
-            rel_insts = rel_model.get(session, ids_to_get, todict=False)
+            rel_insts = rel_model.get(session, ids_to_get, todict=False) if ids_to_get else []
         else:
             rel_insts = getattr(instance, attr_name)
             if not rel_insts:
@@ -203,42 +213,22 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
     def _exec_update_on_instance(
             cls, session, rel_model, attr_name, relationship,
             rel_id, rel_values, rel_insts, instance, values):
-        updated = False
-
         if relationship.prop.uselist is True:
-            cls._raise_id_not_found_error(rel_id, 'update', values)
             for rel_inst in rel_insts:
                 if rel_inst.get_id() == rel_id:
                     rel_model._update_instance(session, rel_inst, rel_values)
                     setattr(instance, attr_name, rel_insts)
-                    updated = True
                     break
 
         else:
-            if rel_insts:
-                rel_model._update_instance(session, rel_insts[0], rel_values)
-                setattr(instance, attr_name, rel_insts[0])
-                updated = True
-
-        if not updated:
-            raise ModelBaseError(
-                "can't update model '{}' with column '{}' with value"\
-                " '{}' for update with values {}".format(
-                    rel_model.tablename, rel_model.id_name, rel_id, values
-                )
-            )
-
-    def _raise_id_not_found_error(cls, rel_id, type_, values):
-        if rel_id is None:
-            rel_error_message = "can't execute '{}' without '{}' for values {}"
-            raise ModelBaseError(rel_error_message.format(type_, cls.id_name, values))
+            rel_model._update_instance(session, rel_insts[0], rel_values)
+            setattr(instance, attr_name, rel_insts[0])
 
     def _exec_remove_on_instance(
             cls, rel_model, attr_name, relationship,
-            rel_id, rel_insts, values):
+            rel_id, rel_insts, instance, values):
         rel_to_remove = None
         if relationship.prop.uselist is True:
-            cls._raise_id_not_found_error(rel_id, 'remove', values)
             for rel_inst in rel_insts:
                 if rel_inst.get_id() == rel_id:
                     rel_to_remove = rel_inst
@@ -249,9 +239,8 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
             else:
                 raise ModelBaseError(
-                    "can't update model '{}' with column '{}' with value"\
-                    " '{}' for update with values {}".format(
-                        rel_model.tablename, rel_model.id_name, rel_id, values
+                    "can't remove model '{}' on column '{}' with value '{}'".format(
+                        rel_model.tablename, rel_model.id_name, rel_id
                     )
                 )
 
@@ -270,15 +259,14 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
             rels_.extend(inserted_objs)
             values[attr_name] = rels_
 
-    def update(cls, session, ids_objs_map, commit=True):
+    def update(cls, session, ids_objs_map):
         insts = cls.get(session, list(ids_objs_map.keys()), todict=False)
         id_insts_map = {inst.get_id(): inst for inst in insts}
 
         for id_, inst in id_insts_map.items():
             cls._update_instance(session, inst, ids_objs_map[id_])
 
-        if commit:
-            session.commit()
+        session.commit()
 
         return list(id_insts_map.keys())
 
@@ -302,7 +290,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
                 query = query.limit(limit)
 
             if offset is not None:
-                query = query.offset(limit)
+                query = query.offset(offset)
 
             return [each.todict() for each in query.all()] if todict else query.all()
 
@@ -323,34 +311,26 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
         if ids:
             filters_ids = cls._build_filters_by_ids(ids)
-            objs.extend([each.todict() for each in session.query(cls).filter(filters_ids).all()])
+            instances = session.query(cls).filter(filters_ids).all()
+            no_cached_map = {each.get_id(): each.todict() for each in instances}
+            session.redis_bind.hmset(model_redis_key, no_cached_map)
+            objs.extend(no_cached_map.values())
 
         return objs
 
-    def _build_filters_by_ids(cls, ids, or_clause=None):
-        if len(ids) == 0:
-            return or_clause
-
+    def _build_filters_by_ids(cls, ids):
         if len(ids) == 1:
-            comparison = cls._get_obj_i_comparison(0, ids)
-            if or_clause is None:
-                return comparison
-            else:
-                return or_(or_clause, comparison)
+            return cls._get_obj_i_comparison(0, ids)
 
-        if or_clause is None:
-            comparison1 = cls._get_obj_i_comparison(0, ids)
-            comparison2 = cls._get_obj_i_comparison(1, ids)
-            or_clause = or_(comparison1, comparison2)
+        comparison1 = cls._get_obj_i_comparison(0, ids)
+        comparison2 = cls._get_obj_i_comparison(1, ids)
+        or_clause = or_(comparison1, comparison2)
 
-        last_i = 2
         for i in range(2, len(ids)):
             comparison = cls._get_obj_i_comparison(i, ids)
             or_clause = or_(or_clause, comparison)
-            last_i = i
 
-        ids = ids[last_i+1:]
-        return cls._build_filters_by_ids(ids, or_clause)
+        return or_clause
 
     def _get_obj_i_comparison(cls, i, ids):
         return (cls.get_model_id() == ids[i])

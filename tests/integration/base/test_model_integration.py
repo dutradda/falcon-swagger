@@ -23,6 +23,7 @@
 
 from myreco.base.model import model_base_builder
 from myreco.base.session import Session
+from myreco.exceptions import ModelBaseError
 from unittest import mock
 
 import pytest
@@ -592,6 +593,21 @@ class TestModelBaseInsert(object):
         }
         assert objs == [expected]
 
+    def test_insert_nested_update_without_relationships(
+            self, model1, model2, session, redis):
+        with pytest.raises(ModelBaseError):
+            model2.insert(session, {'model1': {'id': 1, '_update': True}})
+
+    def test_insert_nested_remove_without_relationships(
+            self, model1, model2, session, redis):
+        with pytest.raises(ModelBaseError):
+            model2.insert(session, {'model1': {'id': 1, '_remove': True}})
+
+    def test_insert_nested_delete_without_relationships(
+            self, model1, model2, session, redis):
+        with pytest.raises(ModelBaseError):
+            model2.insert(session, {'model1': {'id': 1, '_delete': True}})
+
 
 class TestModelBaseUpdate(object):
     def test_update_with_one_object(self, model1_nested, session):
@@ -768,15 +784,23 @@ class TestModelBaseUpdate(object):
         }
         assert session.query(model3).one().todict() == expected
 
-    def test_with_missing_id(
-            self, model1, session):
+    def test_update_with_missing_id(self, model1, session):
         session.add(model1(id=1))
         session.commit()
         assert model1.update(session, {1: {'id': 3}, 2: {'id': 1}}) == [1]
 
-    def test_with_missing_all_ids(
-            self, model1, session, redis):
+    def test_update_with_missing_all_ids(self, model1, session):
         assert model1.update(session, {1: {'id': 3}, 2: {'id': 1}}) == []
+
+    def test_update_with_nested_remove_without_uselist(self, model1, model2, session):
+        model2.insert(session, {'model1': {}})
+        model2.update(session, {1: {'model1': {'id': 1, '_remove': True}}})
+        assert session.query(model2).one().todict() == {'id': 1, 'model1_id': None, 'model1': None}
+
+    def test_update_with_nested_remove_with_two_relationships(self, model1, model2_mtm, session):
+        model2_mtm.insert(session, {'model1': [{}, {}]})
+        model2_mtm.update(session, {1: {'model1': [{'id': 2, '_remove': True}]}})
+        assert session.query(model2_mtm).one().todict() == {'id': 1, 'model1': [{'id': 1}]}
 
 
 class TestModelBaseGet(object):
@@ -823,17 +847,39 @@ class TestModelBaseGet(object):
         redis.hmget.return_value = [None, '{"id": 2}']
         assert model1.get(session, [1, 2]) == [{'id': 2}, {'id': 1}]
 
-    def test_with_missing_id(
-            self, model1, session, redis):
+    def test_with_missing_id(self, model1, session, redis):
         session.add(model1(id=1))
         session.commit()
         redis.hmget.return_value = [None, None]
         assert model1.get(session, [1, 2]) == [{'id': 1}]
 
-    def test_with_missing_all_ids(
-            self, model1, session, redis):
+    def test_with_missing_all_ids(self, model1, session, redis):
         redis.hmget.return_value = [None, None]
         assert model1.get(session, [1, 2]) == []
+
+    def test_if_raises_ids_offset_error(self, model1, session, redis):
+        with pytest.raises(ModelBaseError):
+            model1.get(session, [1, 2], offset=1)
+
+    def test_if_raises_ids_limit_error(self, model1, session, redis):
+        with pytest.raises(ModelBaseError):
+            model1.get(session, [1, 2], limit=1)
+
+    def test_without_ids(self, model1, session, redis):
+        model1.insert(session, {})
+        assert model1.get(session) == [{'id': 1}]
+
+    def test_without_ids_and_with_limit(self, model1, session, redis):
+        model1.insert(session, [{}, {}, {}])
+        assert model1.get(session, limit=2) == [{'id': 1}, {'id': 2}]
+
+    def test_without_ids_and_with_offset(self, model1, session, redis):
+        model1.insert(session, [{}, {}, {}])
+        assert model1.get(session, offset=1) == [{'id': 2}, {'id': 3}]
+
+    def test_without_ids_and_with_limit_and_offset(self, model1, session, redis):
+        model1.insert(session, [{}, {}, {}])
+        assert model1.get(session, limit=1, offset=1) == [{'id': 2}]
 
 
 class TestModelBaseDelete(object):
