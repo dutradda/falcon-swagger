@@ -146,7 +146,9 @@ class FalconModelResource(FalconJsonSchemaResource):
                 raise HTTPNotFound()
 
     def _get_id_from_kwargs(self, kwargs):
-        return kwargs.pop(self.model.id_name)
+        id_name = self.model.id_name
+        id_ = kwargs.pop(id_name)
+        return self.model.get_model_id().type.python_type(id_)
 
     def on_patch(self, req, resp, **kwargs):
         self._raise_method_not_allowed('PATCH')
@@ -154,7 +156,8 @@ class FalconModelResource(FalconJsonSchemaResource):
 
         if self.model.id_name in kwargs:
             id_ = self._get_id_from_kwargs(kwargs)
-            ids = self.model.update(session, {id_: req.context['body']})
+            req.context['body'][self.model.id_name] = id_
+            ids = self.model.update(session, req.context['body'])
             if ids:
                 ids = ids[0]
 

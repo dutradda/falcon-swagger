@@ -21,7 +21,6 @@
 # SOFTWARE.
 
 
-from myreco.base.model import model_base_builder
 from myreco.base.session import Session
 from unittest import mock
 from sqlalchemy import create_engine
@@ -29,11 +28,6 @@ from sqlalchemy import create_engine
 import pytest
 import pymysql
 
-
-
-@pytest.fixture
-def model_base():
-    return model_base_builder()
 
 
 @pytest.fixture

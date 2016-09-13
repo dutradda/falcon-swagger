@@ -612,19 +612,21 @@ class TestModelBaseInsert(object):
 class TestModelBaseUpdate(object):
     def test_update_with_one_object(self, model1_nested, session):
         model1_nested.insert(session, {'id': 1})
-        model1_nested.update(session, {1: {'test': 'test_updated'}})
+        model1_nested.update(session, {'id': 1, 'test': 'test_updated'})
         assert session.query(model1_nested).one().todict() == {'id': 1, 'test': 'test_updated'}
 
     def test_update_with_two_objects(self, model1_nested, session):
         model1_nested.insert(session, [{'id': 1}, {'id': 2}])
-        model1_nested.update(session, {1: {'test': 'test_updated'}, 2: {'test': 'test_updated2'}})
+        model1_nested.update(session, [
+            {'id': 1, 'test': 'test_updated'},
+            {'id': 2, 'test': 'test_updated2'}])
         assert [o.todict() for o in session.query(model1_nested).all()] == \
             [{'id': 1, 'test': 'test_updated'}, {'id': 2, 'test': 'test_updated2'}]
 
     def test_update_with_two_nested_objects(self, model1_nested, model2, session):
         model1_nested.insert(session, {'id': 1})
         model2.insert(session, {'id': 1})
-        model2.update(session, {1: {'model1': {'id': 1, '_update': True, 'test': 'test_updated'}}})
+        model2.update(session, {'id': 1, 'model1': {'id': 1, '_update': True, 'test': 'test_updated'}})
 
         assert session.query(model2).one().todict() == {
             'id': 1,
@@ -640,15 +642,14 @@ class TestModelBaseUpdate(object):
         model2.insert(session, {'id': 1})
         model3.insert(session, {'id': 1})
         m3_update = {
-            1: {
-                'model2': {
+            'id': 1,
+            'model2': {
+                'id': 1,
+                '_update': True,
+                'model1': {
                     'id': 1,
                     '_update': True,
-                    'model1': {
-                        'id': 1,
-                        '_update': True,
-                        'test': 'test_updated'
-                    }
+                    'test': 'test_updated'
                 }
             }
         }
@@ -673,10 +674,9 @@ class TestModelBaseUpdate(object):
         model2.insert(session, {'id': 1})
 
         m2_update = {
-            1: {
-                'model1': {
-                    'id': 1
-                }
+            'id': 1,
+            'model1': {
+                'id': 1
             }
         }
         model2.update(session, m2_update)
@@ -694,12 +694,11 @@ class TestModelBaseUpdate(object):
         model3.insert(session, {'id': 1})
 
         m3_update = {
-            1: {
-                'model2': {
-                    'id': 1,
-                    'model1': {
-                        'id': 1
-                    }
+            'id': 1,
+            'model2': {
+                'id': 1,
+                'model1': {
+                    'id': 1
                 }
             }
         }
@@ -725,14 +724,13 @@ class TestModelBaseUpdate(object):
         model3.insert(session, {'id': 1})
 
         m3_update = {
-            1: {
-                'model2': {
-                    'id': 1,
-                    'model1': [
-                        {'id': 1},
-                        {'id': 2}
-                    ]
-                }
+            'id': 1,
+            'model2': {
+                'id': 1,
+                'model1': [
+                    {'id': 1},
+                    {'id': 2}
+                ]
             }
         }
         model3.update(session, m3_update)
@@ -757,14 +755,13 @@ class TestModelBaseUpdate(object):
         model3.insert(session, {'id': 1})
 
         m3_update = {
-            1: {
-                'model1': {
-                    'id': 1,
-                    'model2': [
-                        {'id': 1},
-                        {'id': 2}
-                    ]
-                }
+            'id': 1,
+            'model1': {
+                'id': 1,
+                'model2': [
+                    {'id': 1},
+                    {'id': 2}
+                ]
             }
         }
         model3.update(session, m3_update)
@@ -787,19 +784,19 @@ class TestModelBaseUpdate(object):
     def test_update_with_missing_id(self, model1, session):
         session.add(model1(id=1))
         session.commit()
-        assert model1.update(session, {1: {'id': 3}, 2: {'id': 1}}) == [1]
+        assert model1.update(session, [{'id': 1}, {'id': 2}]) == [1]
 
     def test_update_with_missing_all_ids(self, model1, session):
         assert model1.update(session, {1: {'id': 3}, 2: {'id': 1}}) == []
 
     def test_update_with_nested_remove_without_uselist(self, model1, model2, session):
         model2.insert(session, {'model1': {}})
-        model2.update(session, {1: {'model1': {'id': 1, '_remove': True}}})
+        model2.update(session, {'id': 1, 'model1': {'id': 1, '_remove': True}})
         assert session.query(model2).one().todict() == {'id': 1, 'model1_id': None, 'model1': None}
 
     def test_update_with_nested_remove_with_two_relationships(self, model1, model2_mtm, session):
         model2_mtm.insert(session, {'model1': [{}, {}]})
-        model2_mtm.update(session, {1: {'model1': [{'id': 2, '_remove': True}]}})
+        model2_mtm.update(session, {'id': 1, 'model1': [{'id': 2, '_remove': True}]})
         assert session.query(model2_mtm).one().todict() == {'id': 1, 'model1': [{'id': 1}]}
 
 

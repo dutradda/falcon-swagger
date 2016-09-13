@@ -23,6 +23,14 @@
 
 import os
 import sys
+import pytest
 
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(ROOT_PATH, '..'))
+
+from myreco.base.model import model_base_builder
+
+
+@pytest.fixture
+def model_base():
+    return model_base_builder()

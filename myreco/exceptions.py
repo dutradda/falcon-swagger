@@ -21,12 +21,21 @@
 # SOFTWARE.
 
 
+from falcon.errors import HTTPError
+from falcon import HTTP_UNAUTHORIZED, HTTP_BAD_REQUEST
+
+import json
+
+
 class MyrecoError(Exception):
     pass
 
 
 class ModelBaseError(MyrecoError):
-	pass
+    def __init__(self, message, input_=None):
+        self.message = message
+        self.input_ = input_
+        self.args = (message,)
 
 
 class QueryError(MyrecoError):

@@ -23,7 +23,7 @@
 
 from falcon import API, HTTP_INTERNAL_SERVER_ERROR, HTTP_BAD_REQUEST, HTTPError
 from myreco.base.middlewares import FalconSQLAlchemyRedisMiddleware
-from myreco.exceptions import JSONError
+from myreco.exceptions import JSONError, ModelBaseError
 from sqlalchemy.exc import IntegrityError
 from jsonschema import ValidationError
 
@@ -38,6 +38,7 @@ class HttpAPI(API):
         self.add_error_handler(IntegrityError, self._handle_integrity_error)
         self.add_error_handler(ValidationError, self._handle_json_validation_error)
         self.add_error_handler(JSONError, self._handle_json_error)
+        self.add_error_handler(ModelBaseError, self._handle_model_base_error)
         self._error_handlers.append((Exception, self._handle_generic_error))
 
     def _handle_integrity_error(self, exception, req, resp, params):
@@ -52,17 +53,6 @@ class HttpAPI(API):
                 'details': exception.detail
             }
         }
-        logging.exception(exception)
-
-    def _handle_json_error(self, exception, req, resp, params):
-        resp.status = HTTP_BAD_REQUEST
-        resp.body = {
-            'error': {
-                'message': exception.args[0],
-                'instance': req.context['body']
-            }
-        }
-        logging.exception(exception)
 
     def _handle_json_validation_error(self, exception, req, resp, params):
         resp.status = HTTP_BAD_REQUEST
@@ -70,10 +60,27 @@ class HttpAPI(API):
             'error': {
                 'message': exception.message,
                 'schema': exception.schema,
-                'instance': exception.instance
+                'input': exception.instance
             }
         }
-        logging.exception(exception)
+
+    def _handle_json_error(self, exception, req, resp, params):
+        resp.status = HTTP_BAD_REQUEST
+        resp.body = {
+            'error': {
+                'message': exception.args[0],
+                'input': req.context['body']
+            }
+        }
+
+    def _handle_model_base_error(self, exception, req, resp, params):
+        resp.status = HTTP_BAD_REQUEST
+        resp.body = {
+            'error': {
+                'message': exception.message,
+                'input': exception.input_
+            }
+        }
 
     def _handle_generic_error(self, exception, req, resp, params):
         resp.status = HTTP_INTERNAL_SERVER_ERROR

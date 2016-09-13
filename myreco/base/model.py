@@ -28,6 +28,7 @@ from sqlalchemy.ext.declarative.clsregistry import _class_resolver
 from sqlalchemy.orm.properties import RelationshipProperty
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlalchemy import or_
+from copy import deepcopy
 
 from myreco.exceptions import ModelBaseError
 
@@ -115,12 +116,13 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
         return relationship.prop.argument
 
     def insert(cls, session, objs, commit=True, todict=True):
+        input_ = deepcopy(objs)
         objs = cls._to_list(objs)
         new_insts = set()
 
         for obj in objs:
             instance = cls()
-            cls._update_instance(session, instance, obj)
+            cls._update_instance(session, instance, obj, input_)
             new_insts.add(instance)
 
         session.add_all(new_insts)
@@ -136,7 +138,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
     def _to_list(cls, objs):
         return objs if isinstance(objs, list) else [objs]
 
-    def _update_instance(cls, session, instance, values):
+    def _update_instance(cls, session, instance, values, input_):
         for attr_name in set(values.keys()):
             relationship = cls._get_relationship(attr_name)
 
@@ -159,35 +161,35 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
                     to_remove = rel_values.pop('_remove', None)
                     rel_id = rel_values.get(rel_model.id_name)
                     op_count = [op for op in (to_update, to_delete, to_remove) if op is not None]
-                    no_rel_insts_message = "Can't execute nested '_{}' with values {}"
+                    no_rel_insts_message = "Can't execute nested '_{}'"
 
                     if len(op_count) > 1:
                         raise ModelBaseError(
                             "ambiguous operations 'update'"\
-                            ", 'delete' or 'remove' for values {}".format(values))
+                            ", 'delete' or 'remove'", input_)
 
                     if to_update:
                         if not rel_insts:
-                            raise ModelBaseError(no_rel_insts_message.format('update', values))
+                            raise ModelBaseError(no_rel_insts_message.format('update'), input_)
 
                         cls._exec_update_on_instance(
                             session, rel_model, attr_name, relationship, rel_id,
-                            rel_values, rel_insts, instance, values)
+                            rel_values, rel_insts, instance, values, input_)
 
                     elif to_delete:
                         if not rel_insts:
-                            raise ModelBaseError(no_rel_insts_message.format('delete', values))
+                            raise ModelBaseError(no_rel_insts_message.format('delete'), input_)
 
                         rel_model.delete(session, rel_id, commit=False)
                         insts_to_delete[rel_id] = rel_values
 
                     elif to_remove:
                         if not rel_insts:
-                            raise ModelBaseError(no_rel_insts_message.format('remove', values))
+                            raise ModelBaseError(no_rel_insts_message.format('remove'), input_)
 
                         cls._exec_remove_on_instance(
                             rel_model, attr_name, relationship,
-                            rel_id, rel_insts, instance, values)
+                            rel_id, rel_insts, instance, values, input_)
                     else:
                         cls._exec_insert_on_instance(
                             session, rel_model, attr_name, relationship, rel_values, values)
@@ -212,21 +214,21 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
     def _exec_update_on_instance(
             cls, session, rel_model, attr_name, relationship,
-            rel_id, rel_values, rel_insts, instance, values):
+            rel_id, rel_values, rel_insts, instance, values, input_):
         if relationship.prop.uselist is True:
             for rel_inst in rel_insts:
                 if rel_inst.get_id() == rel_id:
-                    rel_model._update_instance(session, rel_inst, rel_values)
+                    rel_model._update_instance(session, rel_inst, rel_values, input_)
                     setattr(instance, attr_name, rel_insts)
                     break
 
         else:
-            rel_model._update_instance(session, rel_insts[0], rel_values)
+            rel_model._update_instance(session, rel_insts[0], rel_values, input_)
             setattr(instance, attr_name, rel_insts[0])
 
     def _exec_remove_on_instance(
             cls, rel_model, attr_name, relationship,
-            rel_id, rel_insts, instance, values):
+            rel_id, rel_insts, instance, values, input_):
         rel_to_remove = None
         if relationship.prop.uselist is True:
             for rel_inst in rel_insts:
@@ -241,8 +243,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
                 raise ModelBaseError(
                     "can't remove model '{}' on column '{}' with value '{}'".format(
                         rel_model.tablename, rel_model.id_name, rel_id
-                    )
-                )
+                    ), input_)
 
         else:
             setattr(instance, attr_name, None)
@@ -259,12 +260,15 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
             rels_.extend(inserted_objs)
             values[attr_name] = rels_
 
-    def update(cls, session, ids_objs_map):
+    def update(cls, session, objs):
+        input_ = deepcopy(objs)
+        objs = cls._to_list(objs)
+        ids_objs_map = {obj.get(cls.id_name): obj for obj in objs}
         insts = cls.get(session, list(ids_objs_map.keys()), todict=False)
         id_insts_map = {inst.get_id(): inst for inst in insts}
 
         for id_, inst in id_insts_map.items():
-            cls._update_instance(session, inst, ids_objs_map[id_])
+            cls._update_instance(session, inst, ids_objs_map[id_], input_)
 
         session.commit()
 
@@ -281,7 +285,8 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
     def get(cls, session, ids=None, limit=None, offset=None, todict=True):
         if (ids is not None) and (limit is not None or offset is not None):
             raise ModelBaseError(
-                "'get' method can't be called with 'ids' and with 'offset' or 'limit'")
+                "'get' method can't be called with 'ids' and with 'offset' or 'limit'",
+                {'ids': ids, 'limit': limit, 'offset': offset})
 
         if ids is None:
             query = session.query(cls)

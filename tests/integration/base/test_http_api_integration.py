@@ -26,13 +26,14 @@ def model1(model_base):
         __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
         m2_id = sa.Column(sa.ForeignKey('model2.id'))
+        model2_ = sa.orm.relationship('model2')
 
     return model1
 
 
 @pytest.fixture
 def resource1(model1, app):
-    return FalconModelResource(app, ['post', 'get'], model1)
+    return FalconModelResource(app, ['post', 'get', 'put'], model1)
 
 
 @pytest.fixture
@@ -84,7 +85,7 @@ class TestHttpAPIErrorHandlingPOST(object):
         assert resp.status_code == 400
         assert json.loads(resp.body) == {
             'error': {
-                'instance': 'test',
+                'input': 'test',
                 'message': "'test' is not of type 'object'",
                 'schema': {
                     'type': 'object'
@@ -98,8 +99,81 @@ class TestHttpAPIErrorHandlingPOST(object):
         assert resp.status_code == 400
         assert json.loads(resp.body) == {
             'error': {
-                'instance': 'test',
+                'input': 'test',
                 'message': 'Expecting value: line 1 column 1 (char 0)'
+            }
+        }
+
+    def test_model_base_error_handling_with_post_and_with_nested_delete(self, client, resource1):
+        data = {'model2_': {'id': 1, '_delete': True}}
+        resp = client.post('/model1/', data=json.dumps(data))
+
+        assert resp.status_code == 400
+        assert json.loads(resp.body) == {
+            'error': {
+                'input': data,
+                'message': "Can't execute nested '_delete'"
+            }
+        }
+
+    def test_model_base_error_handling_with_post_and_with_nested_remove(self, client, resource1):
+        data = {'model2_': {'id': 1, '_remove': True}}
+        resp = client.post('/model1/', data=json.dumps(data))
+
+        assert resp.status_code == 400
+        assert json.loads(resp.body) == {
+            'error': {
+                'input': data,
+                'message': "Can't execute nested '_remove'"
+            }
+        }
+
+    def test_model_base_error_handling_with_post_and_with_nested_update(self, client, resource1):
+        data = {'model2_': {'id': 1, '_update': True}}
+        resp = client.post('/model1/', data=json.dumps(data))
+
+        assert resp.status_code == 400
+        assert json.loads(resp.body) == {
+            'error': {
+                'input': data,
+                'message': "Can't execute nested '_update'"
+            }
+        }
+
+    def test_model_base_error_handling_with_put_and_with_nested_delete(self, client, resource1):
+        resp = client.post('/model1/', data='{}')
+        data = {'id': 1, 'model2_': {'id': 1, '_delete': True}}
+        resp = client.put('/model1/', body=json.dumps(data))
+
+        assert resp.status_code == 400
+        assert json.loads(resp.body) == {
+            'error': {
+                'input': data,
+                'message': "Can't execute nested '_delete'"
+            }
+        }
+
+    def test_model_base_error_handling_with_put_and_with_nested_remove(self, client, resource1):
+        data = {'model2_': {'id': 1, '_remove': True}}
+        resp = client.post('/model1/', data=json.dumps(data))
+
+        assert resp.status_code == 400
+        assert json.loads(resp.body) == {
+            'error': {
+                'input': data,
+                'message': "Can't execute nested '_remove'"
+            }
+        }
+
+    def test_model_base_error_handling_with_put_and_with_nested_update(self, client, resource1):
+        data = {'model2_': {'id': 1, '_update': True}}
+        resp = client.post('/model1/', data=json.dumps(data))
+
+        assert resp.status_code == 400
+        assert json.loads(resp.body) == {
+            'error': {
+                'input': data,
+                'message': "Can't execute nested '_update'"
             }
         }
 
