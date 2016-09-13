@@ -21,38 +21,29 @@
 # SOFTWARE.
 
 
-from falcon.errors import HTTPError
-from falcon import HTTP_UNAUTHORIZED, HTTP_BAD_REQUEST
-
-import json
+from myreco.exceptions import UnauthorizedError
+from falcon import HTTP_FORBIDDEN
 
 
-class MyrecoError(Exception):
-    pass
+class AuthorizationHook(object):
+    def __init__(self, authorizer_func, realm):
+        self.authorizer = authorizer_func
+        self.realm = realm
 
+    def __call__(self, req, resp, resource, params):
+        auth = req.auth
+        if auth is None:
+            raise UnauthorizedError('Authorization header is required', self.realm)
 
-class ModelBaseError(MyrecoError):
-    def __init__(self, message, input_=None):
-        self.message = message
-        self.input_ = input_
-        self.args = (message,)
+        basic_str = 'Basic '
+        if auth.startswith(basic_str):
+            auth = req.auth.replace(basic_str, '')
 
+        auth = self.authorizer(auth)
 
-class QueryError(MyrecoError):
-    pass
+        if auth is None:
+            raise UnauthorizedError('Invalid authorization', self.realm)
 
-
-class JSONError(MyrecoError):
-    pass
-
-
-class UnauthorizedError(MyrecoError, HTTPError):
-    def __init__(self, message, realm, status=HTTP_UNAUTHORIZED):
-        self.message = message
-        self.status = status
-        self.headers = {'WWW-Authenticate': 'Basic realm="{}"'.format(realm)}
-
-    def to_json(self):
-        return json.dumps({
-            'error': self.message
-        })
+        elif auth is False:
+            raise UnauthorizedError(
+                'Please refresh your authorization', self.realm, HTTP_FORBIDDEN)
