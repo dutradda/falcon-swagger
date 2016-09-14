@@ -31,19 +31,20 @@ class AuthorizationHook(object):
         self.realm = realm
 
     def __call__(self, req, resp, resource, params):
-        auth = req.auth
-        if auth is None:
+        authorization = req.auth
+        if authorization is None:
             raise UnauthorizedError('Authorization header is required', self.realm)
 
         basic_str = 'Basic '
-        if auth.startswith(basic_str):
-            auth = req.auth.replace(basic_str, '')
+        if authorization.startswith(basic_str):
+            authorization = authorization.replace(basic_str, '')
 
-        auth = self.authorizer(auth, req.path, req.method)
+        session = req.context['session']
+        authorization = self.authorizer(session, authorization, req.path, req.method)
 
-        if auth is None:
+        if authorization is None:
             raise UnauthorizedError('Invalid authorization', self.realm)
 
-        elif auth is False:
+        elif authorization is False:
             raise UnauthorizedError(
                 'Please refresh your authorization', self.realm, HTTP_FORBIDDEN)

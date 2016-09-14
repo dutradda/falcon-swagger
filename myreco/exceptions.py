@@ -28,31 +28,48 @@ import json
 
 
 class MyrecoError(Exception):
-    pass
+    def __init__(self, message, status, headers=None, input_=None):
+        self.message = message
+        self.status = status
+        self.args = (message,)
+        self.headers = {} if headers is None else headers
+        self.input_ = input_
+
+    def to_json(self):
+        if self.input_ is not None:
+            return self._to_json_with_input()
+
+        return {
+            'error': self.message
+        }
+
+    def _to_json_with_input(self):
+        return {
+            'error': {
+                'message': self.message,
+                'input': self.input_
+            }
+        }
+
+    @staticmethod
+    def handle(exception, req, resp, params):
+        resp.status = exception.status
+        resp.body = exception.to_json()
+        [resp.append_header(key, value) for key, value in exception.headers.items()]
 
 
 class ModelBaseError(MyrecoError):
     def __init__(self, message, input_=None):
-        self.message = message
+        MyrecoError.__init__(self, message, HTTP_BAD_REQUEST)
         self.input_ = input_
-        self.args = (message,)
-
-
-class QueryError(MyrecoError):
-    pass
 
 
 class JSONError(MyrecoError):
-    pass
+    def __init__(self, message, headers=None, input_=None):
+        MyrecoError.__init__(self, message, HTTP_BAD_REQUEST, headers=headers, input_=input_)
 
 
-class UnauthorizedError(MyrecoError, HTTPError):
+class UnauthorizedError(MyrecoError):
     def __init__(self, message, realm, status=HTTP_UNAUTHORIZED):
-        self.message = message
-        self.status = status
-        self.headers = {'WWW-Authenticate': 'Basic realm="{}"'.format(realm)}
-
-    def to_json(self):
-        return json.dumps({
-            'error': self.message
-        })
+        headers = {'WWW-Authenticate': 'Basic realm="{}"'.format(realm)}
+        MyrecoError.__init__(self, message, status, headers)

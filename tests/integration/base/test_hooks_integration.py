@@ -22,7 +22,9 @@
 
 
 from myreco.base.hooks import AuthorizationHook
-from falcon import API, before as falcon_before
+from myreco.base.http_api import HttpAPI
+from falcon import before as falcon_before
+from unittest import mock
 
 
 import pytest
@@ -31,12 +33,12 @@ import json
 
 @pytest.fixture
 def app():
-    return API()
+    return HttpAPI(mock.MagicMock())
 
 
 @pytest.fixture
 def resource(app):
-    def auth_func(auth_token, uri, method):
+    def auth_func(session, auth_token, uri, method):
         print(uri, method)
         if auth_token == '1' and uri == '/' and method == 'GET':
             return True
@@ -44,6 +46,8 @@ def resource(app):
             return False
 
     class Resource(object):
+        allowed_methods = ['GET']
+
         @falcon_before(AuthorizationHook(auth_func, 'test'))
         def on_get(self, req, resp):
             pass

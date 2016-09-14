@@ -26,7 +26,6 @@ from unittest import mock
 
 from myreco.base.session import Session
 from myreco.base.model import model_base_builder
-from myreco.exceptions import QueryError
 
 import pytest
 import sqlalchemy as sa

@@ -24,10 +24,7 @@
 from sqlalchemy.orm import sessionmaker, Session as SessionSA
 from sqlalchemy.orm.query import Query
 from sqlalchemy import event, or_
-
 from collections import defaultdict
-
-from myreco.exceptions import QueryError
 
 import json
 

@@ -39,7 +39,7 @@ class FalconJsonSchemaMiddleware(object):
                     req.context['body'] = json.loads(body)
                 except ValueError as error:
                     req.context['body'] = body
-                    raise JSONError(*error.args)
+                    raise JSONError(*error.args, input_=req.context['body'])
             else:
                 req.context['body'] = {}
 
