@@ -87,7 +87,7 @@ class _SessionBase(SessionSA):
             self.redis_bind.hmset(model_key, insts_keys_insts_map)
 
     def build_inst_redis_key(self, inst):
-        return str(inst.get_id())
+        return str(inst.get_ids_values())
 
     def build_model_redis_key(self, model):
         return model.tablename

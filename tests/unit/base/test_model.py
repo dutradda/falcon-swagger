@@ -162,7 +162,7 @@ class TestModelBaseInit(object):
     def test_builds_with_id_name(self, model_base):
         class test(model_base):
             __tablename__ = 'test'
-            id_name = 'id2'
+            id_names = ['id2']
 
             id2 = sa.Column(sa.Integer, primary_key=True)
 
@@ -258,19 +258,28 @@ class TestModelBaseTodict(object):
 
 class TestModelBaseNestedOperations(object):
     def test_raises_model_error_with_update_and_delete(self, model1, model2):
-        with pytest.raises(ModelBaseError):
+        with pytest.raises(ModelBaseError) as exc_info:
             model2.insert(mock.MagicMock(), {'model1': {'_update': True, '_delete': True}})
 
+        assert exc_info.value.args == \
+            ("ambiguous operations 'update', 'delete' or 'remove'",)
+
     def test_raises_model_error_with_update_and_remove(self, model1, model2):
-        with pytest.raises(ModelBaseError):
+        with pytest.raises(ModelBaseError) as exc_info:
             model2.insert(mock.MagicMock(), {'model1': {'_update': True, '_remove': True}})
 
+        assert exc_info.value.args == \
+            ("ambiguous operations 'update', 'delete' or 'remove'",)
+
     def test_raises_model_error_with_remove_and_delete(self, model1, model2):
-        with pytest.raises(ModelBaseError):
+        with pytest.raises(ModelBaseError) as exc_info:
             model2.insert(mock.MagicMock(), {'model1': {'_delete': True, '_remove': True}})
+
+        assert exc_info.value.args == \
+            ("ambiguous operations 'update', 'delete' or 'remove'",)
 
     def test_raises_model_error_with_invalid_nested_id(self, model1, model2_mtm):
         with pytest.raises(ModelBaseError) as exc_info:
             model2_mtm.insert(mock.MagicMock(), {'model1': [{'id': 1, '_remove': True}]})
         assert exc_info.value.args == \
-            ("can't remove model 'model1' on column 'id' with value '1'",)
+            ("can't remove model 'model1' on column(s) 'id' with value(s) 1",)

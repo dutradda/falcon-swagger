@@ -41,6 +41,31 @@ def model1(model_base):
 
 
 @pytest.fixture
+def model1_two_ids(model_base):
+    class model1(model_base):
+        __tablename__ = 'model1'
+        __table_args__ = {'mysql_engine':'innodb'}
+        id_names = ('id', 'id2')
+        id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+        id2 = sa.Column(sa.Integer, primary_key=True)
+
+    return model1
+
+
+@pytest.fixture
+def model1_three_ids(model_base):
+    class model1(model_base):
+        __tablename__ = 'model1'
+        __table_args__ = {'mysql_engine':'innodb'}
+        id_names = ('id', 'id2', 'id3')
+        id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
+        id2 = sa.Column(sa.Integer, primary_key=True)
+        id3 = sa.Column(sa.Integer, primary_key=True)
+
+    return model1
+
+
+@pytest.fixture
 def model1_nested(model_base):
     class model1(model_base):
         __tablename__ = 'model1'
@@ -784,10 +809,10 @@ class TestModelBaseUpdate(object):
     def test_update_with_missing_id(self, model1, session):
         session.add(model1(id=1))
         session.commit()
-        assert model1.update(session, [{'id': 1}, {'id': 2}]) == [1]
+        assert model1.update(session, [{'id': 1}, {'id': 2}]) == [{'id': 1}]
 
     def test_update_with_missing_all_ids(self, model1, session):
-        assert model1.update(session, {1: {'id': 3}, 2: {'id': 1}}) == []
+        assert model1.update(session, [{'id': 1}, {'id': 2}]) == []
 
     def test_update_with_nested_remove_without_uselist(self, model1, model2, session):
         model2.insert(session, {'model1': {}})
@@ -803,11 +828,11 @@ class TestModelBaseUpdate(object):
 class TestModelBaseGet(object):
     def test_if_query_get_calls_hmget_correctly(self, session, redis, model1):
         model1.get(session, 1)
-        assert redis.hmget.call_args_list == [mock.call('model1', ['1'])]
+        assert redis.hmget.call_args_list == [mock.call('model1', ['(1,)'])]
 
     def test_if_query_get_calls_hmget_correctly_with_two_ids(self, session, redis, model1):
         model1.get(session, [1, 2])
-        assert redis.hmget.call_args_list == [mock.call('model1', ['1', '2'])]
+        assert redis.hmget.call_args_list == [mock.call('model1', ['(1,)', '(2,)'])]
 
     def test_if_query_get_builds_redis_left_ids_correctly_with_result_found_on_redis_with_one_id(
             self, model1, session, redis):
@@ -891,3 +916,17 @@ class TestModelBaseDelete(object):
         model1.insert(session, {})
         model1.delete(session , [2, 3])
         assert model1.get(session) == [{'id': 1}]
+
+    def test_delete_with_two_ids(self, model1_two_ids, session, redis):
+        model1_two_ids.insert(session, {'id2': 2})
+        assert model1_two_ids.get(session) == [{'id': 1, 'id2': 2}]
+
+        model1_two_ids.delete(session , (1, 2))
+        assert model1_two_ids.get(session) == []
+
+    def test_delete_with_three_ids(self, model1_three_ids, session, redis):
+        model1_three_ids.insert(session, {'id2': 2, 'id3': 3})
+        assert model1_three_ids.get(session) == [{'id': 1, 'id2': 2, 'id3': 3}]
+
+        model1_three_ids.delete(session , (1, 2, 3))
+        assert model1_three_ids.get(session) == []

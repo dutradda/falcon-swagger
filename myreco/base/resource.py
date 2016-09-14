@@ -100,14 +100,17 @@ class FalconModelResource(FalconJsonSchemaResource):
 
     def _add_route(self, api, api_prefix):
         uri = uri_single = os.path.join(api_prefix, '{}/'.format(self.model.tablename))
-        uri_single += '{' + self.model.id_name + '}/'
+
+        for id_name in self.model.id_names:
+            uri_single += '{' + id_name + '}/'
+
         api.add_route(uri, self)
         api.add_route(uri_single, self)
 
     def on_post(self, req, resp, **kwargs):
         self._raise_method_not_allowed('POST')
 
-        if self.model.id_name in kwargs:
+        if self._id_names_in_kwargs(kwargs):
             raise HTTPNotFound()
 
         session = req.context['session']
@@ -115,25 +118,33 @@ class FalconModelResource(FalconJsonSchemaResource):
         resp.body = resp.body if isinstance(req.context['body'], list) else resp.body[0]
         resp.status = HTTP_CREATED
 
+    def _id_names_in_kwargs(self, kwargs):
+        return bool([True for id_name in self.model.id_names if id_name in kwargs])
+
     def _raise_method_not_allowed(self, method):
         if not method in self.allowed_methods:
             raise HTTPMethodNotAllowed(self.allowed_methods)
 
     def on_put(self, req, resp, **kwargs):
-        self._raise_method_not_allowed('PUT')
+        self._update(req, resp, **kwargs)
+
+    def _update(self, req, resp, with_insert=True, **kwargs):
+        self._raise_method_not_allowed(req.method.upper())
         session = req.context['session']
 
-        if self.model.id_name in kwargs:
-            id_ = self._get_id_from_kwargs(kwargs)
-            ids = self.model.update(session, {id_: req.context['body']})
+        if self._id_names_in_kwargs(kwargs):
+            id_ = self.model.get_ids_from_values(kwargs)
+            id_dict = self.model.build_id_dict(id_)
+            req.context['body'].update(id_dict)
+            ids = self.model.update(session, req.context['body'])
 
-            if not ids:
-                req.context['body'][self.model.id_name] = id_
-                self.model.insert(session, req.context['body'])
+            if not ids and with_insert:
+                id_ = self.model.insert(session, req.context['body'])[0]
                 resp.status = HTTP_CREATED
-
-            else:
+            elif ids:
                 id_ = ids[0]
+            else:
+                raise HTTPNotFound()
 
             resp.body = id_
 
@@ -145,36 +156,15 @@ class FalconModelResource(FalconJsonSchemaResource):
             else:
                 raise HTTPNotFound()
 
-    def _get_id_from_kwargs(self, kwargs):
-        id_name = self.model.id_name
-        id_ = kwargs.pop(id_name)
-        return self.model.get_model_id().type.python_type(id_)
-
     def on_patch(self, req, resp, **kwargs):
-        self._raise_method_not_allowed('PATCH')
-        session = req.context['session']
-
-        if self.model.id_name in kwargs:
-            id_ = self._get_id_from_kwargs(kwargs)
-            req.context['body'][self.model.id_name] = id_
-            ids = self.model.update(session, req.context['body'])
-            if ids:
-                ids = ids[0]
-
-        else:
-            ids = self.model.update(session, req.context['body'])
-
-        if ids:
-            resp.body = ids
-        else:
-            raise HTTPNotFound()
+        self._update(req, resp, with_insert=False, **kwargs)
 
     def on_delete(self, req, resp, **kwargs):
         self._raise_method_not_allowed('DELETE')
         session = req.context['session']
 
-        if self.model.id_name in kwargs:
-            id_ = self._get_id_from_kwargs(kwargs)
+        if self._id_names_in_kwargs(kwargs):
+            id_ = self.model.get_ids_from_values(kwargs)
             self.model.delete(session, id_)
         else:
             self.model.delete(session, req.context['body'])
@@ -185,8 +175,8 @@ class FalconModelResource(FalconJsonSchemaResource):
         self._raise_method_not_allowed('GET')
         session = req.context['session']
 
-        if self.model.id_name in kwargs:
-            id_ = self._get_id_from_kwargs(kwargs)
+        if self._id_names_in_kwargs(kwargs):
+            id_ = self.model.get_ids_from_values(kwargs)
             resp.body = self.model.get(session, id_)
             if resp.body:
                 resp.body = resp.body[0]
