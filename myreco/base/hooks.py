@@ -39,7 +39,7 @@ class AuthorizationHook(object):
         if auth.startswith(basic_str):
             auth = req.auth.replace(basic_str, '')
 
-        auth = self.authorizer(auth)
+        auth = self.authorizer(auth, req.path, req.method)
 
         if auth is None:
             raise UnauthorizedError('Invalid authorization', self.realm)

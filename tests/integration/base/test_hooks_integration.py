@@ -36,8 +36,9 @@ def app():
 
 @pytest.fixture
 def resource(app):
-    def auth_func(auth_token):
-        if auth_token == '1':
+    def auth_func(auth_token, uri, method):
+        print(uri, method)
+        if auth_token == '1' and uri == '/' and method == 'GET':
             return True
         if auth_token == '2':
             return False
