@@ -413,3 +413,6 @@ def model_base_builder(
         name=MODEL_BASE_CLASS_NAME, metaclass=_SQLAlchemyModelMeta,
         cls=_SQLAlchemyModel, bind=bind, metadata=metadata,
         mapper=mapper, constructor=constructor)
+
+
+SQLAlchemyRedisModelBase = model_base_builder()
