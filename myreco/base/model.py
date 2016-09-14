@@ -36,7 +36,7 @@ from myreco.exceptions import ModelBaseError
 import json
 
 
-MODEL_BASE_CLASS_NAME = 'ModelBase'
+MODEL_BASE_CLASS_NAME = 'SQLAlchemyRedisModelBase'
 
 
 class _SQLAlchemyModelMeta(DeclarativeMeta):
