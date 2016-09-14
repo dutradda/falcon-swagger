@@ -331,7 +331,11 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
         if not todict or session.redis_bind is None:
             filters_ids = cls._build_filters_by_ids(ids)
-            return session.query(cls).filter(filters_ids).all()
+            insts = session.query(cls).filter(filters_ids).all()
+            if todict:
+                return [inst.todict() for inst in insts]
+            else:
+                return insts
 
         model_redis_key = session.build_model_redis_key(cls)
         ids_redis_keys = [str(id_) for id_ in ids]
