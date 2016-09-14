@@ -341,7 +341,6 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
         if ids:
             filters_ids = cls._build_filters_by_ids(ids)
-            print(filters_ids)
             instances = session.query(cls).filter(filters_ids).all()
             items = [(str(each.get_ids_values()), each.todict()) for each in instances]
             no_cached_map = OrderedDict(items)
