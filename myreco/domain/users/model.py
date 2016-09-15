@@ -31,12 +31,11 @@ import re
 class UsersModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'users'
     __table_args__ = {'mysql_engine':'innodb'}
-    id_names = ('email', 'password_hash')
 
-    id = sa.Column(sa.Integer, primary_key=True)
+    id = sa.Column(sa.String(255), primary_key=True)
     name = sa.Column(sa.String(255), unique=True, nullable=False)
     email = sa.Column(sa.String(255), unique=True, nullable=False)
-    password_hash = sa.Column(sa.String(255), nullable=False)
+    password = sa.Column(sa.String(255), nullable=False)
 
     grants_primaryjoin = 'UsersModel.id == users_grants.c.user_id'
     grants_secondaryjoin = 'and_('\
@@ -54,8 +53,7 @@ class UsersModel(SQLAlchemyRedisModelBase):
         if not ':' in authorization:
             return
 
-        user, pass_hash = authorization.split(':')
-        user = cls.get(session, (user, pass_hash))
+        user = cls.get(session, authorization)
         user = user[0] if user else user
         if user and not user.get('grants'):
             session.user = user
@@ -68,6 +66,33 @@ class UsersModel(SQLAlchemyRedisModelBase):
                         and grant['method']['method'] == method:
                     session.user = user
                     return True
+
+    @classmethod
+    def insert(cls, session, objs, commit=True, todict=True):
+        cls._set_objs_ids(objs)
+        return type(cls).insert(cls, session, objs, commit, todict)
+
+    @classmethod
+    def _set_objs_ids(cls, objs):
+        objs = cls._to_list(objs)
+        for obj in objs:
+            obj['id'] = '{}:{}'.format(obj['email'], obj['password'])
+
+    @classmethod
+    def update(cls, session, objs, commit=True, todict=True):
+        insts = SQLAlchemyRedisModelBase.update(cls, session, objs, commit=False, todict=False)
+        cls._set_insts_ids(insts)
+
+        if commit:
+            session.commit()
+
+        return cls._build_todict_list(insts) if todict else insts
+
+    @classmethod
+    def _set_insts_ids(cls, insts):
+        insts = cls._to_list(insts)
+        for inst in insts:
+            inst.id = '{}:{}'.format(inst,email, inst.password)
 
 
 class GrantsModel(SQLAlchemyRedisModelBase):
@@ -100,7 +125,8 @@ class MethodsModel(SQLAlchemyRedisModelBase):
 
 users_grants = sa.Table(
     'users_grants', SQLAlchemyRedisModelBase.metadata,
-    sa.Column('user_id', sa.Integer, sa.ForeignKey('users.id', ondelete='CASCADE')),
+    sa.Column('user_id', sa.String(255), sa.ForeignKey(
+        'users.id', ondelete='CASCADE', onupdate='CASCADE')),
     sa.Column('grant_uri_id', sa.Integer, sa.ForeignKey('grants.uri_id', ondelete='CASCADE')),
     sa.Column('grant_method_id', sa.Integer, sa.ForeignKey('grants.method_id', ondelete='CASCADE')),
     mysql_engine='innodb')
@@ -108,6 +134,6 @@ users_grants = sa.Table(
 
 users_stores = sa.Table(
     'users_stores', SQLAlchemyRedisModelBase.metadata,
-    sa.Column('user_id', sa.Integer, sa.ForeignKey('users.id', ondelete='CASCADE')),
+    sa.Column('user_id', sa.String(255), sa.ForeignKey('users.id', ondelete='CASCADE')),
     sa.Column('store_id', sa.Integer, sa.ForeignKey('stores.id', ondelete='CASCADE')),
     mysql_engine='innodb')

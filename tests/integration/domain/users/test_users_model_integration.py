@@ -62,12 +62,12 @@ class TestUsersModelIntegrationWithAuthorizationHook(object):
         user = {
             'name': 'test',
             'email': 'test@test',
-            'password_hash': '123'
+            'password': '123'
         }
         UsersModel.insert(session, user)
 
         authorization = \
-            b64encode('{}:{}'.format(user['email'], user['password_hash']).encode()).decode()
+            b64encode('{}:{}'.format(user['email'], user['password']).encode()).decode()
         headers = {
             'Authorization': authorization
         }
@@ -80,13 +80,13 @@ class TestUsersModelIntegrationWithAuthorizationHook(object):
         user = {
             'name': 'test',
             'email': 'test@test',
-            'password_hash': '123',
+            'password': '123',
             'grants': [{'uri': {'uri': '/test/{id}'}, 'method': {'method': 'POST'}}]
         }
         UsersModel.insert(session, user)
 
         authorization = \
-            b64encode('{}:{}'.format(user['email'], user['password_hash']).encode()).decode()
+            b64encode('{}:{}'.format(user['email'], user['password']).encode()).decode()
         headers = {
             'Authorization': authorization
         }
@@ -100,13 +100,13 @@ class TestUsersModelIntegrationWithAuthorizationHook(object):
         user = {
             'name': 'test',
             'email': 'test@test',
-            'password_hash': '123',
+            'password': '123',
             'grants': [{'uri': {'uri': '/test/{id}'}, 'method': {'method': 'POST'}}]
         }
         UsersModel.insert(session, user)
 
         authorization = \
-            b64encode('{}:{}'.format(user['email'], user['password_hash']).encode()).decode()
+            b64encode('{}:{}'.format(user['email'], user['password']).encode()).decode()
         headers = {
             'Authorization': authorization
         }
@@ -141,10 +141,10 @@ class TestUsersModel(object):
         user = {
             'name': 'test',
             'email': 'test@test',
-            'password_hash': '123'
+            'password': '123'
         }
         UsersModel.insert(session, user)
-        authorization = b64encode('{}:{}'.format(user['email'], user['password_hash']).encode())
+        authorization = b64encode('{}:{}'.format(user['email'], user['password']).encode())
         redis.hmget.return_value = [None]
 
         assert UsersModel.authorize(session, authorization, None, None, None) is True
@@ -153,11 +153,11 @@ class TestUsersModel(object):
         user = {
             'name': 'test',
             'email': 'test@test',
-            'password_hash': '123',
+            'password': '123',
             'grants': [{'uri': {'uri': '/test'}, 'method': {'method': 'POST'}}]
         }
         UsersModel.insert(session, user)
-        authorization = b64encode('{}:{}'.format(user['email'], user['password_hash']).encode())
+        authorization = b64encode('{}:{}'.format(user['email'], user['password']).encode())
         redis.hmget.return_value = [None]
 
         assert UsersModel.authorize(session, authorization, '', '/test', 'POST') is True
@@ -166,11 +166,11 @@ class TestUsersModel(object):
         user = {
             'name': 'test',
             'email': 'test@test',
-            'password_hash': '123',
+            'password': '123',
             'grants': [{'uri': {'uri': '/test'}, 'method': {'method': 'POST'}}]
         }
         UsersModel.insert(session, user)
-        authorization = b64encode('{}:{}'.format(user['email'], user['password_hash']).encode())
+        authorization = b64encode('{}:{}'.format(user['email'], user['password']).encode())
         redis.hmget.return_value = [None]
 
         assert UsersModel.authorize(session, authorization, '', '/tes', 'POST') is None

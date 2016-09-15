@@ -134,10 +134,10 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
         if commit:
             session.commit()
 
-        if todict:
-            new_insts = [inst.todict() for inst in new_insts]
+        return cls._build_todict_list(new_insts) if todict else list(new_insts)
 
-        return list(new_insts)
+    def _build_todict_list(cls, insts):
+        return [inst.todict() for inst in insts]
 
     def _to_list(cls, objs):
         return objs if isinstance(objs, list) else [objs]
@@ -274,25 +274,22 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
             rels_.extend(inserted_objs)
             values[attr_name] = rels_
 
-    def update(cls, session, objs):
+    def update(cls, session, objs, commit=True, todict=True):
         input_ = deepcopy(objs)
+
         objs = cls._to_list(objs)
         ids_objs_map = {cls.get_ids_from_values(obj): obj for obj in objs}
+
         insts = cls.get(session, list(ids_objs_map.keys()), todict=False)
         id_insts_map = {inst.get_ids_values(): inst for inst in insts}
 
         for id_, inst in id_insts_map.items():
             cls._update_instance(session, inst, ids_objs_map[id_], input_)
 
-        session.commit()
+        if commit:
+            session.commit()
 
-        updated_ids = []
-        for inst in id_insts_map.values():
-            dict_inst = {id_name: id_value \
-                for id_name, id_value in zip(cls.id_names, inst.get_ids_values())}
-            updated_ids.append(dict_inst)
-
-        return updated_ids
+        return cls._build_todict_list(insts) if todict else insts
 
     def delete(cls, session, ids, commit=True):
         ids = cls._to_list(ids)
@@ -321,7 +318,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
             if offset is not None:
                 query = query.offset(offset)
 
-            return [each.todict() for each in query.all()] if todict else query.all()
+            return cls._build_todict_list(query.all()) if todict else query.all()
 
         return cls._get_many(session, ids, todict=todict)
 

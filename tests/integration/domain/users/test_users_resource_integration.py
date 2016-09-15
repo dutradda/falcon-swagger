@@ -48,7 +48,7 @@ def resource(app, session):
     user = {
         'name': 'test',
         'email': 'test',
-        'password_hash': 'test'
+        'password': 'test'
     }
     resource_.model.insert(session, user)
 
@@ -79,7 +79,7 @@ class TestUsersResourcePost(object):
         user = {
             'name': 'test2',
             'email': 'test2',
-            'password_hash': 'test',
+            'password': 'test',
             'grants': [{
                 'uri_id': 1,
                 'method_id': 1,
@@ -90,10 +90,10 @@ class TestUsersResourcePost(object):
 
         assert resp.status_code == 201
         assert json.loads(resp.body) == {
-            'id': 2,
+            'id': 'test2:test',
             'name': 'test2',
             'email': 'test2',
-            'password_hash': 'test',
+            'password': 'test',
             'grants': [{
                 'method_id': 1,
                 'uri_id': 1,
@@ -108,7 +108,7 @@ class TestUsersResourcePost(object):
         user = {
             'name': 'test2',
             'email': 'test2',
-            'password_hash': 'test',
+            'password': 'test',
             'grants': [{
                 'uri': {'id': 2, '_update': True},
                 'method': {'id': 2, '_update': True}
@@ -118,10 +118,10 @@ class TestUsersResourcePost(object):
 
         assert resp.status_code == 201
         assert json.loads(resp.body) == {
-            'id': 2,
+            'id': 'test2:test',
             'name': 'test2',
             'email': 'test2',
-            'password_hash': 'test',
+            'password': 'test',
             'grants': [{
                 'method_id': 2,
                 'uri_id': 2,
@@ -136,7 +136,7 @@ class TestUsersResourcePost(object):
         user = {
             'name': 'test2',
             'email': 'test2',
-            'password_hash': 'test',
+            'password': 'test',
             'grants': [{
                 'uri': {'uri': '/test3'},
                 'method': {'method': 'put'}
@@ -147,10 +147,10 @@ class TestUsersResourcePost(object):
         print(resp.body)
         assert resp.status_code == 201
         assert json.loads(resp.body) == {
-            'id': 2,
+            'id': 'test2:test',
             'name': 'test2',
             'email': 'test2',
-            'password_hash': 'test',
+            'password': 'test',
             'grants': [{
                 'method_id': 3,
                 'uri_id': 3,
@@ -164,7 +164,7 @@ class TestUsersResourcePost(object):
         user = {
             'name': 'test2',
             'email': 'test2',
-            'password_hash': 'test',
+            'password': 'test',
             'grants': [{
                 'uri_id': 1,
                 'method_id': 1
