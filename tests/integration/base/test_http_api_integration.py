@@ -33,7 +33,10 @@ def model1(model_base):
 
 @pytest.fixture
 def resource1(model1, app):
-    return FalconModelResource(app, ['post', 'get', 'put'], model1)
+    class Resource(FalconModelResource):
+        pass
+
+    return Resource(app, ['post', 'get', 'put'], model1)
 
 
 @pytest.fixture

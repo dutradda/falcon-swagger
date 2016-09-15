@@ -1,0 +1,83 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "title": "Recommendations Users",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["name", "email", "password_hash", "grants"],
+    "properties": {
+        "name": {"type": "string"},
+        "email": {"type": "string"},
+        "password_hash": {"type": "string"},
+        "grants": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": {"$ref": "#/definitions/grants"}
+        }
+    },
+    "definitions": {
+        "grants": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["uri_id", "method_id", "_update"],
+                    "properties": {
+                        "uri_id": {"type": "integer"},
+                        "method_id": {"type": "integer"},
+                        "_update": {"enum": [true]}
+                    }
+                },{
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["uri", "method"],
+                    "properties": {
+                        "uri": {"$ref": "#/definitions/uri"},
+                        "method": {"$ref": "#/definitions/method"}
+                    }
+                }
+            ]
+        },
+        "uri": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["id", "_update"],
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "regex": {"type": "string"},
+                        "_update": {"enum": [true]}
+                    }
+                },{
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["regex"],
+                    "properties": {
+                        "regex": {"type": "string"}
+                    }
+                }
+            ]
+        },
+        "method": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["id", "_update"],
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "_update": {"enum": [true]}
+                    }
+                },{
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["method"],
+                    "properties": {
+                        "method": {"type": "string"}
+                    }
+                }
+            ]
+        }
+    }
+}

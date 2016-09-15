@@ -26,8 +26,12 @@ from falcon.errors import HTTPMethodNotAllowed, HTTPNotFound
 from falcon import HTTP_CREATED, HTTP_NO_CONTENT
 from myreco.base.session import Session
 from myreco.exceptions import JSONError
+from importlib import import_module
+from glob import glob
+from re import match as re_match
 
 import os.path
+import json
 
 
 class FalconJsonSchemaResource(object):
@@ -70,33 +74,11 @@ class FalconJsonSchemaResource(object):
 
 
 class FalconModelResource(FalconJsonSchemaResource):
-    def __init__(
-            self, api, allowed_methods,
-            model, api_prefix='/',
-            post_input_json_schema={},
-            post_output_json_schema={},
-            put_input_json_schema={},
-            put_output_json_schema={},
-            patch_input_json_schema={},
-            patch_output_json_schema={},
-            delete_input_json_schema={},
-            delete_output_json_schema={},
-            get_input_json_schema={},
-            get_output_json_schema={}):
+    def __init__(self, api, allowed_methods, model, api_prefix='/', **kwargs):
         self.allowed_methods = [am.upper() for am in allowed_methods]
         self.model = model
         self._add_route(api, api_prefix)
-        FalconJsonSchemaResource.__init__(
-            self, post_input_json_schema,
-            post_output_json_schema,
-            put_input_json_schema,
-            put_output_json_schema,
-            patch_input_json_schema,
-            patch_output_json_schema,
-            delete_input_json_schema,
-            delete_output_json_schema,
-            get_input_json_schema,
-            get_output_json_schema)
+        FalconJsonSchemaResource.__init__(self, **self._build_schemas(kwargs))
 
     def _add_route(self, api, api_prefix):
         uri = uri_single = os.path.join(api_prefix, '{}/'.format(self.model.tablename))
@@ -106,6 +88,23 @@ class FalconModelResource(FalconJsonSchemaResource):
 
         api.add_route(uri, self)
         api.add_route(uri_single, self)
+
+    def _build_schemas(self, user_schemas):
+        schemas = user_schemas
+        module_filename = import_module(type(self).__module__).__file__
+        module_path = os.path.dirname(os.path.abspath(module_filename))
+        schemas_path = os.path.join(module_path, 'schemas')
+        schemas_glob = os.path.join(schemas_path, '*.json')
+        schema_regex = '(post|put|patch|delete|get)_(input|output).json'
+
+        for json_schema_filename in glob(schemas_glob):
+            json_schema_basename = os.path.basename(json_schema_filename)
+            if re_match(schema_regex, json_schema_basename):
+                with open(json_schema_filename) as json_schema_file:
+                    schema_name = json_schema_basename.replace('.json', '_json_schema')
+                    schemas[schema_name] = json.load(json_schema_file)
+
+        return schemas
 
     def on_post(self, req, resp, **kwargs):
         self._raise_method_not_allowed('POST')

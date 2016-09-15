@@ -22,8 +22,9 @@
 
 
 from myreco.base.model import SQLAlchemyRedisModelBase
-import sqlalchemy as sa
 from base64 import b64decode
+import sqlalchemy as sa
+import re
 
 
 class UsersModel(SQLAlchemyRedisModelBase):
@@ -35,7 +36,13 @@ class UsersModel(SQLAlchemyRedisModelBase):
     name = sa.Column(sa.String(255), unique=True, nullable=False)
     email = sa.Column(sa.String(255), unique=True, nullable=False)
     password_hash = sa.Column(sa.String(255), nullable=False)
-    grants = sa.orm.relationship('GrantsModel', uselist=True, secondary='users_grants')
+    primaryjoin = 'UsersModel.id == users_grants.c.user_id'
+    secondaryjoin = 'and_('\
+            'GrantsModel.uri_id == users_grants.c.grant_uri_id, '\
+            'GrantsModel.method_id == users_grants.c.grant_method_id)'
+    grants = sa.orm.relationship(
+        'GrantsModel', uselist=True, secondary='users_grants',
+        primaryjoin=primaryjoin, secondaryjoin=secondaryjoin)
 
     @classmethod
     def authorize(cls, session, authorization, uri, method):
@@ -51,17 +58,17 @@ class UsersModel(SQLAlchemyRedisModelBase):
 
         elif user:
             for grant in user['grants']:
-                if grant['uri']['uri'] == uri and grant['method']['method'] == method:
+                if re.match(grant['uri']['regex'], uri) and grant['method']['method'] == method:
                     return True
 
 
 class GrantsModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'grants'
     __table_args__ = {'mysql_engine':'innodb'}
+    id_names = ('uri_id', 'method_id')
 
-    id = sa.Column(sa.Integer, primary_key=True)
-    uri_id = sa.Column(sa.ForeignKey('uris.id'), nullable=False)
-    method_id = sa.Column(sa.ForeignKey('methods.id'), nullable=False)
+    uri_id = sa.Column(sa.ForeignKey('uris.id'), primary_key=True)
+    method_id = sa.Column(sa.ForeignKey('methods.id'), primary_key=True)
 
     uri = sa.orm.relationship('URIsModel')
     method = sa.orm.relationship('MethodsModel')
@@ -72,7 +79,7 @@ class URIsModel(SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}
 
     id = sa.Column(sa.Integer, primary_key=True)
-    uri = sa.Column(sa.String(255), unique=True, nullable=False)
+    regex = sa.Column(sa.String(255), unique=True, nullable=False)
 
 
 class MethodsModel(SQLAlchemyRedisModelBase):
@@ -86,6 +93,6 @@ class MethodsModel(SQLAlchemyRedisModelBase):
 users_grants = sa.Table(
     'users_grants', SQLAlchemyRedisModelBase.metadata,
     sa.Column('user_id', sa.Integer, sa.ForeignKey('users.id', ondelete='CASCADE')),
-    sa.Column('grant_id', sa.Integer, sa.ForeignKey('grants.id', ondelete='CASCADE')),
-    mysql_engine='innodb'
-)
+    sa.Column('grant_uri_id', sa.Integer, sa.ForeignKey('grants.uri_id', ondelete='CASCADE')),
+    sa.Column('grant_method_id', sa.Integer, sa.ForeignKey('grants.method_id', ondelete='CASCADE')),
+    mysql_engine='innodb')

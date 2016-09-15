@@ -23,6 +23,9 @@
 
 from myreco.domain.users.model import UsersModel
 from myreco.base.model import SQLAlchemyRedisModelBase
+from myreco.base.hooks import AuthorizationHook
+from myreco.base.http_api import HttpAPI
+from falcon import before as falcon_before
 from unittest import mock
 
 import pytest
@@ -32,6 +35,104 @@ from base64 import b64encode
 @pytest.fixture
 def model_base():
     return SQLAlchemyRedisModelBase
+
+
+@pytest.fixture
+def app(session):
+    return HttpAPI(session.bind)
+
+
+@pytest.fixture
+def resource(app):
+    @falcon_before(AuthorizationHook(UsersModel.authorize, 'test'))
+    class Resource(object):
+        allowed_methods = ['post']
+
+        def on_post(self, req, resp, **kwargs):
+            pass
+
+    resource_ = Resource()
+    app.add_route('/test/', resource_)
+    app.add_route('/test/{id}', resource_)
+    return resource_
+
+
+class TestUsersModelIntegrationWithAuthorizationHook(object):
+    def test_user_authorized_without_uri_and_methods(self, session, client, resource):
+        user = {
+            'name': 'test',
+            'email': 'test@test',
+            'password_hash': '123'
+        }
+        UsersModel.insert(session, user)
+
+        authorization = \
+            b64encode('{}:{}'.format(user['email'], user['password_hash']).encode()).decode()
+        headers = {
+            'Authorization': authorization
+        }
+
+        resp = client.post('/test/', headers=headers)
+        assert resp.status_code == 200
+        assert resp.body == ''
+
+    def test_user_authorized_with_uri_and_methods(self, session, client, resource):
+        user = {
+            'name': 'test',
+            'email': 'test@test',
+            'password_hash': '123',
+            'grants': [{'uri': {'regex': '/test/\d+'}, 'method': {'method': 'POST'}}]
+        }
+        UsersModel.insert(session, user)
+
+        authorization = \
+            b64encode('{}:{}'.format(user['email'], user['password_hash']).encode()).decode()
+        headers = {
+            'Authorization': authorization
+        }
+
+        resp = client.post('/test/1/', headers=headers)
+        assert resp.status_code == 200
+        assert resp.body == ''
+
+    def test_user_not_authorized_with_wrong_uri(self, session, client, resource):
+        user = {
+            'name': 'test',
+            'email': 'test@test',
+            'password_hash': '123',
+            'grants': [{'uri': {'regex': '/test/\d+'}, 'method': {'method': 'POST'}}]
+        }
+        UsersModel.insert(session, user)
+
+        authorization = \
+            b64encode('{}:{}'.format(user['email'], user['password_hash']).encode()).decode()
+        headers = {
+            'Authorization': authorization
+        }
+
+        resp = client.post('/test/a/', headers=headers)
+        assert resp.status_code == 401
+        assert resp.body == '{"error": "Invalid authorization"}'
+
+    def test_user_not_authorized_without_user(self, session, client, resource):
+        authorization = b64encode('test:test'.encode()).decode()
+        headers = {
+            'Authorization': authorization
+        }
+
+        resp = client.post('/test/1/', headers=headers)
+        assert resp.status_code == 401
+        assert resp.body == '{"error": "Invalid authorization"}'
+
+    def test_user_not_authorized_with_authorization_without_colon(self, session, client, resource):
+        authorization = b64encode('test'.encode()).decode()
+        headers = {
+            'Authorization': authorization
+        }
+
+        resp = client.post('/test/1/', headers=headers)
+        assert resp.status_code == 401
+        assert resp.body == '{"error": "Invalid authorization"}'
 
 
 class TestUsersModel(object):
@@ -52,7 +153,7 @@ class TestUsersModel(object):
             'name': 'test',
             'email': 'test@test',
             'password_hash': '123',
-            'grants': [{'uri': {'uri': '/test'}, 'method': {'method': 'POST'}}]
+            'grants': [{'uri': {'regex': '/test'}, 'method': {'method': 'POST'}}]
         }
         UsersModel.insert(session, user)
         authorization = b64encode('{}:{}'.format(user['email'], user['password_hash']).encode())
@@ -65,7 +166,7 @@ class TestUsersModel(object):
             'name': 'test',
             'email': 'test@test',
             'password_hash': '123',
-            'grants': [{'uri': {'uri': '/test'}, 'method': {'method': 'POST'}}]
+            'grants': [{'uri': {'regex': '/test'}, 'method': {'method': 'POST'}}]
         }
         UsersModel.insert(session, user)
         authorization = b64encode('{}:{}'.format(user['email'], user['password_hash']).encode())

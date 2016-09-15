@@ -22,6 +22,7 @@
 
 
 from myreco.domain.users.resource import UsersResource
+from myreco.domain.users.model import GrantsModel, URIsModel, MethodsModel
 from myreco.base.model import SQLAlchemyRedisModelBase
 from myreco.base.http_api import HttpAPI
 from unittest import mock
@@ -42,103 +43,162 @@ def app(session):
 
 
 @pytest.fixture
-def resource(app):
-    return UsersResource(app)
+def resource(app, session):
+    resource_ = UsersResource(app)
+    user = {
+        'name': 'test',
+        'email': 'test',
+        'password_hash': 'test'
+    }
+    resource_.model.insert(session, user)
+
+    grants = [{
+        'uri': {'regex': '/test'},
+        'method': {'method': 'post'}
+    }]
+    GrantsModel.insert(session, grants)
+
+    uri = {'regex': '/test2'}
+    URIsModel.insert(session, uri)
+
+    method = {'method': 'get'}
+    MethodsModel.insert(session, method)
+
+    return resource_
 
 
-class TestUsersResource(object):
-    def test_user_authorized_without_uri_and_methods(self, resource, client, session):
+@pytest.fixture
+def headers():
+    return {
+        'Authorization': b64encode('test:test'.encode()).decode()
+    }
+
+
+class TestUsersResourcePost(object):
+    def test_post_valid_grants_update(self, resource, client, headers):
         user = {
-            'name': 'test',
-            'email': 'test@test',
-            'password_hash': '123'
-        }
-        resource.model.insert(session, user)
-
-        authorization = \
-            b64encode('{}:{}'.format(user['email'], user['password_hash']).encode()).decode()
-        headers = {
-            'Authorization': 'Basic {}'.format(authorization)
-        }
-
-        resp = client.get('/users/', headers=headers)
-        assert resp.status_code == 200
-        assert json.loads(resp.body) == [{
-            'email': 'test@test',
-            'name': 'test',
-            'grants': [],
-            'id': 1,
-            'password_hash': '123'
-        }]
-
-    def test_user_authorized_with_uri_and_methods(self, resource, client, session):
-        user = {
-            'name': 'test',
-            'email': 'test@test',
-            'password_hash': '123',
-            'grants': [{'uri': {'uri': '/users'}, 'method': {'method': 'GET'}}]
-        }
-        resource.model.insert(session, user)
-
-        authorization = \
-            b64encode('{}:{}'.format(user['email'], user['password_hash']).encode()).decode()
-        headers = {
-            'Authorization': 'Basic {}'.format(authorization)
-        }
-
-        resp = client.get('/users/', headers=headers)
-        assert resp.status_code == 200
-        assert json.loads(resp.body) == [{
-            'email': 'test@test',
-            'name': 'test',
+            'name': 'test2',
+            'email': 'test2',
+            'password_hash': 'test',
             'grants': [{
-                "uri_id": 1,
-                "id": 1,
-                "uri": {
-                    "id": 1,
-                    "uri": "/users"
-                },
-                "method_id": 1,
-                "method": {
-                    "id": 1,
-                    "method": "GET"
-                }
-            }],
-            'id': 1,
-            'password_hash': '123'
-        }]
+                'uri_id': 1,
+                'method_id': 1,
+                '_update': True
+            }]
+        }
+        resp = client.post('/users', data=json.dumps(user), headers=headers)
 
-    def test_user_not_authorized_with_wrong_uri(self, session, resource, client):
+        assert resp.status_code == 201
+        assert json.loads(resp.body) == {
+            'id': 2,
+            'name': 'test2',
+            'email': 'test2',
+            'password_hash': 'test',
+            'grants': [{
+                'method_id': 1,
+                'uri_id': 1,
+                'method': {'id': 1, 'method': 'post'},
+                'uri': {'id': 1, 'regex': '/test'}
+            }]
+        }
+
+    def test_post_valid_with_grants_insert_and_uri_and_method_update(
+            self, resource, client, headers):
         user = {
-            'name': 'test',
-            'email': 'test@test',
-            'password_hash': '123',
-            'grants': [{'uri': {'uri': '/user'}, 'method': {'method': 'GET'}}]
+            'name': 'test2',
+            'email': 'test2',
+            'password_hash': 'test',
+            'grants': [{
+                'uri': {'id': 2, '_update': True},
+                'method': {'id': 2, '_update': True}
+            }]
         }
-        resource.model.insert(session, user)
+        resp = client.post('/users', data=json.dumps(user), headers=headers)
 
-        authorization = \
-            b64encode('{}:{}'.format(user['email'], user['password_hash']).encode()).decode()
-        headers = {
-            'Authorization': 'Basic {}'.format(authorization)
+        assert resp.status_code == 201
+        assert json.loads(resp.body) == {
+            'id': 2,
+            'name': 'test2',
+            'email': 'test2',
+            'password_hash': 'test',
+            'grants': [{
+                'method_id': 2,
+                'uri_id': 2,
+                'method': {'id': 2, 'method': 'get'},
+                'uri': {'id': 2, 'regex': '/test2'}
+            }]
         }
 
-        resp = client.get('/users/', headers=headers)
-        assert resp.status_code == 401
-        assert resp.body == json.dumps({'error': 'Invalid authorization'})
-
-    def test_user_not_authorized_without_user(self, session, resource, client):
-        authorization = b64encode('test:test'.encode()).decode()
-        headers = {
-            'Authorization': 'Basic {}'.format(authorization)
+    def test_post_valid_with_grants_uri_and_method_insert(
+            self, resource, client, headers):
+        user = {
+            'name': 'test2',
+            'email': 'test2',
+            'password_hash': 'test',
+            'grants': [{
+                'uri': {'regex': '/test3'},
+                'method': {'method': 'put'}
+            }]
         }
-        resp = client.get('/users/', headers=headers)
+        resp = client.post('/users', data=json.dumps(user), headers=headers)
 
-        assert resp.status_code == 401
-        assert resp.body == json.dumps({'error': 'Invalid authorization'})
+        assert resp.status_code == 201
+        assert json.loads(resp.body) == {
+            'id': 2,
+            'name': 'test2',
+            'email': 'test2',
+            'password_hash': 'test',
+            'grants': [{
+                'method_id': 3,
+                'uri_id': 3,
+                'method': {'id': 3, 'method': 'put'},
+                'uri': {'id': 3, 'regex': '/test3'}
+            }]
+        }
 
-    def test_user_not_authorized_without_authorization_header(self, session, resource, client):
-        resp = client.get('/users/')
+    def test_post_invalid_json(self, resource, client, headers):
+        user = {
+            'name': 'test2',
+            'email': 'test2',
+            'password_hash': 'test',
+            'grants': [{
+                'uri_id': 1,
+                'method_id': 1
+            }]
+        }
+        resp = client.post('/users', data=json.dumps(user), headers=headers)
 
-        assert resp.status_code == 401
-        assert resp.body == json.dumps({'error': 'Authorization header is required'})
+        assert resp.status_code == 400
+        result = json.loads(resp.body)
+        message = result['error'].pop('message')
+        assert message == \
+                "{'method_id': 1, 'uri_id': 1} is not valid under any of the given schemas" \
+            or message == \
+                "{'uri_id': 1, 'method_id': 1} is not valid under any of the given schemas"
+        assert result == {
+            'error': {
+                'input': {'method_id': 1, 'uri_id': 1},
+                'schema': {
+                    'oneOf': [
+                        {
+                            'type': 'object',
+                            'additionalProperties': False,
+                            'required': ['uri_id', 'method_id', '_update'],
+                            'properties': {
+                                '_update': {'enum': [True]},
+                                'method_id': {'type': 'integer'},
+                                'uri_id': {'type': 'integer'}
+                            }
+                        },{
+                            'type': 'object',
+                            'additionalProperties': False,
+                            'required': ['uri', 'method'],
+                            'properties': {
+                                'method': {'$ref': '#/definitions/method'},
+                                'uri': {'$ref': '#/definitions/uri'}
+                            }
+                        }
+                    ]
+                }
+            }
+        }
