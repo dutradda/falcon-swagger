@@ -22,6 +22,7 @@
 
 
 from myreco.base.model import SQLAlchemyRedisModelBase
+from myreco.domain.stores.model import StoresModel
 from base64 import b64decode
 import sqlalchemy as sa
 import re
@@ -36,16 +37,19 @@ class UsersModel(SQLAlchemyRedisModelBase):
     name = sa.Column(sa.String(255), unique=True, nullable=False)
     email = sa.Column(sa.String(255), unique=True, nullable=False)
     password_hash = sa.Column(sa.String(255), nullable=False)
-    primaryjoin = 'UsersModel.id == users_grants.c.user_id'
-    secondaryjoin = 'and_('\
+
+    grants_primaryjoin = 'UsersModel.id == users_grants.c.user_id'
+    grants_secondaryjoin = 'and_('\
             'GrantsModel.uri_id == users_grants.c.grant_uri_id, '\
             'GrantsModel.method_id == users_grants.c.grant_method_id)'
+
     grants = sa.orm.relationship(
         'GrantsModel', uselist=True, secondary='users_grants',
-        primaryjoin=primaryjoin, secondaryjoin=secondaryjoin)
+        primaryjoin=grants_primaryjoin, secondaryjoin=grants_secondaryjoin)
+    stores = sa.orm.relationship('StoresModel', uselist=True, secondary='users_stores')
 
     @classmethod
-    def authorize(cls, session, authorization, uri, method):
+    def authorize(cls, session, authorization, uri, path, method):
         authorization = b64decode(authorization).decode()
         if not ':' in authorization:
             return
@@ -54,11 +58,15 @@ class UsersModel(SQLAlchemyRedisModelBase):
         user = cls.get(session, (user, pass_hash))
         user = user[0] if user else user
         if user and not user.get('grants'):
+            session.user = user
             return True
 
         elif user:
             for grant in user['grants']:
-                if re.match(grant['uri']['regex'], uri) and grant['method']['method'] == method:
+                grant_uri = grant['uri']['uri']
+                if bool(grant_uri == uri) != bool(grant_uri == path) \
+                        and grant['method']['method'] == method:
+                    session.user = user
                     return True
 
 
@@ -79,7 +87,7 @@ class URIsModel(SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}
 
     id = sa.Column(sa.Integer, primary_key=True)
-    regex = sa.Column(sa.String(255), unique=True, nullable=False)
+    uri = sa.Column(sa.String(255), unique=True, nullable=False)
 
 
 class MethodsModel(SQLAlchemyRedisModelBase):
@@ -95,4 +103,11 @@ users_grants = sa.Table(
     sa.Column('user_id', sa.Integer, sa.ForeignKey('users.id', ondelete='CASCADE')),
     sa.Column('grant_uri_id', sa.Integer, sa.ForeignKey('grants.uri_id', ondelete='CASCADE')),
     sa.Column('grant_method_id', sa.Integer, sa.ForeignKey('grants.method_id', ondelete='CASCADE')),
+    mysql_engine='innodb')
+
+
+users_stores = sa.Table(
+    'users_stores', SQLAlchemyRedisModelBase.metadata,
+    sa.Column('user_id', sa.Integer, sa.ForeignKey('users.id', ondelete='CASCADE')),
+    sa.Column('store_id', sa.Integer, sa.ForeignKey('stores.id', ondelete='CASCADE')),
     mysql_engine='innodb')

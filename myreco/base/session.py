@@ -35,6 +35,7 @@ class _SessionBase(SessionSA):
             autocommit=False, twophase=False, weak_identity_map=True,
             binds=None, extension=None, info=None, query_cls=Query, redis_bind=None):
         self.redis_bind = redis_bind
+        self.user = None
         self._clean_redis_sets()
         SessionSA.__init__(
             self, bind=bind, autoflush=autoflush, expire_on_commit=expire_on_commit,

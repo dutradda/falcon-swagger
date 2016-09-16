@@ -53,12 +53,12 @@ def resource(app, session):
     resource_.model.insert(session, user)
 
     grants = [{
-        'uri': {'regex': '/test'},
+        'uri': {'uri': '/test'},
         'method': {'method': 'post'}
     }]
     GrantsModel.insert(session, grants)
 
-    uri = {'regex': '/test2'}
+    uri = {'uri': '/test2'}
     URIsModel.insert(session, uri)
 
     method = {'method': 'get'}
@@ -98,8 +98,9 @@ class TestUsersResourcePost(object):
                 'method_id': 1,
                 'uri_id': 1,
                 'method': {'id': 1, 'method': 'post'},
-                'uri': {'id': 1, 'regex': '/test'}
-            }]
+                'uri': {'id': 1, 'uri': '/test'}
+            }],
+            'stores': []
         }
 
     def test_post_valid_with_grants_insert_and_uri_and_method_update(
@@ -125,8 +126,9 @@ class TestUsersResourcePost(object):
                 'method_id': 2,
                 'uri_id': 2,
                 'method': {'id': 2, 'method': 'get'},
-                'uri': {'id': 2, 'regex': '/test2'}
-            }]
+                'uri': {'id': 2, 'uri': '/test2'}
+            }],
+            'stores': []
         }
 
     def test_post_valid_with_grants_uri_and_method_insert(
@@ -136,12 +138,13 @@ class TestUsersResourcePost(object):
             'email': 'test2',
             'password_hash': 'test',
             'grants': [{
-                'uri': {'regex': '/test3'},
+                'uri': {'uri': '/test3'},
                 'method': {'method': 'put'}
             }]
         }
         resp = client.post('/users', data=json.dumps(user), headers=headers)
 
+        print(resp.body)
         assert resp.status_code == 201
         assert json.loads(resp.body) == {
             'id': 2,
@@ -152,8 +155,9 @@ class TestUsersResourcePost(object):
                 'method_id': 3,
                 'uri_id': 3,
                 'method': {'id': 3, 'method': 'put'},
-                'uri': {'id': 3, 'regex': '/test3'}
-            }]
+                'uri': {'id': 3, 'uri': '/test3'}
+            }],
+            'stores': []
         }
 
     def test_post_invalid_json(self, resource, client, headers):

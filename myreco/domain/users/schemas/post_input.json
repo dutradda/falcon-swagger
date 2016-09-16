@@ -46,15 +46,15 @@
                     "required": ["id", "_update"],
                     "properties": {
                         "id": {"type": "integer"},
-                        "regex": {"type": "string"},
+                        "uri": {"type": "string"},
                         "_update": {"enum": [true]}
                     }
                 },{
                     "type": "object",
                     "additionalProperties": false,
-                    "required": ["regex"],
+                    "required": ["uri"],
                     "properties": {
-                        "regex": {"type": "string"}
+                        "uri": {"type": "string"}
                     }
                 }
             ]

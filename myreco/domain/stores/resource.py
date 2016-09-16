@@ -22,6 +22,7 @@
 
 
 from myreco.domain.users.model import UsersModel
+from myreco.domain.stores.model import StoresModel
 from myreco.domain.constants import AUTH_REALM
 from myreco.base.resource import FalconModelResource
 from myreco.base.hooks import AuthorizationHook

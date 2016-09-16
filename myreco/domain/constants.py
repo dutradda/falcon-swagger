@@ -21,15 +21,4 @@
 # SOFTWARE.
 
 
-from myreco.domain.users.model import UsersModel
-from myreco.domain.constants import AUTH_REALM
-from myreco.base.resource import FalconModelResource
-from myreco.base.hooks import AuthorizationHook
-from falcon import before as falcon_before
-
-
-@falcon_before(AuthorizationHook(UsersModel.authorize, AUTH_REALM))
-class UsersResource(FalconModelResource):
-    def __init__(self, api):
-        allowed_methods = ['POST', 'PUT', 'PATCH', 'DELETE', 'GET']
-        FalconModelResource.__init__(self, api, allowed_methods, UsersModel)
+AUTH_REALM = 'myreco'

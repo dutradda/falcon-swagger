@@ -40,7 +40,8 @@ class AuthorizationHook(object):
             authorization = authorization.replace(basic_str, '')
 
         session = req.context['session']
-        authorization = self.authorizer(session, authorization, req.path, req.method)
+        authorization = self.authorizer(session, authorization,
+            req.uri_template, req.path, req.method)
 
         if authorization is None:
             raise UnauthorizedError('Invalid authorization', self.realm)
