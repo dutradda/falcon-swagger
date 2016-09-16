@@ -90,13 +90,13 @@ class TestFalconModelResourcePost(object):
         resource = FalconModelResource(api, ['post'], model)
 
         with pytest.raises(HTTPNotFound):
-            resource.on_post(mock.MagicMock(), mock.MagicMock(), id_test=1)
+            resource.on_post(mock.MagicMock(method='post'), mock.MagicMock(), id_test=1)
 
     def test_on_post_created_with_object(self, model, api):
         model.insert = mock.MagicMock(return_value=[{'id_test': 1}])
         resource = FalconModelResource(api, ['post'], model, '/testing')
         resp = mock.MagicMock()
-        req = mock.MagicMock()
+        req = mock.MagicMock(method='post')
         req.context = {'body': {}, 'session': mock.MagicMock()}
 
         resource.on_post(req, resp)
@@ -108,7 +108,7 @@ class TestFalconModelResourcePost(object):
         model.insert = mock.MagicMock(return_value=[{'id_test': 1}])
         resource = FalconModelResource(api, ['post'], model)
         resp = mock.MagicMock()
-        req = mock.MagicMock()
+        req = mock.MagicMock(method='post')
         req.context = {'body': [], 'session': mock.MagicMock()}
 
         resource.on_post(req, resp)
@@ -119,9 +119,10 @@ class TestFalconModelResourcePost(object):
     def test_on_post_with_id_raises_not_found(self, model, api):
         model.update = mock.MagicMock(return_value=[])
         resource = FalconModelResource(api, ['post'], model)
+        req = mock.MagicMock(method='post')
 
         with pytest.raises(HTTPNotFound):
-            resource.on_post(mock.MagicMock(), mock.MagicMock(), id_test=1)
+            resource.on_post(req, mock.MagicMock(), id_test=1)
 
 
 class TestFalconModelResourcePut(object):
@@ -205,7 +206,7 @@ class TestFalconModelResourceDelete(object):
     def test_on_delete_with_id(self, model, api):
         resource = FalconModelResource(api, ['delete'], model)
         resp = mock.MagicMock()
-        req = mock.MagicMock()
+        req = mock.MagicMock(method='delete')
 
         resource.on_delete(req, resp, id_test=1)
         assert resp.status == HTTP_NO_CONTENT
@@ -213,7 +214,7 @@ class TestFalconModelResourceDelete(object):
     def test_on_delete_with_list(self, model, api):
         resource = FalconModelResource(api, ['delete'], model)
         resp = mock.MagicMock()
-        req = mock.MagicMock()
+        req = mock.MagicMock(method='delete')
 
         resource.on_delete(req, resp)
         assert resp.status == HTTP_NO_CONTENT
@@ -225,13 +226,13 @@ class TestFalconModelResourceGet(object):
         resource = FalconModelResource(mock.MagicMock(), ['get'], model)
 
         with pytest.raises(HTTPNotFound):
-            resource.on_get(mock.MagicMock(), mock.MagicMock())
+            resource.on_get(mock.MagicMock(method='get'), mock.MagicMock())
 
     def test_on_get_with_id(self, model, api):
         model.get = mock.MagicMock(return_value=[{'id_test': 1}])
         resource = FalconModelResource(api, ['get'], model)
         resp = mock.MagicMock()
-        req = mock.MagicMock()
+        req = mock.MagicMock(method='get')
 
         resource.on_get(req, resp, id_test=1)
         assert resp.body == {'id_test': 1}
@@ -240,7 +241,7 @@ class TestFalconModelResourceGet(object):
         model.get = mock.MagicMock(return_value=[])
         resource = FalconModelResource(api, ['get'], model)
         resp = mock.MagicMock()
-        req = mock.MagicMock()
+        req = mock.MagicMock(method='get')
 
         with pytest.raises(HTTPNotFound):
             resource.on_get(req, resp, id_test=1)
@@ -249,7 +250,7 @@ class TestFalconModelResourceGet(object):
         model.get = mock.MagicMock(return_value=[{'id_test': 1}])
         resource = FalconModelResource(api, ['get'], model)
         resp = mock.MagicMock()
-        req = mock.MagicMock()
+        req = mock.MagicMock(method='get')
 
         resource.on_get(req, resp)
         assert resp.body == [{'id_test': 1}]
@@ -258,7 +259,7 @@ class TestFalconModelResourceGet(object):
         model.get = mock.MagicMock(return_value=[])
         resource = FalconModelResource(api, ['get'], model)
         resp = mock.MagicMock()
-        req = mock.MagicMock()
+        req = mock.MagicMock(method='get')
 
         with pytest.raises(HTTPNotFound):
             resource.on_get(req, resp)
@@ -267,7 +268,7 @@ class TestFalconModelResourceGet(object):
         model.get = mock.MagicMock(return_value=[{'id_test': 1}])
         resource = FalconModelResource(api, ['get'], model)
         resp = mock.MagicMock()
-        req = mock.MagicMock(context={'body': {}, 'session': mock.MagicMock()})
+        req = mock.MagicMock(method='get', context={'body': {}, 'session': mock.MagicMock()})
 
         resource.on_get(req, resp)
         assert resp.body == [{'id_test': 1}]
