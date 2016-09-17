@@ -1,0 +1,12 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "title": "Recommendations Users",
+    "type": "object",
+    "additionalProperties": false,
+    "required": ["name", "password", "grants"],
+    "properties": {
+        "name": {"type": "string"},
+        "email": {"type": "string"},
+        "password": {"type": "string"}
+    }
+}

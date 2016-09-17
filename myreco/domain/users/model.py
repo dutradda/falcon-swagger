@@ -23,6 +23,7 @@
 
 from myreco.base.model import SQLAlchemyRedisModelBase
 from myreco.domain.stores.model import StoresModel
+from sqlalchemy.inspection import inspect
 from base64 import b64decode
 import sqlalchemy as sa
 import re
@@ -53,7 +54,7 @@ class UsersModel(SQLAlchemyRedisModelBase):
         if not ':' in authorization:
             return
 
-        user = cls.get(session, authorization)
+        user = cls.get(session, {'id': authorization})
         user = user[0] if user else user
         if user and not user.get('grants'):
             session.user = user
@@ -69,6 +70,7 @@ class UsersModel(SQLAlchemyRedisModelBase):
 
     @classmethod
     def insert(cls, session, objs, commit=True, todict=True):
+        objs = cls._to_list(objs)
         cls._set_objs_ids(objs)
         return type(cls).insert(cls, session, objs, commit, todict)
 
@@ -79,8 +81,11 @@ class UsersModel(SQLAlchemyRedisModelBase):
             obj['id'] = '{}:{}'.format(obj['email'], obj['password'])
 
     @classmethod
-    def update(cls, session, objs, commit=True, todict=True):
-        insts = SQLAlchemyRedisModelBase.update(cls, session, objs, commit=False, todict=False)
+    def update(cls, session, objs, commit=True, todict=True, ids=None):
+        objs = cls._to_list(objs)
+        filters = cls.build_filters_by_ids([{'email': obj.pop('email')} for obj in objs])
+        insts = type(cls).update(
+            cls, session, objs, commit=False, todict=False, filters=filters, ids=ids)
         cls._set_insts_ids(insts)
 
         if commit:
@@ -92,7 +97,7 @@ class UsersModel(SQLAlchemyRedisModelBase):
     def _set_insts_ids(cls, insts):
         insts = cls._to_list(insts)
         for inst in insts:
-            inst.id = '{}:{}'.format(inst,email, inst.password)
+            inst.id = '{}:{}'.format(inst.email, inst.password)
 
 
 class GrantsModel(SQLAlchemyRedisModelBase):

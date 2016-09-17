@@ -92,7 +92,6 @@ class TestUsersModelIntegrationWithAuthorizationHook(object):
         }
 
         resp = client.post('/test/1/', headers=headers)
-        print(resp.body)
         assert resp.status_code == 200
         assert resp.body == ''
 

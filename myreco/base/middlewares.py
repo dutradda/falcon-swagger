@@ -28,9 +28,9 @@ import json
 
 class FalconJsonSchemaMiddleware(object):
     def process_resource(self, req, resp, resource, params):
-        self._process_resource(req, resource)
+        self._process_resource(req, resource, params)
 
-    def _process_resource(self, req, resource):
+    def _process_resource(self, req, resource, params):
         method = req.method.upper()
         if method in resource.allowed_methods:
             body = req.stream.read().decode()
@@ -43,10 +43,10 @@ class FalconJsonSchemaMiddleware(object):
             else:
                 req.context['body'] = {}
 
-            validator = getattr(resource, 'on_{}_validator'.format(method.lower()), None)
+            route = resource.routes.get((req.uri_template, req.method.upper()))
 
-            if validator is not None:
-                validator.validate(req.context['body'])
+            if route is not None and route.validator is not None:
+                route.validator.validate(req.context['body'])
 
     def process_response(self, req, resp, resource):
         if resp.body and resp.body != 0:

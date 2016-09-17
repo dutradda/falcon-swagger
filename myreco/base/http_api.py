@@ -35,12 +35,16 @@ class HttpAPI(API):
         sqlalchemy_redis_mid = FalconSQLAlchemyRedisMiddleware(sqlalchemy_bind, redis_bind)
         API.__init__(self, middleware=sqlalchemy_redis_mid)
 
+        self.add_error_handler(Exception, self._handle_generic_error)
+        self.add_error_handler(HTTPError, self._handle_http_error)
         self.add_error_handler(IntegrityError, self._handle_integrity_error)
         self.add_error_handler(ValidationError, self._handle_json_validation_error)
         self.add_error_handler(JSONError)
         self.add_error_handler(ModelBaseError)
         self.add_error_handler(UnauthorizedError)
-        self._error_handlers.append((Exception, self._handle_generic_error))
+
+    def _handle_http_error(self, exception, req, resp, params):
+        self._compose_error_response(req, resp, exception)
 
     def _handle_integrity_error(self, exception, req, resp, params):
         resp.status = HTTP_BAD_REQUEST

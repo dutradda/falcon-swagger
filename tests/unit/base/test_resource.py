@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.base.resource import FalconModelResource, FalconJsonSchemaResource
+from myreco.base.resource import FalconModelResource
 from falcon.errors import HTTPMethodNotAllowed, HTTPNotFound
 from falcon import HTTP_CREATED, HTTP_NO_CONTENT
 from unittest import mock
@@ -272,25 +272,3 @@ class TestFalconModelResourceGet(object):
 
         resource.on_get(req, resp)
         assert resp.body == [{'id_test': 1}]
-
-
-class TestFalconJsonSchemaResource(object):
-    def test_build_post_validator(self):
-        resource = FalconJsonSchemaResource(post_input_json_schema={'type': 'object'})
-        assert hasattr(resource, 'on_post_validator')
-
-    def test_build_put_validator(self):
-        resource = FalconJsonSchemaResource(put_input_json_schema={'type': 'object'})
-        assert hasattr(resource, 'on_put_validator')
-
-    def test_build_patch_validator(self):
-        resource = FalconJsonSchemaResource(patch_input_json_schema={'type': 'object'})
-        assert hasattr(resource, 'on_patch_validator')
-
-    def test_build_delete_validator(self):
-        resource = FalconJsonSchemaResource(delete_input_json_schema={'type': 'object'})
-        assert hasattr(resource, 'on_delete_validator')
-
-    def test_build_get_validator(self):
-        resource = FalconJsonSchemaResource(get_input_json_schema={'type': 'object'})
-        assert hasattr(resource, 'on_get_validator')

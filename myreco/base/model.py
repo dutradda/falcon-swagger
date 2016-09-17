@@ -25,8 +25,10 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.ext.declarative.api import DeclarativeMeta
 from sqlalchemy.ext.declarative.base import _declarative_constructor
 from sqlalchemy.ext.declarative.clsregistry import _class_resolver
-from sqlalchemy.orm.properties import RelationshipProperty
+from sqlalchemy.orm.properties import RelationshipProperty, ColumnProperty
 from sqlalchemy.orm.attributes import InstrumentedAttribute
+from sqlalchemy.orm.collections import InstrumentedList
+from sqlalchemy.inspection import inspect
 from sqlalchemy import or_, and_
 from copy import deepcopy
 from collections import OrderedDict
@@ -44,12 +46,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
         DeclarativeMeta.__init__(cls, name, bases_classes, attributes)
 
         if name != MODEL_BASE_CLASS_NAME:
-            if not hasattr(cls, 'id_names'):
-                cls.id_names = ('id',)
-            else:
-                cls.id_names = tuple(cls.id_names)
-
-            cls.get_id_attributes()
+            cls._build_primary_keys()
 
             base_class = None
             for base in bases_classes:
@@ -73,8 +70,20 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
         else:
             cls.all_models = set()
 
-    def get_id_attributes(cls):
-        return [getattr(cls, id_name) for id_name in cls.id_names]
+    def _build_primary_keys(cls):
+        cls.primaries_keys = OrderedDict()
+
+        for attr_name in cls.__dict__:
+            primary_key = cls._get_primary_key(attr_name)
+            if primary_key:
+                cls.primaries_keys[attr_name] = primary_key
+
+    def _get_primary_key(cls, attr_name):
+        attr = getattr(cls, attr_name)
+        if isinstance(attr, InstrumentedAttribute) \
+                and isinstance(attr.prop, ColumnProperty) \
+                and [col for col in attr.prop.columns if col.primary_key]:
+            return attr
 
     def _build_backrefs_for_all_models(cls, all_models):
         all_relationships = set()
@@ -148,15 +157,12 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
             if relationship is not None:
                 rel_model = cls.get_model_from_rel(relationship)
-                insts_to_update = dict()
-                insts_to_delete = dict()
-                insts_to_remove = dict()
                 rels_values = values.pop(attr_name)
 
                 if relationship.prop.uselist is not True:
                     rels_values = [rels_values]
 
-                rel_insts = cls._build_relationship_instances(
+                rel_insts = cls._get_relationship_instances(
                     session, rel_model, attr_name, rels_values, instance)
 
                 for rel_values in rels_values:
@@ -185,7 +191,6 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
                             raise ModelBaseError(no_rel_insts_message.format('delete'), input_)
 
                         rel_model.delete(session, rel_id, commit=False)
-                        insts_to_delete[rel_id] = rel_values
 
                     elif to_remove:
                         if not rel_insts:
@@ -194,21 +199,29 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
                         cls._exec_remove_on_instance(
                             rel_model, attr_name, relationship,
                             rel_id, rel_insts, instance, values, input_)
+
                     else:
                         cls._exec_insert_on_instance(
                             session, rel_model, attr_name, relationship, rel_values, values)
 
         instance.update_(**values)
 
-    def _build_relationship_instances(cls, session, rel_model, attr_name, rels_values, instance):
+    def _get_relationship_instances(cls, session, rel_model, attr_name, rels_values, instance):
+        ids_to_get = cls._get_ids_from_rels_values(rel_model, rels_values)
+
         if not instance in session.identity_map.values():
-            ids_to_get = cls._get_ids_from_rels_values(rel_model, rels_values)
             rel_insts = rel_model.get(session, ids_to_get, todict=False) if ids_to_get else []
         else:
             rel_insts = getattr(instance, attr_name)
-            if not rel_insts:
-                ids_to_get = cls._get_ids_from_rels_values(rel_model, rels_values)
-                rel_insts = rel_model.get(session, ids_to_get, todict=False)
+            if isinstance(rel_insts, InstrumentedList):
+                print(rel_insts, ids_to_get, rel_model.get(session))
+                rel_insts = set(rel_insts)
+                rel_insts.update(set(rel_model.get(session, ids_to_get, todict=False)))
+                rel_insts = list(rel_insts)
+                print(rel_insts)
+
+            elif rel_insts is None:
+                return rel_model.get(session, ids_to_get, todict=False)
 
         return rel_insts
 
@@ -223,14 +236,14 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
     def get_ids_from_values(cls, values):
         cast = lambda id_name, value: getattr(cls, id_name).type.python_type(value) \
             if value is not None else None
-        return tuple([cast(id_name, values.get(id_name)) for id_name in cls.id_names])
+        return {id_name: cast(id_name, values.get(id_name)) for id_name in cls.primaries_keys}
 
     def _exec_update_on_instance(
             cls, session, rel_model, attr_name, relationship,
             rel_id, rel_values, rel_insts, instance, values, input_):
         if relationship.prop.uselist is True:
             for rel_inst in rel_insts:
-                if rel_inst.get_ids_values() == rel_id:
+                if rel_inst.get_ids_map() == rel_id:
                     rel_model._update_instance(session, rel_inst, rel_values, input_)
                     setattr(instance, attr_name, rel_insts)
                     break
@@ -245,15 +258,16 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
         rel_to_remove = None
         if relationship.prop.uselist is True:
             for rel_inst in rel_insts:
-                if rel_inst.get_ids_values() == rel_id:
+                if rel_inst.get_ids_map() == rel_id:
                     rel_to_remove = rel_inst
                     break
 
             if rel_to_remove is not None:
                 rel_insts.remove(rel_to_remove)
+                setattr(instance, attr_name, rel_insts)
 
             else:
-                columns_str = ', '.join(rel_model.id_names)
+                columns_str = ', '.join(rel_model.primaries_keys)
                 ids_str = ', '.join([str(id_) for id_ in rel_id])
                 error_message = "can't remove model '{}' on column(s) '{}' with value(s) {}"
                 error_message = error_message.format(rel_model.tablename, columns_str, ids_str)
@@ -274,36 +288,67 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
             rels_.extend(inserted_objs)
             values[attr_name] = rels_
 
-    def update(cls, session, objs, commit=True, todict=True):
+    def update(cls, session, objs, commit=True, todict=True, filters=None, ids=None):
         input_ = deepcopy(objs)
 
         objs = cls._to_list(objs)
-        ids_objs_map = {cls.get_ids_from_values(obj): obj for obj in objs}
+        ids = [cls.get_ids_from_values(obj) for obj in objs] if not ids else cls._to_list(ids)
 
-        insts = cls.get(session, list(ids_objs_map.keys()), todict=False)
-        id_insts_map = {inst.get_ids_values(): inst for inst in insts}
+        insts = cls.get(session, ids, todict=False, filters=filters)
 
-        for id_, inst in id_insts_map.items():
-            cls._update_instance(session, inst, ids_objs_map[id_], input_)
+        for inst in insts:
+            inst.old_redis_key = session.build_inst_redis_key(inst)
+
+        id_insts_zip = [(inst.get_ids_map(ids[0].keys()), inst) for inst in insts]
+
+        for id_, inst in id_insts_zip:
+            cls._update_instance(session, inst, objs[ids.index(id_)], input_)
 
         if commit:
             session.commit()
 
         return cls._build_todict_list(insts) if todict else insts
 
-    def delete(cls, session, ids, commit=True):
+    def delete(cls, session, ids, commit=True, filters=None):
         ids = cls._to_list(ids)
-        ids = cls._to_tuple_items(ids)
-        filters = cls._build_filters_by_ids(ids)
+        if filters is None:
+            filters = cls.build_filters_by_ids(ids)
+
         session.query(cls).filter(filters).delete()
 
         if commit:
             session.commit()
 
+    def build_filters_by_ids(cls, ids):
+        if len(ids) == 1:
+            return cls._get_obj_i_comparison(ids[0])
+
+        or_clause_args = []
+        for i in range(0, len(ids)):
+            comparison = cls._get_obj_i_comparison(ids[i])
+            or_clause_args.append(comparison)
+
+        return or_(*or_clause_args)
+
+    def _get_obj_i_comparison(cls, pk_attributes):
+        if len(pk_attributes) == 1:
+            pk_name = [i for i in pk_attributes.keys()][0]
+            return cls._build_id_attribute_comparison(pk_name, pk_attributes)
+
+        and_clause_args = []
+        for pk_name in pk_attributes:
+            comparison = cls._build_id_attribute_comparison(pk_name, pk_attributes)
+            and_clause_args.append(comparison)
+
+        return and_(*and_clause_args)
+
+    def _build_id_attribute_comparison(cls, pk_name, pk_attributes):
+        return getattr(cls, pk_name) == pk_attributes[pk_name]
+
     def _to_tuple_items(cls, ids):
         return [id_ if isinstance(id_, tuple) else (id_,) for id_ in ids]
 
-    def get(cls, session, ids=None, limit=None, offset=None, todict=True):
+    def get(cls, session, ids=None, limit=None, offset=None, todict=True, filters=None):
         if (ids is not None) and (limit is not None or offset is not None):
             raise ModelBaseError(
                 "'get' method can't be called with 'ids' and with 'offset' or 'limit'",
@@ -320,29 +365,28 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
             return cls._build_todict_list(query.all()) if todict else query.all()
 
-        return cls._get_many(session, ids, todict=todict)
+        return cls._get_many(session, ids, todict=todict, filters=filters)
 
-    def _get_many(cls, session, ids, todict=True):
+    def _get_many(cls, session, ids, todict=True, filters=None):
         ids = cls._to_list(ids)
-        ids = cls._to_tuple_items(ids)
 
         if not todict or session.redis_bind is None:
-            filters_ids = cls._build_filters_by_ids(ids)
-            insts = session.query(cls).filter(filters_ids).all()
+            filters = cls.build_filters_by_ids(ids) if filters is None else filters
+            insts = session.query(cls).filter(filters).all()
             if todict:
                 return [inst.todict() for inst in insts]
             else:
                 return insts
 
         model_redis_key = session.build_model_redis_key(cls)
-        ids_redis_keys = [str(id_) for id_ in ids]
+        ids_redis_keys = [str(tuple(sorted(id_.values()))) for id_ in ids]
         objs = session.redis_bind.hmget(model_redis_key, ids_redis_keys)
         ids = [id_ for id_, obj in zip(ids, objs) if obj is None]
         objs = [json.loads(obj) for obj in objs if obj is not None]
 
         if ids:
-            filters_ids = cls._build_filters_by_ids(ids)
-            instances = session.query(cls).filter(filters_ids).all()
+            filters = cls.build_filters_by_ids(ids) if filters is None else filters
+            instances = session.query(cls).filter(filters).all()
             items = [(str(each.get_ids_values()), each.todict()) for each in instances]
             no_cached_map = OrderedDict(items)
             session.redis_bind.hmset(model_redis_key, no_cached_map)
@@ -350,47 +394,21 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
         return objs
 
-    def _build_filters_by_ids(cls, ids):
-        if len(ids) == 1:
-            return cls._get_obj_i_comparison(0, ids)
-
-        comparison1 = cls._get_obj_i_comparison(0, ids)
-        comparison2 = cls._get_obj_i_comparison(1, ids)
-        or_clause = or_(comparison1, comparison2)
-
-        for i in range(2, len(ids)):
-            comparison = cls._get_obj_i_comparison(i, ids)
-            or_clause = or_(or_clause, comparison)
-
-        return or_clause
-
-    def _get_obj_i_comparison(cls, i, ids):
-        id_attributes = ids[i]
-
-        if len(id_attributes) == 1:
-            return cls._build_id_attribute_comparison(0, id_attributes)
-
-        comparison = and_(
-            cls._build_id_attribute_comparison(0, id_attributes),
-            cls._build_id_attribute_comparison(1, id_attributes)
-        )
-
-        for j in range(2, len(id_attributes)):
-            comparison_ = cls._build_id_attribute_comparison(j, id_attributes)
-            comparison = and_(comparison, comparison_)
-
-        return comparison
-
-    def _build_id_attribute_comparison(cls, i, id_attributes):
-        return cls.get_id_attributes()[i] == id_attributes[i]
-
     def build_id_dict(cls, id_values):
-        return {id_name: id_value for id_name, id_value in zip(cls.id_names, id_values)}
+        return {id_name: id_value for id_name, id_value in zip(cls.primaries_keys, id_values)}
 
 
 class _SQLAlchemyModel(object):
     def get_ids_values(self):
-        return tuple([getattr(self, id_name) for id_name in type(self).id_names])
+        pk_names = sorted(type(self).primaries_keys.keys())
+        return tuple([getattr(self, id_name) for id_name in pk_names])
+
+    def get_ids_map(self, keys=None):
+        if keys is None:
+            keys = type(self).primaries_keys.keys()
+
+        pk_names = sorted(keys)
+        return {id_name: getattr(self, id_name) for id_name in pk_names}
 
     def get_related(self, session):
         related = set()
@@ -410,7 +428,7 @@ class _SQLAlchemyModel(object):
         cls = type(self)
         rel_model = cls.get_model_from_rel(relationship, parent=parent)
 
-        filters = cls._build_filters_by_ids([self.get_ids_values()])
+        filters = cls.build_filters_by_ids([self.get_ids_map()])
         result = set(session.query(rel_model).join(relationship).filter(filters).all())
         return result
 

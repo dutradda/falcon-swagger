@@ -827,11 +827,11 @@ class TestModelBaseUpdate(object):
 
 class TestModelBaseGet(object):
     def test_if_query_get_calls_hmget_correctly(self, session, redis, model1):
-        model1.get(session, 1)
+        model1.get(session, {'id': 1})
         assert redis.hmget.call_args_list == [mock.call('model1', ['(1,)'])]
 
     def test_if_query_get_calls_hmget_correctly_with_two_ids(self, session, redis, model1):
-        model1.get(session, [1, 2])
+        model1.get(session, [{'id': 1}, {'id': 2}])
         assert redis.hmget.call_args_list == [mock.call('model1', ['(1,)', '(2,)'])]
 
     def test_if_query_get_builds_redis_left_ids_correctly_with_result_found_on_redis_with_one_id(
@@ -839,53 +839,55 @@ class TestModelBaseGet(object):
         session.add(model1(id=1))
         session.commit()
         redis.hmget.return_value = [None]
-        assert model1.get(session, 1) == [{'id': 1}]
+        assert model1.get(session, {'id': 1}) == [{'id': 1}]
 
     def test_if_query_get_builds_redis_left_ids_correctly_with_no_result_found_on_redis_with_two_ids(
             self, model1, session, redis):
         session.add_all([model1(id=1), model1(id=2)])
         session.commit()
         redis.hmget.return_value = [None, None]
-        assert model1.get(session, [1, 2]) == [{'id': 1}, {'id': 2}]
+        assert model1.get(session, [{'id': 1}, {'id': 2}]) == [{'id': 1}, {'id': 2}]
 
     def test_if_query_get_builds_redis_left_ids_correctly_with_no_result_found_on_redis_with_three_ids(
             self, model1, session, redis):
         session.add_all([model1(id=1), model1(id=2), model1(id=3)])
         session.commit()
         redis.hmget.return_value = [None, None, None]
-        assert model1.get(session, [1, 2, 3]) == [{'id': 1}, {'id': 2}, {'id': 3}]
+        assert model1.get(session, [{'id': 1}, {'id': 2}, {'id': 3}]) == \
+            [{'id': 1}, {'id': 2}, {'id': 3}]
 
     def test_if_query_get_builds_redis_left_ids_correctly_with_no_result_found_on_redis_with_four_ids(
             self, model1, session, redis):
         session.add_all([model1(id=1), model1(id=2), model1(id=3), model1(id=4)])
         session.commit()
         redis.hmget.return_value = [None, None, None, None]
-        assert model1.get(session, [1, 2, 3, 4]) == [{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}]
+        assert model1.get(session, [{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}]) == \
+            [{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}]
 
     def test_if_query_get_builds_redis_left_ids_correctly_with_one_not_found_on_redis(
             self, model1, session, redis):
         session.add(model1(id=1))
         session.commit()
         redis.hmget.return_value = [None, '{"id": 2}']
-        assert model1.get(session, [1, 2]) == [{'id': 2}, {'id': 1}]
+        assert model1.get(session, [{'id': 1}, {'id': 2}]) == [{'id': 2}, {'id': 1}]
 
     def test_with_missing_id(self, model1, session, redis):
         session.add(model1(id=1))
         session.commit()
         redis.hmget.return_value = [None, None]
-        assert model1.get(session, [1, 2]) == [{'id': 1}]
+        assert model1.get(session, [{'id': 1}, {'id': 2}]) == [{'id': 1}]
 
     def test_with_missing_all_ids(self, model1, session, redis):
         redis.hmget.return_value = [None, None]
-        assert model1.get(session, [1, 2]) == []
+        assert model1.get(session, [{'id': 1}, {'id': 2}]) == []
 
     def test_if_raises_ids_offset_error(self, model1, session, redis):
         with pytest.raises(ModelBaseError):
-            model1.get(session, [1, 2], offset=1)
+            model1.get(session, [{'id': 1}, {'id': 2}], offset=1)
 
     def test_if_raises_ids_limit_error(self, model1, session, redis):
         with pytest.raises(ModelBaseError):
-            model1.get(session, [1, 2], limit=1)
+            model1.get(session, [{'id': 1}, {'id': 2}], limit=1)
 
     def test_without_ids(self, model1, session, redis):
         model1.insert(session, {})
@@ -909,24 +911,24 @@ class TestModelBaseDelete(object):
         model1.insert(session, {})
         assert model1.get(session) == [{'id': 1}]
 
-        model1.delete(session, 1)
+        model1.delete(session, {'id': 1})
         assert model1.get(session) == []
 
     def test_delete_with_invalid_id(self, model1, session, redis):
         model1.insert(session, {})
-        model1.delete(session , [2, 3])
+        model1.delete(session , [{'id': 2}, {'id': 3}])
         assert model1.get(session) == [{'id': 1}]
 
     def test_delete_with_two_ids(self, model1_two_ids, session, redis):
         model1_two_ids.insert(session, {'id2': 2})
         assert model1_two_ids.get(session) == [{'id': 1, 'id2': 2}]
 
-        model1_two_ids.delete(session , (1, 2))
+        model1_two_ids.delete(session , {'id': 1, 'id2': 2})
         assert model1_two_ids.get(session) == []
 
     def test_delete_with_three_ids(self, model1_three_ids, session, redis):
         model1_three_ids.insert(session, {'id2': 2, 'id3': 3})
         assert model1_three_ids.get(session) == [{'id': 1, 'id2': 2, 'id3': 3}]
 
-        model1_three_ids.delete(session , (1, 2, 3))
+        model1_three_ids.delete(session , {'id': 1, 'id2': 2, 'id3': 3})
         assert model1_three_ids.get(session) == []

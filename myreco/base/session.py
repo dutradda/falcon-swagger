@@ -75,17 +75,25 @@ class _SessionBase(SessionSA):
 
     def _exec_hmset(self, insts):
         models_keys_insts_keys_insts_map = defaultdict(dict)
+        models_keys_insts_keys_map = defaultdict(set)
 
         for inst in insts:
             model_redis_key = self.build_model_redis_key(type(inst))
             inst_redis_key = self.build_inst_redis_key(inst)
+            inst_old_redis_key = getattr(inst, 'old_redis_key', None)
+            if inst_old_redis_key is not None and inst_old_redis_key != inst_redis_key:
+                models_keys_insts_keys_map[model_redis_key].add(inst_old_redis_key)
+
             models_keys_insts_keys_insts_map[model_redis_key][inst_redis_key] = inst.todict()
 
         for model_key, insts_keys_insts_map in models_keys_insts_keys_insts_map.items():
             self.redis_bind.hmset(model_key, insts_keys_insts_map)
 
+        for model_key, insts_keys in models_keys_insts_keys_map.items():
+            self.redis_bind.hdel(model_key, *insts_keys)
+
     def build_inst_redis_key(self, inst):
-        return str(inst.get_ids_values())
+        return str(tuple(sorted(inst.get_ids_map().values())))
 
     def build_model_redis_key(self, model):
         return model.tablename

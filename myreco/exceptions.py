@@ -21,7 +21,6 @@
 # SOFTWARE.
 
 
-from falcon.errors import HTTPError
 from falcon import HTTP_UNAUTHORIZED, HTTP_BAD_REQUEST
 
 import json

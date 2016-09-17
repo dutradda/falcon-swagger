@@ -1,6 +1,7 @@
 from myreco.base.http_api import HttpAPI
-from myreco.base.resource import FalconModelResource
+from myreco.base.resource import FalconModelResource, Route
 from unittest import mock
+from jsonschema import Draft4Validator
 
 import pytest
 import sqlalchemy as sa
@@ -41,7 +42,9 @@ def resource1(model1, app):
 
 @pytest.fixture
 def resource1_with_schema(model1, app):
-    return FalconModelResource(app, ['post'], model1, post_input_json_schema={'type': 'object'})
+    schema = {'type': 'object'}
+    route = Route('/model1/', 'POST', schema, Draft4Validator(schema))
+    return FalconModelResource(app, ['post'], model1, routes=[route])
 
 
 class TestHttpAPIErrorHandlingPOST(object):

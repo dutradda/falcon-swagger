@@ -46,6 +46,7 @@ def resource(app):
 
     class Resource(object):
         allowed_methods = ['GET']
+        routes = {}
 
         @falcon_before(AuthorizationHook(auth_func, 'test'))
         def on_get(self, req, resp):

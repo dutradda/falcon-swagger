@@ -21,95 +21,115 @@
 # SOFTWARE.
 
 
-from jsonschema import Draft4Validator
+from jsonschema import Draft4Validator, RefResolver
 from falcon.errors import HTTPMethodNotAllowed, HTTPNotFound
 from falcon import HTTP_CREATED, HTTP_NO_CONTENT
 from myreco.base.session import Session
 from myreco.exceptions import JSONError
 from importlib import import_module
 from glob import glob
-from re import match as re_match
+from re import match as re_match, sub as re_sub
+from collections import namedtuple
+from copy import deepcopy
 
 import os.path
 import json
 
 
-class FalconJsonSchemaResource(object):
-    def __init__(
-            self, post_input_json_schema={},
-            post_output_json_schema={},
-            put_input_json_schema={},
-            put_output_json_schema={},
-            patch_input_json_schema={},
-            patch_output_json_schema={},
-            delete_input_json_schema={},
-            delete_output_json_schema={},
-            get_input_json_schema={},
-            get_output_json_schema={}):
-        self.post_input_json_schema = post_input_json_schema
-        self.post_output_json_schema = post_output_json_schema
-        self.put_input_json_schema = put_input_json_schema
-        self.put_output_json_schema = put_output_json_schema
-        self.patch_input_json_schema = patch_input_json_schema
-        self.patch_output_json_schema = patch_output_json_schema
-        self.delete_input_json_schema = delete_input_json_schema
-        self.delete_output_json_schema = delete_output_json_schema
-        self.get_input_json_schema = get_input_json_schema
-        self.get_output_json_schema = get_output_json_schema
-
-        if post_input_json_schema:
-            self.on_post_validator = Draft4Validator(post_input_json_schema)
-
-        if put_input_json_schema:
-            self.on_put_validator = Draft4Validator(put_input_json_schema)
-
-        if patch_input_json_schema:
-            self.on_patch_validator = Draft4Validator(patch_input_json_schema)
-
-        if delete_input_json_schema:
-            self.on_delete_validator = Draft4Validator(delete_input_json_schema)
-
-        if get_input_json_schema:
-            self.on_get_validator = Draft4Validator(get_input_json_schema)
+Route = namedtuple('Route', ['uri', 'method', 'schema', 'validator'])
 
 
-class FalconModelResource(FalconJsonSchemaResource):
-    def __init__(self, api, allowed_methods, model, api_prefix='/', **kwargs):
-        self.allowed_methods = [am.upper() for am in allowed_methods]
+class FalconModelResource(object):
+    def __init__(self, api, allowed_methods, model, api_prefix='/', routes=None):
         self.model = model
-        self._add_route(api, api_prefix)
-        FalconJsonSchemaResource.__init__(self, **self._build_schemas(kwargs))
+        self.api_prefix = api_prefix
+        self.allowed_methods = [method.upper() for method in allowed_methods]
+        self.routes = self._build_routes(api)
 
-    def _add_route(self, api, api_prefix):
-        uri = uri_single = os.path.join(api_prefix, '{}/'.format(self.model.tablename))
+        if routes is not None:
+            for route in routes:
+                self.routes[(route.uri, route.method)] = route
 
-        for id_name in self.model.id_names:
+    def _build_base_uri(self, api_prefix):
+        return os.path.join(api_prefix, self.model.tablename)
+
+    def _build_routes(self, api):
+        schemas_path = self.get_schemas_path()
+        schemas_glob = os.path.join(schemas_path, '*.json')
+        ids_str = '_'.join(self.model.primaries_keys.keys())
+        schema_regex = '(([\w\d%_-]+)_)?(post|put|patch|delete|get)_(input|output).json'
+        routes = {}
+        added_uris = set()
+
+        for json_schema_filename in glob(schemas_glob):
+            json_schema_basename = os.path.basename(json_schema_filename)
+            match = re_match(schema_regex, json_schema_basename)
+            if match:
+                uri = self._build_uri(match.groups()[1])
+                method = match.groups()[2].upper()
+                type_ = match.groups()[3]
+                schema = {}
+                validator = None
+
+                with open(json_schema_filename) as json_schema_file:
+                    schema = json.load(json_schema_file)
+
+                if type_ == 'input':
+                    validator = self._build_validator(schema)
+
+                if uri not in added_uris:
+                    api.add_route(uri, self)
+                    added_uris.add(uri)
+
+                routes[(uri, method)] = Route(uri, method, schema, validator)
+
+        if not routes:
+            routes = self._build_generic_routes(api)
+
+        return routes
+
+    def get_schemas_path(self):
+        module_filename = import_module(type(self).__module__).__file__
+        module_path = os.path.dirname(os.path.abspath(module_filename))
+        return os.path.join(module_path, 'schemas')
+
+    def _build_uri(self, uri_str):
+        uri = self._build_base_uri(self.api_prefix)
+        if uri_str is None:
+            return uri
+
+        return '/'.join((uri, re_sub(r'%([\d\w_-]+)%', r'{\1}', uri_str).replace('__', '/')))
+
+    def _build_validator(self, schema):
+        handlers = {'schema': self._handle_schema_uri}
+        resolver = RefResolver.from_schema(schema, handlers=handlers)
+        return Draft4Validator(schema, resolver=resolver)
+
+    def _handle_schema_uri(self, uri):
+        schema_filename = os.path.join(self.get_schemas_path(), uri.replace('schema:', ''))
+        with open(schema_filename) as json_schema_file:
+            return json.load(json_schema_file)
+
+    def _build_generic_routes(self, api):
+        uri = uri_single = os.path.join(self.api_prefix, '{}/'.format(self.model.tablename))
+
+        for id_name in self.model.primaries_keys:
             uri_single += '{' + id_name + '}/'
 
         api.add_route(uri, self)
         api.add_route(uri_single, self)
 
-    def _build_schemas(self, user_schemas):
-        schemas = user_schemas
-        module_filename = import_module(type(self).__module__).__file__
-        module_path = os.path.dirname(os.path.abspath(module_filename))
-        schemas_path = os.path.join(module_path, 'schemas')
-        schemas_glob = os.path.join(schemas_path, '*.json')
-        schema_regex = '(post|put|patch|delete|get)_(input|output).json'
+        routes = {}
+        for method in self.allowed_methods:
+            routes[(uri, method)] = Route(uri, method, {}, None)
+            routes[(uri_single, method)] = Route(uri_single, method, {}, None)
 
-        for json_schema_filename in glob(schemas_glob):
-            json_schema_basename = os.path.basename(json_schema_filename)
-            if re_match(schema_regex, json_schema_basename):
-                with open(json_schema_filename) as json_schema_file:
-                    schema_name = json_schema_basename.replace('.json', '_json_schema')
-                    schemas[schema_name] = json.load(json_schema_file)
-
-        return schemas
+        return routes
 
     def on_post(self, req, resp, **kwargs):
         self._raise_method_not_allowed(req)
 
-        if self._id_names_in_kwargs(kwargs):
+        if kwargs:
             raise HTTPNotFound()
 
         session = req.context['session']
@@ -117,8 +137,8 @@ class FalconModelResource(FalconJsonSchemaResource):
         resp.body = resp.body if isinstance(req.context['body'], list) else resp.body[0]
         resp.status = HTTP_CREATED
 
-    def _id_names_in_kwargs(self, kwargs):
-        return bool([True for id_name in self.model.id_names if id_name in kwargs])
+    def _primaries_keys_names_in_kwargs(self, kwargs):
+        return bool([True for id_name in self.model.primaries_keys if id_name in kwargs])
 
     def _raise_method_not_allowed(self, req):
         if not req.method.upper() in self.allowed_methods:
@@ -130,10 +150,13 @@ class FalconModelResource(FalconJsonSchemaResource):
     def _update(self, req, resp, with_insert=True, **kwargs):
         self._raise_method_not_allowed(req)
 
-        if self._id_names_in_kwargs(kwargs):
-            objs = self._update_one(req, resp, kwargs)
+        if kwargs:
+            req.context['body'].update(kwargs)
+            body = deepcopy(req.context['body'])
+            objs = self.model.update(req.context['session'], req.context['body'], ids=kwargs)
 
             if not objs and with_insert:
+                req.context['body'] = body
                 self.on_post(req, resp)
             elif objs:
                 resp.body = objs[0]
@@ -148,13 +171,6 @@ class FalconModelResource(FalconJsonSchemaResource):
             else:
                 raise HTTPNotFound()
 
-    def _update_one(self, req, resp, kwargs):
-        id_ = self.model.get_ids_from_values(kwargs)
-        id_dict = self.model.build_id_dict(id_)
-        req.context['body'].update(id_dict)
-        session = req.context['session']
-        return self.model.update(session, req.context['body'])
-
     def on_patch(self, req, resp, **kwargs):
         self._update(req, resp, with_insert=False, **kwargs)
 
@@ -162,7 +178,7 @@ class FalconModelResource(FalconJsonSchemaResource):
         self._raise_method_not_allowed(req)
         session = req.context['session']
 
-        if self._id_names_in_kwargs(kwargs):
+        if kwargs:
             id_ = self.model.get_ids_from_values(kwargs)
             self.model.delete(session, id_)
         else:
@@ -174,7 +190,7 @@ class FalconModelResource(FalconJsonSchemaResource):
         self._raise_method_not_allowed(req)
         session = req.context['session']
 
-        if self._id_names_in_kwargs(kwargs): # get one
+        if kwargs: # get one
             id_ = self.model.get_ids_from_values(kwargs)
             resp.body = self.model.get(session, id_)
             if resp.body:

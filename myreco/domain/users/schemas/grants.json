@@ -1,0 +1,74 @@
+{
+    "$schema": "http://json-schema.org/draft-04/schema#",
+    "title": "Recommendations Access Grants",
+    "oneOf": [
+        {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["uri_id", "method_id", "_update"],
+            "properties": {
+                "uri_id": {"type": "integer"},
+                "method_id": {"type": "integer"},
+                "_update": {"enum": [true]}
+            }
+        },{
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["uri_id", "method_id", "_remove"],
+            "properties": {
+                "uri_id": {"type": "integer"},
+                "method_id": {"type": "integer"},
+                "_remove": {"enum": [true]}
+            }
+        },{
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["uri", "method"],
+            "properties": {
+                "uri": {"$ref": "schema:grants.json#/uri"},
+                "method": {"$ref": "schema:grants.json#/method"}
+            }
+        }
+    ],
+    "uri": {
+        "oneOf": [
+            {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "_update"],
+                "properties": {
+                    "id": {"type": "integer"},
+                    "uri": {"type": "string"},
+                    "_update": {"enum": [true]}
+                }
+            },{
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["uri"],
+                "properties": {
+                    "uri": {"type": "string"}
+                }
+            }
+        ]
+    },
+    "method": {
+        "oneOf": [
+            {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id", "_update"],
+                "properties": {
+                    "id": {"type": "integer"},
+                    "_update": {"enum": [true]}
+                }
+            },{
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["method"],
+                "properties": {
+                    "method": {"type": "string"}
+                }
+            }
+        ]
+    }
+}
