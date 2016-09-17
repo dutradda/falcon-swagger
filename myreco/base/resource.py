@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from jsonschema import Draft4Validator, RefResolver
+from jsonschema import Draft4Validator, RefResolver, ValidationError
 from falcon.errors import HTTPMethodNotAllowed, HTTPNotFound
 from falcon import HTTP_CREATED, HTTP_NO_CONTENT
 from myreco.base.session import Session
@@ -151,11 +151,20 @@ class FalconModelResource(object):
         self._raise_method_not_allowed(req)
 
         if kwargs:
-            req.context['body'].update(kwargs)
             body = deepcopy(req.context['body'])
+            req.context['body'].update(kwargs)
             objs = self.model.update(req.context['session'], req.context['body'], ids=kwargs)
 
             if not objs and with_insert:
+                ambigous_keys = \
+                    [kwa for kwa in kwargs if kwa in body and body[kwa] != kwargs[kwa]]
+                if ambigous_keys:
+                    schema = self.routes[(req.uri_template, req.method)].schema
+                    raise ValidationError(
+                        "Ambiguous value for '{}'".format("', '".join(ambigous_keys)),
+                        instance={'body': body, 'uri': kwargs}, schema=schema)
+
+                body.update(kwargs)
                 req.context['body'] = body
                 self.on_post(req, resp)
             elif objs:

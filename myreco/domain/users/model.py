@@ -81,9 +81,12 @@ class UsersModel(SQLAlchemyRedisModelBase):
             obj['id'] = '{}:{}'.format(obj['email'], obj['password'])
 
     @classmethod
-    def update(cls, session, objs, commit=True, todict=True, ids=None):
+    def update(cls, session, objs, commit=True, todict=True, ids=None, filters=None):
         objs = cls._to_list(objs)
-        filters = cls.build_filters_by_ids([{'email': obj.pop('email')} for obj in objs])
+
+        if ids:
+            filters = cls.build_filters_by_ids([{'email': obj.pop('email')} for obj in objs])
+
         insts = type(cls).update(
             cls, session, objs, commit=False, todict=False, filters=filters, ids=ids)
         cls._set_insts_ids(insts)

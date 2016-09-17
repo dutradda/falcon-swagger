@@ -204,9 +204,60 @@ class TestUsersResourcePost(object):
 
 
 class TestUsersResourcePutInsert(object):
+    def test_put_with_ambiguous_ids(self, resource, client, headers):
+        user = {
+            'name': 'test2',
+            'email': 'test22',
+            'password': 'test',
+            'grants': [{
+                'uri_id': 1,
+                'method_id': 1,
+                '_update': True
+            }]
+        }
+        resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
+
+        assert resp.status_code == 400
+        assert json.loads(resp.body) == {
+            'error': {
+                'schema': {
+                    '$schema': 'http://json-schema.org/draft-04/schema#',
+                    'type': 'object',
+                    'properties': {
+                        'grants': {
+                            'uniqueItems': True,
+                            'minItems': 1,
+                            'type': 'array',
+                            'items': {'$ref': 'schema:grants.json'}
+                        },
+                        'name': {'type': 'string'},
+                        'email': {'type': 'string'},
+                        'password': {'type': 'string'}
+                    },
+                    'required': ['name', 'password', 'email', 'grants'],
+                    'additionalProperties': False,
+                    'title': 'Recommendations Users'
+                },
+                'input': {
+                    'body': {
+                        'grants': [{
+                            'method_id': 1,
+                            'uri_id': 1,
+                            '_update': True
+                        }],
+                    'name': 'test2',
+                    'email': 'test22',
+                    'password': 'test'
+                },
+                'uri': {'email': 'test2'}
+            },
+            'message': "Ambiguous value for 'email'"}
+        }
+
     def test_put_with_insert_and_grants_update(self, resource, client, headers):
         user = {
             'name': 'test2',
+            'email': 'test2',
             'password': 'test',
             'grants': [{
                 'uri_id': 1,
@@ -235,6 +286,7 @@ class TestUsersResourcePutInsert(object):
     def test_put_with_insert_and_grants_insert(self, resource, client, headers):
         user = {
             'name': 'test2',
+            'email': 'test2',
             'password': 'test',
             'grants': [{
                 'uri': {'uri': '/test4'},
@@ -264,6 +316,7 @@ class TestUsersResourcePutUpdateOne(object):
         user = {
             'name': 'test2',
             'password': 'test',
+            'email': 'test2',
             'grants': [{
                 'uri_id': 1,
                 'method_id': 1,
@@ -275,6 +328,7 @@ class TestUsersResourcePutUpdateOne(object):
 
         user = {
             'name': 'test2_updated',
+            'email': 'test2',
             'password': 'test_updated',
             'grants': [{
                 'uri_id': 3,
@@ -307,6 +361,7 @@ class TestUsersResourcePutUpdateOne(object):
     def test_put_update_and_grants_remove(self, resource, client, headers):
         user = {
             'name': 'test2',
+            'email': 'test2',
             'password': 'test',
             'grants': [{
                 'uri_id': 1,
@@ -319,6 +374,7 @@ class TestUsersResourcePutUpdateOne(object):
 
         user = {
             'name': 'test2_updated',
+            'email': 'test2',
             'password': 'test_updated',
             'grants': [{
                 'uri_id': 1,
@@ -341,6 +397,7 @@ class TestUsersResourcePutUpdateOne(object):
     def test_put_update_and_grants_update_and_grants_remove(self, resource, client, headers):
         user = {
             'name': 'test2',
+            'email': 'test2',
             'password': 'test',
             'grants': [{
                 'uri_id': 1,
@@ -353,6 +410,7 @@ class TestUsersResourcePutUpdateOne(object):
 
         user = {
             'name': 'test2_updated',
+            'email': 'test2',
             'password': 'test_updated',
             'grants': [{
                 'uri_id': 3,
@@ -382,105 +440,133 @@ class TestUsersResourcePutUpdateOne(object):
         }
 
 
-class TestUsersResourcePut(object):
-    def test_put_valid_with_grants_insert_and_uri_and_method_update(
-            self, resource, client, headers):
-        user = {
-            'name': 'test2',
-            'email': 'test2',
-            'password': 'test',
-            'grants': [{
-                'uri': {'id': 2, '_update': True},
-                'method': {'id': 2, '_update': True}
-            }]
-        }
-        resp = client.put('/users', body=json.dumps(user), headers=headers)
-
-        assert resp.status_code == 201
-        assert json.loads(resp.body) == {
-            'id': 'test2:test',
-            'name': 'test2',
-            'email': 'test2',
-            'password': 'test',
-            'stores': [],
-            'grants': [{
-                'method_id': 2,
-                'uri_id': 2,
-                'method': {'id': 2, 'method': 'get'},
-                'uri': {'id': 2, 'uri': '/test'}
-            }]
-        }
-
-    def test_post_valid_with_grants_uri_and_method_insert(
-            self, resource, client, headers):
-        user = {
-            'name': 'test2',
-            'email': 'test2',
-            'password': 'test',
-            'grants': [{
-                'uri': {'regex': '/test3'},
-                'method': {'method': 'put'}
-            }]
-        }
-        resp = client.post('/users', data=json.dumps(user), headers=headers)
-
-        assert resp.status_code == 201
-        assert json.loads(resp.body) == {
-            'id': 'test2:test',
-            'name': 'test2',
-            'email': 'test2',
-            'password': 'test',
-            'grants': [{
-                'method_id': 3,
-                'uri_id': 3,
-                'method': {'id': 3, 'method': 'put'},
-                'uri': {'id': 3, 'regex': '/test3'}
-            }]
-        }
-
-    def test_post_invalid_json(self, resource, client, headers):
+class TestUsersResourcePutUpdateMany(object):
+    def test_put_update_and_grants_update(self, resource, client, headers):
         user = {
             'name': 'test2',
             'email': 'test2',
             'password': 'test',
             'grants': [{
                 'uri_id': 1,
-                'method_id': 1
+                'method_id': 1,
+                '_update': True
             }]
         }
-        resp = client.post('/users', data=json.dumps(user), headers=headers)
+        resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
+        assert resp.status_code == 201
 
-        assert resp.status_code == 400
-        result = json.loads(resp.body)
-        message = result['error'].pop('message')
-        assert message == \
-                "{'method_id': 1, 'uri_id': 1} is not valid under any of the given schemas" \
-            or message == \
-                "{'uri_id': 1, 'method_id': 1} is not valid under any of the given schemas"
-        assert result == {
-            'error': {
-                'input': {'method_id': 1, 'uri_id': 1},
-                'schema': {
-                    'oneOf': [
-                        {
-                            'type': 'object',
-                            'additionalProperties': False,
-                            'required': ['uri_id', 'method_id', '_update'],
-                            'properties': {
-                                '_update': {'enum': [True]},
-                                'method_id': {'type': 'integer'},
-                                'uri_id': {'type': 'integer'}
-                            }
-                        },{
-                            'type': 'object',
-                            'additionalProperties': False,
-                            'required': ['uri', 'method'],
-                            'properties': {
-                                'method': {'$ref': '#/definitions/method'},
-                                'uri': {'$ref': '#/definitions/uri'}
-                            }
-                        }
-                    ]
-                }
-            }
+        users = [{
+            'id': 'test2:test',
+            'name': 'test2_updated',
+            'email': 'test2_updated',
+            'password': 'test_updated',
+            'grants': [{
+                'uri_id': 3,
+                'method_id': 3,
+                '_update': True
+            }]
+        }]
+        resp = client.put('/users', body=json.dumps(users), headers=headers)
+
+        assert resp.status_code == 200
+        assert json.loads(resp.body) == [{
+            'id': 'test2_updated:test_updated',
+            'name': 'test2_updated',
+            'email': 'test2_updated',
+            'password': 'test_updated',
+            'stores': [],
+            'grants': [{
+                'method_id': 1,
+                'uri_id': 1,
+                'method': {'id': 1, 'method': 'post'},
+                'uri': {'id': 1, 'uri': '/test'}
+            },{
+                'method_id': 3,
+                'uri_id': 3,
+                'method': {'id': 3, 'method': 'put'},
+                'uri': {'id': 3, 'uri': '/test3'}
+            }]
+        }]
+
+    def test_put_update_and_grants_remove(self, resource, client, headers):
+        user = {
+            'name': 'test2',
+            'email': 'test2',
+            'password': 'test',
+            'grants': [{
+                'uri_id': 1,
+                'method_id': 1,
+                '_update': True
+            }]
         }
+        resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
+        assert resp.status_code == 201
+
+        users = [{
+            'id': 'test2:test',
+            'name': 'test2_updated',
+            'email': 'test2_updated',
+            'password': 'test_updated',
+            'grants': [{
+                'uri_id': 1,
+                'method_id': 1,
+                '_remove': True
+            }]
+        }]
+        resp = client.put('/users', body=json.dumps(users), headers=headers)
+
+        assert resp.status_code == 200
+        assert json.loads(resp.body) == [{
+            'id': 'test2_updated:test_updated',
+            'name': 'test2_updated',
+            'email': 'test2_updated',
+            'password': 'test_updated',
+            'stores': [],
+            'grants': []
+        }]
+
+    def test_put_update_and_grants_update_and_grants_remove(self, resource, client, headers):
+        user = {
+            'name': 'test2',
+            'email': 'test2',
+            'password': 'test',
+            'grants': [{
+                'uri_id': 1,
+                'method_id': 1,
+                '_update': True
+            }]
+        }
+        resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
+        assert resp.status_code == 201
+
+        users = [{
+            'id': 'test2:test',
+            'name': 'test2_updated',
+            'email': 'test2_updated',
+            'password': 'test_updated',
+            'grants': [{
+                'uri_id': 3,
+                'method_id': 3,
+                '_update': True
+            },{
+                'uri_id': 1,
+                'method_id': 1,
+                '_remove': True
+            }]
+        }]
+        resp = client.put('/users', body=json.dumps(users), headers=headers)
+
+        assert resp.status_code == 200
+        assert json.loads(resp.body) == [{
+            'id': 'test2_updated:test_updated',
+            'name': 'test2_updated',
+            'email': 'test2_updated',
+            'password': 'test_updated',
+            'stores': [],
+            'grants': [{
+                'method_id': 3,
+                'uri_id': 3,
+                'method': {'id': 3, 'method': 'put'},
+                'uri': {'id': 3, 'uri': '/test3'}
+            }]
+        }]

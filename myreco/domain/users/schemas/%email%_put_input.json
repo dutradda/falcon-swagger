@@ -3,9 +3,10 @@
     "title": "Recommendations Users",
     "type": "object",
     "additionalProperties": false,
-    "required": ["name", "password", "grants"],
+    "required": ["name", "password", "email", "grants"],
     "properties": {
         "name": {"type": "string"},
+        "email": {"type": "string"},
         "password": {"type": "string"},
         "grants": {
             "type": "array",

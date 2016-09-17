@@ -214,11 +214,9 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
         else:
             rel_insts = getattr(instance, attr_name)
             if isinstance(rel_insts, InstrumentedList):
-                print(rel_insts, ids_to_get, rel_model.get(session))
                 rel_insts = set(rel_insts)
                 rel_insts.update(set(rel_model.get(session, ids_to_get, todict=False)))
                 rel_insts = list(rel_insts)
-                print(rel_insts)
 
             elif rel_insts is None:
                 return rel_model.get(session, ids_to_get, todict=False)
@@ -268,7 +266,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
             else:
                 columns_str = ', '.join(rel_model.primaries_keys)
-                ids_str = ', '.join([str(id_) for id_ in rel_id])
+                ids_str = ', '.join([str(id_) for id_ in rel_id.values()])
                 error_message = "can't remove model '{}' on column(s) '{}' with value(s) {}"
                 error_message = error_message.format(rel_model.tablename, columns_str, ids_str)
                 raise ModelBaseError(error_message, input_)

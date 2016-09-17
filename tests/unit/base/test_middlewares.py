@@ -73,7 +73,7 @@ class TestFalconJsonSchemaMiddleware(object):
 
         json_schema_middleware.process_resource(req, resp, resource, params)
         assert hasattr(resource, 'on_test_validator')
-        assert resource.on_test_validator.validate.call_args_list == [mock.call('test')]
+        assert resource.routes.get().validator.validate.call_args_list == [mock.call('test')]
 
     def test_process_resource_with_valid_json_and_without_validator(self, json_schema_middleware):
         req = mock.MagicMock(method='test', context=dict())
