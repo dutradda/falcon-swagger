@@ -32,8 +32,10 @@ from sqlalchemy.inspection import inspect
 from sqlalchemy import or_, and_
 from copy import deepcopy
 from collections import OrderedDict
+from importlib import import_module
 
 from myreco.exceptions import ModelBaseError
+from myreco.base.routes import RoutesBuilder
 
 import json
 
@@ -42,6 +44,7 @@ MODEL_BASE_CLASS_NAME = 'SQLAlchemyRedisModelBase'
 
 
 class _SQLAlchemyModelMeta(DeclarativeMeta):
+
     def __init__(cls, name, bases_classes, attributes):
         DeclarativeMeta.__init__(cls, name, bases_classes, attributes)
 
@@ -64,19 +67,29 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
             cls.columns = set(cls.__table__.c)
             cls.tablename = str(cls.__table__.name)
             cls.todict_schema = {}
+            cls.valid_attributes = set()
             base_class.all_models.add(cls)
 
             cls._build_backrefs_for_all_models(base_class.all_models)
+
+            cls.routes = getattr(cls, 'routes', set())
+            build_routes_from_schemas = getattr(cls, '_build_routes_from_schemas', True)
+            build_basic_routes = getattr(cls, '_build_basic_routes', False)
+
+            routes = RoutesBuilder(cls, build_routes_from_schemas, build_basic_routes)
+            cls.routes.update(routes)
         else:
             cls.all_models = set()
 
     def _build_primary_keys(cls):
-        cls.primaries_keys = OrderedDict()
+        primaries_keys = {}
 
         for attr_name in cls.__dict__:
             primary_key = cls._get_primary_key(attr_name)
             if primary_key:
-                cls.primaries_keys[attr_name] = primary_key
+                primaries_keys[attr_name] = primary_key
+
+        cls.primaries_keys = OrderedDict(sorted(primaries_keys.items()))
 
     def _get_primary_key(cls, attr_name):
         attr = getattr(cls, attr_name)
@@ -95,7 +108,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
         for model in all_models:
             for relationship in all_relationships:
                 if model != cls.get_model_from_rel(relationship, all_models, parent=True) and \
-                    model == cls.get_model_from_rel(relationship, all_models):
+                        model == cls.get_model_from_rel(relationship, all_models):
                     model.backrefs.add(relationship)
 
     def _build_relationships(cls):
@@ -109,8 +122,10 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
     def _get_relationship(cls, attr_name):
         attr = getattr(cls, attr_name)
-        if isinstance(attr, InstrumentedAttribute) and isinstance(attr.prop, RelationshipProperty):
-            return attr
+        if isinstance(attr, InstrumentedAttribute):
+            cls.valid_attributes.add(attr_name)
+            if isinstance(attr.prop, RelationshipProperty):
+                return attr
 
     def get_model_from_rel(cls, relationship, all_models=None, parent=False):
         if parent:
@@ -170,17 +185,19 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
                     to_delete = rel_values.pop('_delete', None)
                     to_remove = rel_values.pop('_remove', None)
                     rel_id = rel_model.get_ids_from_values(rel_values)
-                    op_count = [op for op in (to_update, to_delete, to_remove) if op is not None]
+                    op_count = [op for op in (
+                        to_update, to_delete, to_remove) if op is not None]
                     no_rel_insts_message = "Can't execute nested '_{}'"
 
                     if len(op_count) > 1:
                         raise ModelBaseError(
-                            "ambiguous operations 'update'"\
+                            "ambiguous operations 'update'"
                             ", 'delete' or 'remove'", input_)
 
                     if to_update:
                         if not rel_insts:
-                            raise ModelBaseError(no_rel_insts_message.format('update'), input_)
+                            raise ModelBaseError(
+                                no_rel_insts_message.format('update'), input_)
 
                         cls._exec_update_on_instance(
                             session, rel_model, attr_name, relationship, rel_id,
@@ -188,13 +205,15 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
                     elif to_delete:
                         if not rel_insts:
-                            raise ModelBaseError(no_rel_insts_message.format('delete'), input_)
+                            raise ModelBaseError(
+                                no_rel_insts_message.format('delete'), input_)
 
                         rel_model.delete(session, rel_id, commit=False)
 
                     elif to_remove:
                         if not rel_insts:
-                            raise ModelBaseError(no_rel_insts_message.format('remove'), input_)
+                            raise ModelBaseError(
+                                no_rel_insts_message.format('remove'), input_)
 
                         cls._exec_remove_on_instance(
                             rel_model, attr_name, relationship,
@@ -210,12 +229,14 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
         ids_to_get = cls._get_ids_from_rels_values(rel_model, rels_values)
 
         if not instance in session.identity_map.values():
-            rel_insts = rel_model.get(session, ids_to_get, todict=False) if ids_to_get else []
+            rel_insts = rel_model.get(
+                session, ids_to_get, todict=False) if ids_to_get else []
         else:
             rel_insts = getattr(instance, attr_name)
             if isinstance(rel_insts, InstrumentedList):
                 rel_insts = set(rel_insts)
-                rel_insts.update(set(rel_model.get(session, ids_to_get, todict=False)))
+                rel_insts.update(
+                    set(rel_model.get(session, ids_to_get, todict=False)))
                 rel_insts = list(rel_insts)
 
             elif rel_insts is None:
@@ -242,12 +263,14 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
         if relationship.prop.uselist is True:
             for rel_inst in rel_insts:
                 if rel_inst.get_ids_map() == rel_id:
-                    rel_model._update_instance(session, rel_inst, rel_values, input_)
+                    rel_model._update_instance(
+                        session, rel_inst, rel_values, input_)
                     setattr(instance, attr_name, rel_insts)
                     break
 
         else:
-            rel_model._update_instance(session, rel_insts[0], rel_values, input_)
+            rel_model._update_instance(
+                session, rel_insts[0], rel_values, input_)
             setattr(instance, attr_name, rel_insts[0])
 
     def _exec_remove_on_instance(
@@ -268,7 +291,8 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
                 columns_str = ', '.join(rel_model.primaries_keys)
                 ids_str = ', '.join([str(id_) for id_ in rel_id.values()])
                 error_message = "can't remove model '{}' on column(s) '{}' with value(s) {}"
-                error_message = error_message.format(rel_model.tablename, columns_str, ids_str)
+                error_message = error_message.format(
+                    rel_model.tablename, columns_str, ids_str)
                 raise ModelBaseError(error_message, input_)
 
         else:
@@ -278,7 +302,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
             cls, session, rel_model, attr_name,
             relationship, rel_values, values):
         inserted_objs = rel_model.insert(
-                session, rel_values, commit=False, todict=False)
+            session, rel_values, commit=False, todict=False)
         if relationship.prop.uselist is not True:
             values[attr_name] = inserted_objs[0]
         else:
@@ -290,14 +314,16 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
         input_ = deepcopy(objs)
 
         objs = cls._to_list(objs)
-        ids = [cls.get_ids_from_values(obj) for obj in objs] if not ids else cls._to_list(ids)
+        ids = [cls.get_ids_from_values(
+            obj) for obj in objs] if not ids else cls._to_list(ids)
 
         insts = cls.get(session, ids, todict=False, filters=filters)
 
         for inst in insts:
             inst.old_redis_key = session.build_inst_redis_key(inst)
 
-        id_insts_zip = [(inst.get_ids_map(ids[0].keys()), inst) for inst in insts]
+        id_insts_zip = [(inst.get_ids_map(ids[0].keys()), inst)
+                        for inst in insts]
 
         for id_, inst in id_insts_zip:
             cls._update_instance(session, inst, objs[ids.index(id_)], input_)
@@ -335,7 +361,8 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
         and_clause_args = []
         for pk_name in pk_attributes:
-            comparison = cls._build_id_attribute_comparison(pk_name, pk_attributes)
+            comparison = cls._build_id_attribute_comparison(
+                pk_name, pk_attributes)
             and_clause_args.append(comparison)
 
         return and_(*and_clause_args)
@@ -369,7 +396,8 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
         ids = cls._to_list(ids)
 
         if not todict or session.redis_bind is None:
-            filters = cls.build_filters_by_ids(ids) if filters is None else filters
+            filters = cls.build_filters_by_ids(
+                ids) if filters is None else filters
             insts = session.query(cls).filter(filters).all()
             if todict:
                 return [inst.todict() for inst in insts]
@@ -383,9 +411,11 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
         objs = [json.loads(obj) for obj in objs if obj is not None]
 
         if ids:
-            filters = cls.build_filters_by_ids(ids) if filters is None else filters
+            filters = cls.build_filters_by_ids(
+                ids) if filters is None else filters
             instances = session.query(cls).filter(filters).all()
-            items = [(str(each.get_ids_values()), each.todict()) for each in instances]
+            items = [(str(each.get_ids_values()), each.todict())
+                     for each in instances]
             no_cached_map = OrderedDict(items)
             session.redis_bind.hmset(model_redis_key, no_cached_map)
             objs.extend(no_cached_map.values())
@@ -395,8 +425,28 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
     def build_id_dict(cls, id_values):
         return {id_name: id_value for id_name, id_value in zip(cls.primaries_keys, id_values)}
 
+    def get_module_filename(cls):
+        return import_module(cls.__module__).__file__
+
+    def on_post(cls, *args, **kwargs):
+        pass
+
+    def on_put(cls, *args, **kwargs):
+        pass
+
+    def on_patch(cls, *args, **kwargs):
+        pass
+
+    def on_delete(cls, *args, **kwargs):
+        pass
+
+    def on_get(cls, *args, **kwargs):
+        pass
+
 
 class _SQLAlchemyModel(object):
+    api_prefix = '/'
+
     def get_ids_values(self):
         pk_names = sorted(type(self).primaries_keys.keys())
         return tuple([getattr(self, id_name) for id_name in pk_names])
@@ -413,11 +463,13 @@ class _SQLAlchemyModel(object):
         cls = type(self)
 
         for relationship in cls.relationships:
-            related_model_insts = self._get_related_model_insts(session, relationship)
+            related_model_insts = self._get_related_model_insts(
+                session, relationship)
             related.update(related_model_insts)
 
         for relationship in cls.backrefs:
-            related_model_insts = self._get_related_model_insts(session, relationship, parent=True)
+            related_model_insts = self._get_related_model_insts(
+                session, relationship, parent=True)
             related.update(related_model_insts)
 
         return related
@@ -427,7 +479,8 @@ class _SQLAlchemyModel(object):
         rel_model = cls.get_model_from_rel(relationship, parent=parent)
 
         filters = cls.build_filters_by_ids([self.get_ids_map()])
-        result = set(session.query(rel_model).join(relationship).filter(filters).all())
+        result = set(session.query(rel_model).join(
+            relationship).filter(filters).all())
         return result
 
     def todict(self, schema=None):
@@ -454,7 +507,8 @@ class _SQLAlchemyModel(object):
             rel_name = rel.key
             if self._attribute_in_schema(rel_name, schema):
                 rel_schema = schema.get(rel_name)
-                rel_schema = rel_schema if isinstance(rel_schema, dict) else None
+                rel_schema = rel_schema if isinstance(
+                    rel_schema, dict) else None
                 attr = getattr(self, rel.prop.key)
                 relationships = None
                 if rel.prop.uselist is True:
@@ -471,7 +525,15 @@ class _SQLAlchemyModel(object):
 def model_base_builder(
         bind=None, metadata=None, mapper=None,
         constructor=_declarative_constructor,
-        class_registry=None):
+        class_registry=None, api_prefix=None):
+    if api_prefix is not None:
+        old_prefix = _SQLAlchemyModel.api_prefix
+        _SQLAlchemyModel.api_prefix = api_prefix
+
+    if not _SQLAlchemyModel.api_prefix.endswith('/'):
+        _SQLAlchemyModel.api_prefix = old_prefix
+        raise ModelBaseError("'api_prefix' attribute must ends with a '/'")
+
     return declarative_base(
         name=MODEL_BASE_CLASS_NAME, metaclass=_SQLAlchemyModelMeta,
         cls=_SQLAlchemyModel, bind=bind, metadata=metadata,

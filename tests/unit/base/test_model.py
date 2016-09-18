@@ -127,6 +127,7 @@ def model3_string(model_base, model1, model2):
 
 
 class TestModelBaseInit(object):
+
     def test_builds_no_relationships(self, model1):
         assert model1.relationships == set()
 
@@ -151,7 +152,8 @@ class TestModelBaseInit(object):
 
     def test_if_builds_relationships_correctly_with_two_models_set_with_string(
             self, model1, model2, model3_string):
-        assert model3_string.relationships == {model3_string.model1, model3_string.model2}
+        assert model3_string.relationships == {
+            model3_string.model1, model3_string.model2}
 
     def test_if_builds_backrefs_correctly_with_one_model(self, model2, model3):
         assert model2.backrefs == {model3.model2}
@@ -159,22 +161,43 @@ class TestModelBaseInit(object):
     def test_if_builds_backrefs_correctly_with_two_models(self, model1, model2, model3):
         assert model1.backrefs == {model2.model1, model3.model1}
 
-    def test_builds_with_id_name(self, model_base):
-        class test(model_base):
-            __tablename__ = 'test'
-            id_names = ['id2']
+    def test_if_builds_valid_attributes_correctly(self, model1, model2, model3):
+        assert model3.valid_attributes == {
+            'id', 'model1_id', 'model2_id', 'model1', 'model2'}
 
-            id2 = sa.Column(sa.Integer, primary_key=True)
+    def test_if_builds_primaries_keys_correctly(self, model_base):
+        class model(model_base):
+                __tablename__ = 'test'
+                id3 = sa.Column(sa.Integer, primary_key=True)
+                id1 = sa.Column(sa.Integer, primary_key=True)
+                id2 = sa.Column(sa.Integer, primary_key=True)
+
+        assert model.primaries_keys == {'id1': model.id1, 'id2': model.id2, 'id3': model.id3}
 
     def test_raises_model_error_with_invalid_base_class(self):
         class model(object):
             id = sa.Column(sa.Integer, primary_key=True)
 
-        with pytest.raises(ModelBaseError):
-            sa.ext.declarative.declarative_base(metaclass=_SQLAlchemyModelMeta, cls=model)
+        with pytest.raises(ModelBaseError) as error:
+            sa.ext.declarative.declarative_base(
+                metaclass=_SQLAlchemyModelMeta, cls=model)
+
+        assert error.value.args == (
+            "'Base' class must inherit from 'SQLAlchemyRedisModelBase'",)
+
+    def test_raises_model_error_with_invalid_api_prefix(self):
+        with pytest.raises(ModelBaseError) as error:
+            model_base = model_base_builder(api_prefix='/test')
+        assert error.value.args == (
+            "'api_prefix' attribute must ends with a '/'",)
+
+
+def test_model_base_get_module_filename(model1):
+    assert model1.get_module_filename() == __file__
 
 
 class TestModelBaseTodict(object):
+
     def test_todict_without_schema(self, model1, model2):
         assert model1(id=1).todict() == {'id': 1}
 
@@ -257,29 +280,34 @@ class TestModelBaseTodict(object):
 
 
 class TestModelBaseNestedOperations(object):
+
     def test_raises_model_error_with_update_and_delete(self, model1, model2):
         with pytest.raises(ModelBaseError) as exc_info:
-            model2.insert(mock.MagicMock(), {'model1': {'_update': True, '_delete': True}})
+            model2.insert(mock.MagicMock(), {'model1': {
+                          '_update': True, '_delete': True}})
 
         assert exc_info.value.args == \
             ("ambiguous operations 'update', 'delete' or 'remove'",)
 
     def test_raises_model_error_with_update_and_remove(self, model1, model2):
         with pytest.raises(ModelBaseError) as exc_info:
-            model2.insert(mock.MagicMock(), {'model1': {'_update': True, '_remove': True}})
+            model2.insert(mock.MagicMock(), {'model1': {
+                          '_update': True, '_remove': True}})
 
         assert exc_info.value.args == \
             ("ambiguous operations 'update', 'delete' or 'remove'",)
 
     def test_raises_model_error_with_remove_and_delete(self, model1, model2):
         with pytest.raises(ModelBaseError) as exc_info:
-            model2.insert(mock.MagicMock(), {'model1': {'_delete': True, '_remove': True}})
+            model2.insert(mock.MagicMock(), {'model1': {
+                          '_delete': True, '_remove': True}})
 
         assert exc_info.value.args == \
             ("ambiguous operations 'update', 'delete' or 'remove'",)
 
     def test_raises_model_error_with_invalid_nested_id(self, model1, model2_mtm):
         with pytest.raises(ModelBaseError) as exc_info:
-            model2_mtm.insert(mock.MagicMock(), {'model1': [{'id': 1, '_remove': True}]})
+            model2_mtm.insert(mock.MagicMock(), {
+                              'model1': [{'id': 1, '_remove': True}]})
         assert exc_info.value.args == \
             ("can't remove model 'model1' on column(s) 'id' with value(s) 1",)
