@@ -35,14 +35,18 @@ class Route(object):
 
     def __init__(self, uri_template, method, action,
                  validator=None, output_schema=None,
-                 authorizer=None):
+                 authorizer=None, hooks=None):
         self.uri_template = uri_template
         self.method = method
         self.action = action
         self.validator = validator
-        self._output_schema = output_schema
+        self.output_schema = output_schema
         self._schemas_sinks = dict()
         self.authorizer = authorizer
+
+        if hooks:
+            for hook in hooks:
+                self.action = hook(self.action)
 
         if validator:
             schema_uri = self.uri_template + '/_schemas/input'
@@ -63,10 +67,10 @@ class Route(object):
             schema_uri = self.uri_template + '/_schemas/input'
             api.add_sink(self._sink_input_schema, schema_uri)
 
-        if self._output_schema:
+        if self.output_schema:
             schema_uri = self.uri_template + '/_schemas/output'
             api.add_sink(self._sink_output_schema, schema_uri)
-            self._schemas_sinks[schema_uri] = self._output_schema
+            self._schemas_sinks[schema_uri] = self.output_schema
 
         if self.has_schemas:
             api.add_sink(self._sink_schemas, self.uri_template + '/_schemas')
@@ -75,7 +79,7 @@ class Route(object):
         resp.body = self.validator.schema
 
     def _sink_output_schema(self, req, resp):
-        resp.body = self._output_schema
+        resp.body = self.output_schema
 
     def _sink_schemas(self, req, resp):
         build_link = lambda uri: '{}://{}{}'.format(
@@ -98,39 +102,54 @@ class URISchemaHandler(object):
 
 class _RoutesBuilderMeta(type):
 
-    def _build_routes_from_schemas(cls, model):
+    def _build_routes_from_schemas(cls, model, auth_hook):
         schemas_path = cls.get_schemas_path(model)
         schemas_glob = os.path.join(schemas_path, '*.json')
-        schema_regex = r'(([\w\d%_-]+)_)?(post|put|patch|delete|get)_(input|output).json'
-        routes_data = defaultdict(lambda: defaultdict(dict))
+        schema_regex = r'(([\w\d%_-]+)_)?(post|put|patch|delete|get)_(input|output)(_auth)?.json'
+        routes = dict()
 
         for json_schema_filename in glob(schemas_glob):
             json_schema_basename = os.path.basename(json_schema_filename)
             match = re_match(schema_regex, json_schema_basename)
             if match:
-                cls._set_route_data(routes_data, model,
-                                    match, json_schema_filename)
+                route = cls._set_route(routes, model, match,
+                                       json_schema_filename,
+                                       auth_hook)
 
-        return cls._build_routes(routes_data)
+        return set(routes.values())
 
     def get_schemas_path(cls, model):
         module_filename = model.get_module_filename()
         module_path = os.path.dirname(os.path.abspath(module_filename))
         return os.path.join(module_path, 'schemas')
 
-    def _set_route_data(cls, routes_data, model, match, json_schema_filename):
+    def _set_route(cls, routes, model, match, json_schema_filename, auth_hook):
         uri_template = cls._build_uri(model, match.groups()[1])
         method = match.groups()[2].upper()
         type_ = match.groups()[3]
-        schema = {}
+        auth = match.groups()[4]
+        hooks = {auth_hook} if auth and auth_hook else None
+        output_schema = None
+        validator = None
 
         with open(json_schema_filename) as json_schema_file:
             schema = json.load(json_schema_file)
 
         if type_ == 'input':
-            schema = cls._build_validator(schema, model)
+            validator = cls._build_validator(schema, model)
+        else:
+            output_schema = schema
 
-        routes_data[uri_template][method][type_] = schema
+        if (uri_template, method) in routes:
+            if output_schema is not None:
+                routes[(uri_template, method)].output_schema = output_schema
+            if validator is not None:
+                routes[(uri_template, method)].validator = validator
+            return
+
+        action = cls._get_action(uri_template, method)
+        routes[(uri_template, method)] = Route(uri_template, method, action, validator=validator,
+                                               output_schema=output_schema, hooks=hooks)
 
     def _build_uri(cls, model, uri_template_sufix):
         base_uri_template = model.api_prefix + model.tablename
@@ -150,30 +169,6 @@ class _RoutesBuilderMeta(type):
         resolver = RefResolver.from_schema(schema, handlers=handlers)
         Draft4Validator.check_schema(schema)
         return Draft4Validator(schema, resolver=resolver)
-
-    def _build_routes(cls, routes_data):
-        added_uris = set()
-        routes = set()
-
-        for uri_template, methods in routes_data.items():
-            cls._set_route(routes, uri_template, methods)
-
-        return routes
-
-    def _set_route(cls, routes, uri_template, methods):
-        for method, types in methods.items():
-            validator = None
-            output_schema = {}
-
-            for type_, schema in types.items():
-                if type_ == 'input':
-                    validator = schema
-                else:
-                    output_schema = schema
-
-            action = cls._get_action(uri_template, method)
-            routes.add(Route(uri_template, method,
-                             action, validator, output_schema))
 
     def _get_action(cls, uri_template, method):
         uri_name = 'model_name'
@@ -313,11 +308,11 @@ class _RoutesBuilderMeta(type):
 
 class RoutesBuilder(metaclass=_RoutesBuilderMeta):
 
-    def __new__(cls, model, build_from_schemas=True, build_generic=False):
+    def __new__(cls, model, build_from_schemas=True, build_generic=False, auth_hook=None):
         routes = set()
 
         if build_from_schemas:
-            routes.update(cls._build_routes_from_schemas(model))
+            routes.update(cls._build_routes_from_schemas(model, auth_hook))
 
         if build_generic:
             routes.update(cls._build_generic_routes(model))

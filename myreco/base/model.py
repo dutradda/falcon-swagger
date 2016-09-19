@@ -72,11 +72,13 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
             cls._build_backrefs_for_all_models(base_class.all_models)
 
+            cls.auth_hook = getattr(cls, 'auth_hook', None)
             cls.routes = getattr(cls, 'routes', set())
-            build_routes_from_schemas = getattr(cls, '_build_routes_from_schemas', True)
+            build_routes_from_schemas = getattr(
+                cls, '_build_routes_from_schemas', True)
             build_generic_routes = getattr(cls, '_build_generic_routes', False)
-
-            routes = RoutesBuilder(cls, build_routes_from_schemas, build_generic_routes)
+            routes = RoutesBuilder(
+                cls, build_routes_from_schemas, build_generic_routes, cls.auth_hook)
             cls.routes.update(routes)
         else:
             cls.all_models = set()
