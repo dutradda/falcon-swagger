@@ -51,7 +51,7 @@ class UsersModel(SQLAlchemyRedisModelBase):
     stores = sa.orm.relationship('StoresModel', uselist=True, secondary='users_stores')
 
     @classmethod
-    def authorize(cls, session, authorization, uri, path, method):
+    def authorize(cls, session, authorization, uri_template, path, method):
         authorization = b64decode(authorization).decode()
         if not ':' in authorization:
             return
@@ -65,7 +65,7 @@ class UsersModel(SQLAlchemyRedisModelBase):
         elif user:
             for grant in user['grants']:
                 grant_uri = grant['uri']['uri']
-                if bool(grant_uri == uri) != bool(grant_uri == path) \
+                if grant_uri == uri_template or grant_uri == path \
                         and grant['method']['method'] == method:
                     session.user = user
                     return True
