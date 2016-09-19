@@ -34,15 +34,13 @@ import json
 class Route(object):
 
     def __init__(self, uri_template, method, action,
-                 validator=None, output_schema=None,
-                 authorizer=None, hooks=None):
+                 validator=None, output_schema=None, hooks=None):
         self.uri_template = uri_template
         self.method = method
         self.action = action
         self.validator = validator
         self.output_schema = output_schema
         self._schemas_sinks = dict()
-        self.authorizer = authorizer
 
         if hooks:
             for hook in hooks:

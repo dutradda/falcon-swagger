@@ -21,10 +21,9 @@
 # SOFTWARE.
 
 
-from myreco.base.hooks import AuthorizationHook
+from myreco.base.hooks import AuthorizationHook, before_action
 from myreco.base.http_api import HttpAPI
 from myreco.base.routes import Route
-from falcon import before as falcon_before
 from unittest import mock
 
 
@@ -49,7 +48,7 @@ def model(model_base):
         _build_routes_from_schema = False
         id = sa.Column(sa.Integer, primary_key=True)
 
-        routes = {Route('/', 'GET', action, authorizer=AuthorizationHook(auth_func, 'test'))}
+        routes = {Route('/', 'GET', action, hooks=[before_action(AuthorizationHook(auth_func, 'test'))])}
 
     return model
 

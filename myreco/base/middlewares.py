@@ -38,8 +38,6 @@ class FalconRoutesMiddleware(object):
 
     def process_resource(self, req, resp, model, uri_params):
         route = self._get_route(req.uri_template, req.method)
-        if route.authorizer:
-            route.authorizer(req, resp, model, uri_params)
 
         body = req.stream.read().decode()
         if body:
