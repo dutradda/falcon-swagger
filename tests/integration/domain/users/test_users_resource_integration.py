@@ -27,6 +27,7 @@ from myreco.base.http_api import HttpAPI
 from myreco.base.routes import RoutesBuilder
 from unittest import mock
 from base64 import b64encode
+from pytest_falcon.plugin import Client
 
 import pytest
 import json
@@ -43,7 +44,8 @@ def init_(session):
     user = {
         'name': 'test',
         'email': 'test',
-        'password': 'test'
+        'password': 'test',
+        'admin': True
     }
     UsersModel.insert(session, user)
 
@@ -92,37 +94,9 @@ class TestUsersResourcePost(object):
             'email': 'test2',
             'password': 'test',
             'grants': [{
-                'uri_id': 1,
-                'method_id': 1,
+                'uri_id': 2,
+                'method_id': 2,
                 '_update': True
-            }]
-        }
-        resp = client.post('/users', data=json.dumps(user), headers=headers)
-
-        assert resp.status_code == 201
-        assert json.loads(resp.body) == {
-            'id': 'test2:test',
-            'name': 'test2',
-            'email': 'test2',
-            'password': 'test',
-            'grants': [{
-                'method_id': 1,
-                'uri_id': 1,
-                'method': {'id': 1, 'method': 'post'},
-                'uri': {'id': 1, 'uri': '/test'}
-            }],
-            'stores': []
-        }
-
-    def test_post_valid_with_grants_insert_and_uri_and_method_update(
-            self, client, headers):
-        user = {
-            'name': 'test2',
-            'email': 'test2',
-            'password': 'test',
-            'grants': [{
-                'uri': {'id': 2, '_update': True},
-                'method': {'id': 2, '_update': True}
             }]
         }
         resp = client.post('/users', data=json.dumps(user), headers=headers)
@@ -136,21 +110,27 @@ class TestUsersResourcePost(object):
             'grants': [{
                 'method_id': 2,
                 'uri_id': 2,
-                'method': {'id': 2, 'method': 'get'},
-                'uri': {'id': 2, 'uri': '/test2'}
+                'method': {'id': 2, 'method': 'post'},
+                'uri': {'id': 2, 'uri': '/test'}
+            },{
+                'method_id': 1,
+                'uri_id': 5,
+                'method': {'id': 1, 'method': 'patch'},
+                'uri': {'id': 5, 'uri': '/users/test2'}
             }],
-            'stores': []
+            'stores': [],
+            'admin': False
         }
 
-    def test_post_valid_with_grants_uri_and_method_insert(
+    def test_post_valid_with_grants_insert_and_uri_and_method_update(
             self, client, headers):
         user = {
             'name': 'test2',
             'email': 'test2',
             'password': 'test',
             'grants': [{
-                'uri': {'uri': '/test4'},
-                'method': {'method': 'patch'}
+                'uri': {'id': 2, '_update': True},
+                'method': {'id': 1, '_update': True}
             }]
         }
         resp = client.post('/users', data=json.dumps(user), headers=headers)
@@ -162,12 +142,64 @@ class TestUsersResourcePost(object):
             'email': 'test2',
             'password': 'test',
             'grants': [{
-                'method_id': 4,
-                'uri_id': 4,
-                'method': {'id': 4, 'method': 'patch'},
-                'uri': {'id': 4, 'uri': '/test4'}
+                'method_id': 1,
+                'uri_id': 2,
+                'method': {'id': 1, 'method': 'patch'},
+                'uri': {'id': 2, 'uri': '/test'}
+            },{
+                'uri_id': 5,
+                'method': {
+                    'id': 1,
+                    'method': 'patch'
+                },
+                'method_id': 1,
+                'uri': {
+                    'id': 5,
+                    'uri': '/users/test2'
+                }
             }],
-            'stores': []
+            'stores': [],
+            'admin': False
+        }
+
+    def test_post_valid_with_grants_uri_and_method_insert(
+            self, client, headers):
+        user = {
+            'name': 'test2',
+            'email': 'test2',
+            'password': 'test',
+            'grants': [{
+                'uri': {'uri': '/test4'},
+                'method': {'method': 'delete'}
+            }]
+        }
+        resp = client.post('/users', data=json.dumps(user), headers=headers)
+
+        assert resp.status_code == 201
+        assert json.loads(resp.body) == {
+            'id': 'test2:test',
+            'name': 'test2',
+            'email': 'test2',
+            'password': 'test',
+            'grants': [{
+                'method_id': 5,
+                'uri_id': 5,
+                'method': {'id': 5, 'method': 'delete'},
+                'uri': {'id': 5, 'uri': '/test4'}
+            },{
+                'uri_id': 6,
+                'method': {
+                    'id': 1,
+                    'method': 'patch'
+                },
+                'method_id': 1,
+                'uri': {
+                    'id': 6,
+                    'uri': '/users/test2'
+                }
+            }],
+            'stores': [],
+            'admin': False
         }
 
     def test_post_invalid_json(self, client, headers):
@@ -271,13 +303,24 @@ class TestUsersResourcePutInsert(object):
             'email': 'test2',
             'password': 'test',
             'stores': [],
+            'admin': False,
             'grants': [{
                 'method_id': 1,
                 'uri_id': 1,
-                'method': {'id': 1, 'method': 'post'},
-                'uri': {'id': 1, 'uri': '/test'}
-            },
-            ]
+                'method': {'id': 1, 'method': 'patch'},
+                'uri': {'id': 1, 'uri': '/users/test'}
+            },{
+                'uri_id': 5,
+                'method': {
+                    'id': 1,
+                    'method': 'patch'
+                },
+                'method_id': 1,
+                'uri': {
+                    'id': 5,
+                    'uri': '/users/test2'
+                }
+            }]
         }
 
     def test_put_with_insert_and_grants_insert(self, client, headers):
@@ -287,7 +330,7 @@ class TestUsersResourcePutInsert(object):
             'password': 'test',
             'grants': [{
                 'uri': {'uri': '/test4'},
-                'method': {'method': 'patch'}
+                'method': {'method': 'delete'}
             }]
         }
         resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
@@ -299,11 +342,23 @@ class TestUsersResourcePutInsert(object):
             'email': 'test2',
             'password': 'test',
             'stores': [],
+            'admin': False,
             'grants': [{
-                'method_id': 4,
-                'uri_id': 4,
-                'method': {'id': 4, 'method': 'patch'},
-                'uri': {'id': 4, 'uri': '/test4'}
+                'method_id': 5,
+                'uri_id': 5,
+                'method': {'id': 5, 'method': 'delete'},
+                'uri': {'id': 5, 'uri': '/test4'}
+            },{
+                'uri_id': 6,
+                'method': {
+                    'id': 1,
+                    'method': 'patch'
+                },
+                'method_id': 1,
+                'uri': {
+                    'id': 6,
+                    'uri': '/users/test2'
+                }
             }]
         }
 
@@ -342,16 +397,28 @@ class TestUsersResourcePutUpdateOne(object):
             'email': 'test2',
             'password': 'test_updated',
             'stores': [],
+            'admin': False,
             'grants': [{
                 'method_id': 1,
                 'uri_id': 1,
-                'method': {'id': 1, 'method': 'post'},
-                'uri': {'id': 1, 'uri': '/test'}
+                'method': {'id': 1, 'method': 'patch'},
+                'uri': {'id': 1, 'uri': '/users/test'}
+            },{
+                'uri_id': 5,
+                'method': {
+                    'id': 1,
+                    'method': 'patch'
+                },
+                'method_id': 1,
+                'uri': {
+                    'id': 5,
+                    'uri': '/users/test2'
+                }
             },{
                 'method_id': 3,
                 'uri_id': 3,
-                'method': {'id': 3, 'method': 'put'},
-                'uri': {'id': 3, 'uri': '/test3'}
+                'method': {'id': 3, 'method': 'get'},
+                'uri': {'id': 3, 'uri': '/test2'}
             }]
         }
 
@@ -388,7 +455,19 @@ class TestUsersResourcePutUpdateOne(object):
             'email': 'test2',
             'password': 'test_updated',
             'stores': [],
-            'grants': []
+            'grants': [{
+                'uri_id': 5,
+                'method': {
+                    'id': 1,
+                    'method': 'patch'
+                },
+                'method_id': 1,
+                'uri': {
+                    'id': 5,
+                    'uri': '/users/test2'
+                }
+            }],
+            'admin': False
         }
 
     def test_put_update_and_grants_update_and_grants_remove(self, client, headers):
@@ -428,13 +507,83 @@ class TestUsersResourcePutUpdateOne(object):
             'email': 'test2',
             'password': 'test_updated',
             'stores': [],
+            'admin': False,
             'grants': [{
+                'uri_id': 5,
+                'method': {
+                    'id': 1,
+                    'method': 'patch'
+                },
+                'method_id': 1,
+                'uri': {
+                    'id': 5,
+                    'uri': '/users/test2'
+                }
+            },{
                 'method_id': 3,
                 'uri_id': 3,
-                'method': {'id': 3, 'method': 'put'},
-                'uri': {'id': 3, 'uri': '/test3'}
+                'method': {'id': 3, 'method': 'get'},
+                'uri': {'id': 3, 'uri': '/test2'}
             }]
         }
+
+    def test_put_update_primary_key_with_redis(self, session, init_, headers):
+        redis = mock.MagicMock()
+        redis.hmget.return_value = [None]
+        client = Client(HttpAPI(session.bind, [UsersModel], redis))
+        user = {
+            'name': 'test2',
+            'password': 'test',
+            'email': 'test2',
+            'grants': [{
+                'uri_id': 1,
+                'method_id': 1,
+                '_update': True
+            }]
+        }
+        resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
+        assert resp.status_code == 201
+
+        user = {
+            'name': 'test2_updated',
+            'email': 'test2',
+            'password': 'test_updated',
+            'grants': [{
+                'uri_id': 1,
+                'method_id': 1,
+                '_update': True
+            }]
+        }
+        session.redis_bind = mock.MagicMock()
+        resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
+
+        assert resp.status_code == 200
+        assert json.loads(resp.body) == {
+            'id': 'test2:test_updated',
+            'name': 'test2_updated',
+            'email': 'test2',
+            'password': 'test_updated',
+            'stores': [],
+            'admin': False,
+            'grants': [{
+                'method_id': 1,
+                'uri_id': 1,
+                'method': {'id': 1, 'method': 'patch'},
+                'uri': {'id': 1, 'uri': '/users/test'}
+            },{
+                'uri_id': 5,
+                'method': {
+                    'id': 1,
+                    'method': 'patch'
+                },
+                'method_id': 1,
+                'uri': {
+                    'id': 5,
+                    'uri': '/users/test2'
+                }
+            }]
+        }
+        assert redis.hdel.call_args_list == [mock.call('users', "('test2:test',)")]
 
 
 class TestUsersResourcePutUpdateMany(object):
@@ -472,16 +621,28 @@ class TestUsersResourcePutUpdateMany(object):
             'email': 'test2_updated',
             'password': 'test_updated',
             'stores': [],
+            'admin': False,
             'grants': [{
                 'method_id': 1,
                 'uri_id': 1,
-                'method': {'id': 1, 'method': 'post'},
-                'uri': {'id': 1, 'uri': '/test'}
+                'method': {'id': 1, 'method': 'patch'},
+                'uri': {'id': 1, 'uri': '/users/test'}
+            },{
+                'uri_id': 5,
+                'method': {
+                    'id': 1,
+                    'method': 'patch'
+                },
+                'method_id': 1,
+                'uri': {
+                    'id': 5,
+                    'uri': '/users/test2'
+                }
             },{
                 'method_id': 3,
                 'uri_id': 3,
-                'method': {'id': 3, 'method': 'put'},
-                'uri': {'id': 3, 'uri': '/test3'}
+                'method': {'id': 3, 'method': 'get'},
+                'uri': {'id': 3, 'uri': '/test2'}
             }]
         }]
 
@@ -519,7 +680,19 @@ class TestUsersResourcePutUpdateMany(object):
             'email': 'test2_updated',
             'password': 'test_updated',
             'stores': [],
-            'grants': []
+            'grants': [{
+                'uri_id': 5,
+                'method': {
+                    'id': 1,
+                    'method': 'patch'
+                },
+                'method_id': 1,
+                'uri': {
+                    'id': 5,
+                    'uri': '/users/test2'
+                }
+            }],
+            'admin': False
         }]
 
     def test_put_update_and_grants_update_and_grants_remove(self, client, headers):
@@ -560,10 +733,34 @@ class TestUsersResourcePutUpdateMany(object):
             'email': 'test2_updated',
             'password': 'test_updated',
             'stores': [],
+            'admin': False,
             'grants': [{
+                'uri_id': 5,
+                'method': {
+                    'id': 1,
+                    'method': 'patch'
+                },
+                'method_id': 1,
+                'uri': {
+                    'id': 5,
+                    'uri': '/users/test2'
+                }
+            },{
                 'method_id': 3,
                 'uri_id': 3,
-                'method': {'id': 3, 'method': 'put'},
-                'uri': {'id': 3, 'uri': '/test3'}
+                'method': {'id': 3, 'method': 'get'},
+                'uri': {'id': 3, 'uri': '/test2'}
             }]
         }]
+
+
+class TestUsersResourcePatchUser(object):
+    pass
+
+
+class TestUsersResourcePatchOne(object):
+    pass
+
+
+class TestUsersResourcePatchMany(object):
+    pass

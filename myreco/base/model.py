@@ -203,7 +203,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
                         cls._exec_update_on_instance(
                             session, rel_model, attr_name, relationship, rel_id,
-                            rel_values, rel_insts, instance, values, input_)
+                            rel_values, rel_insts, instance, input_)
 
                     elif to_delete:
                         if not rel_insts:
@@ -219,11 +219,11 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
                         cls._exec_remove_on_instance(
                             rel_model, attr_name, relationship,
-                            rel_id, rel_insts, instance, values, input_)
+                            rel_id, rel_insts, instance, input_)
 
                     else:
                         cls._exec_insert_on_instance(
-                            session, rel_model, attr_name, relationship, rel_values, values)
+                            session, rel_model, attr_name, relationship, rel_values, instance)
 
         instance.update_(**values)
 
@@ -261,7 +261,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
     def _exec_update_on_instance(
             cls, session, rel_model, attr_name, relationship,
-            rel_id, rel_values, rel_insts, instance, values, input_):
+            rel_id, rel_values, rel_insts, instance, input_):
         if relationship.prop.uselist is True:
             for rel_inst in rel_insts:
                 if rel_inst.get_ids_map() == rel_id:
@@ -269,7 +269,6 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
                         session, rel_inst, rel_values, input_)
                     setattr(instance, attr_name, rel_insts)
                     break
-
         else:
             rel_model._update_instance(
                 session, rel_insts[0], rel_values, input_)
@@ -277,7 +276,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
     def _exec_remove_on_instance(
             cls, rel_model, attr_name, relationship,
-            rel_id, rel_insts, instance, values, input_):
+            rel_id, rel_insts, instance, input_):
         rel_to_remove = None
         if relationship.prop.uselist is True:
             for rel_inst in rel_insts:
@@ -302,15 +301,15 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
     def _exec_insert_on_instance(
             cls, session, rel_model, attr_name,
-            relationship, rel_values, values):
+            relationship, rel_values, instance):
         inserted_objs = rel_model.insert(
             session, rel_values, commit=False, todict=False)
         if relationship.prop.uselist is not True:
-            values[attr_name] = inserted_objs[0]
+            setattr(instance, attr_name, inserted_objs[0])
         else:
-            rels_ = values.get(attr_name, [])
+            rels_ = getattr(instance, attr_name, [])
             rels_.extend(inserted_objs)
-            values[attr_name] = rels_
+            setattr(instance, attr_name, rels_)
 
     def update(cls, session, objs, commit=True, todict=True, filters=None, ids=None):
         input_ = deepcopy(objs)
@@ -381,7 +380,7 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
                 "'get' method can't be called with 'ids' and with 'offset' or 'limit'",
                 {'ids': ids, 'limit': limit, 'offset': offset})
 
-        if ids is None:
+        if ids is None and filters is None:
             query = session.query(cls)
 
             if limit is not None:

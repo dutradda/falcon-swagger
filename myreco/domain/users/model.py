@@ -22,88 +22,12 @@
 
 
 from myreco.base.model import SQLAlchemyRedisModelBase
-from myreco.domain.stores.model import StoresModel
-from sqlalchemy.inspection import inspect
-from base64 import b64decode
-from myreco.domain.constants import AUTH_REALM
 from myreco.base.hooks import AuthorizationHook, before_action
+from myreco.base.routes import Route
+from myreco.domain.stores.model import StoresModel
+from myreco.domain.constants import AUTH_REALM
+from base64 import b64decode
 import sqlalchemy as sa
-import re
-
-
-class UsersModel(SQLAlchemyRedisModelBase):
-    __tablename__ = 'users'
-    __table_args__ = {'mysql_engine':'innodb'}
-
-    id = sa.Column(sa.String(255), primary_key=True)
-    name = sa.Column(sa.String(255), unique=True, nullable=False)
-    email = sa.Column(sa.String(255), unique=True, nullable=False)
-    password = sa.Column(sa.String(255), nullable=False)
-
-    grants_primaryjoin = 'UsersModel.id == users_grants.c.user_id'
-    grants_secondaryjoin = 'and_('\
-            'GrantsModel.uri_id == users_grants.c.grant_uri_id, '\
-            'GrantsModel.method_id == users_grants.c.grant_method_id)'
-
-    grants = sa.orm.relationship(
-        'GrantsModel', uselist=True, secondary='users_grants',
-        primaryjoin=grants_primaryjoin, secondaryjoin=grants_secondaryjoin)
-    stores = sa.orm.relationship('StoresModel', uselist=True, secondary='users_stores')
-
-    @classmethod
-    def authorize(cls, session, authorization, uri_template, path, method):
-        authorization = b64decode(authorization).decode()
-        if not ':' in authorization:
-            return
-
-        user = cls.get(session, {'id': authorization})
-        user = user[0] if user else user
-        if user and not user.get('grants'):
-            session.user = user
-            return True
-
-        elif user:
-            for grant in user['grants']:
-                grant_uri = grant['uri']['uri']
-                if grant_uri == uri_template or grant_uri == path \
-                        and grant['method']['method'] == method:
-                    session.user = user
-                    return True
-
-    @classmethod
-    def insert(cls, session, objs, commit=True, todict=True):
-        objs = cls._to_list(objs)
-        cls._set_objs_ids(objs)
-        return type(cls).insert(cls, session, objs, commit, todict)
-
-    @classmethod
-    def _set_objs_ids(cls, objs):
-        objs = cls._to_list(objs)
-        for obj in objs:
-            obj['id'] = '{}:{}'.format(obj['email'], obj['password'])
-
-    @classmethod
-    def update(cls, session, objs, commit=True, todict=True, ids=None, filters=None):
-        objs = cls._to_list(objs)
-        if ids:
-            filters = cls.build_filters_by_ids([{'email': obj.pop('email')} for obj in objs])
-        insts = type(cls).update(
-            cls, session, objs, commit=False, todict=False, filters=filters, ids=ids)
-        cls._set_insts_ids(insts)
-
-        if commit:
-            session.commit()
-        return cls._build_todict_list(insts) if todict else insts
-
-    @classmethod
-    def _set_insts_ids(cls, insts):
-        insts = cls._to_list(insts)
-        for inst in insts:
-            inst.id = '{}:{}'.format(inst.email, inst.password)
-
-
-for route in UsersModel.routes:
-    route.action = before_action(AuthorizationHook(UsersModel.authorize, AUTH_REALM))(route.action)
 
 
 class GrantsModel(SQLAlchemyRedisModelBase):
@@ -132,6 +56,107 @@ class MethodsModel(SQLAlchemyRedisModelBase):
 
     id = sa.Column(sa.Integer, primary_key=True)
     method = sa.Column(sa.String(10), unique=True, nullable=False)
+
+
+class UsersModel(SQLAlchemyRedisModelBase):
+    __tablename__ = 'users'
+    __table_args__ = {'mysql_engine':'innodb'}
+
+    id = sa.Column(sa.String(255), primary_key=True)
+    name = sa.Column(sa.String(255), unique=True, nullable=False)
+    email = sa.Column(sa.String(255), unique=True, nullable=False)
+    password = sa.Column(sa.String(255), nullable=False)
+    admin = sa.Column(sa.Boolean, default=False)
+
+    grants_primaryjoin = 'UsersModel.id == users_grants.c.user_id'
+    grants_secondaryjoin = 'and_('\
+            'GrantsModel.uri_id == users_grants.c.grant_uri_id, '\
+            'GrantsModel.method_id == users_grants.c.grant_method_id)'
+
+    grants = sa.orm.relationship(
+        'GrantsModel', uselist=True, secondary='users_grants',
+        primaryjoin=grants_primaryjoin, secondaryjoin=grants_secondaryjoin)
+    stores = sa.orm.relationship('StoresModel', uselist=True, secondary='users_stores')
+
+    @classmethod
+    def authorize(cls, session, authorization, uri_template, path, method):
+        authorization = b64decode(authorization).decode()
+        if not ':' in authorization:
+            return
+
+        user = cls.get(session, {'id': authorization})
+        user = user[0] if user else user
+        if user and user.get('admin'):
+            session.user = user
+            return True
+
+        elif user:
+            for grant in user['grants']:
+                grant_uri = grant['uri']['uri']
+                if grant_uri == uri_template or grant_uri == path \
+                        and grant['method']['method'] == method:
+                    session.user = user
+                    return True
+
+    @classmethod
+    def insert(cls, session, objs, commit=True, todict=True):
+        objs = cls._to_list(objs)
+        cls._set_objs_ids_and_grant(objs, session)
+        return type(cls).insert(cls, session, objs, commit, todict)
+
+    @classmethod
+    def _set_objs_ids_and_grant(cls, objs, session):
+        objs = cls._to_list(objs)
+        method = MethodsModel.get(session, filters=(MethodsModel.method == 'patch'), todict=False)
+
+        for obj in objs:
+            user_uri = '/users/{}'.format(obj['email'])
+            uri = URIsModel.get(session, filters=(URIsModel.uri == user_uri), todict=False)
+
+            if uri and method:
+                uri = uri[0]
+                method = method[0]
+                grant = GrantsModel.get(session, {'uri_id': uri.id, 'method_id': method.id})
+                if grant:
+                    grant = {'uri_id': uri.id, 'method_id': method.id, '_update': True}
+                else:
+                    grant = {'uri_id': uri.id, 'method_id': method.id}
+            elif uri:
+                uri = uri[0]
+                grant = {'uri_id': uri.id, 'method': {'method': 'patch'}, '_update': True}
+            elif method:
+                method = method[0]
+                grant = {'method': {'id': method.id, '_update': True}, 'uri': {'uri': user_uri}}
+            else:
+                grant = {'method': {'method': 'patch'}, 'uri': {'uri': user_uri}}
+
+            obj['id'] = '{}:{}'.format(obj['email'], obj['password'])
+            grants = obj.get('grants', [])
+            grants.append(grant)
+            obj['grants'] = grants
+
+    @classmethod
+    def update(cls, session, objs, commit=True, todict=True, ids=None, filters=None):
+        objs = cls._to_list(objs)
+        if ids:
+            filters = cls.build_filters_by_ids([{'email': obj.pop('email')} for obj in objs])
+        insts = type(cls).update(
+            cls, session, objs, commit=False, todict=False, filters=filters, ids=ids)
+        cls._set_insts_ids(insts)
+
+        if commit:
+            session.commit()
+        return cls._build_todict_list(insts) if todict else insts
+
+    @classmethod
+    def _set_insts_ids(cls, insts):
+        insts = cls._to_list(insts)
+        for inst in insts:
+            inst.id = '{}:{}'.format(inst.email, inst.password)
+
+
+for route in UsersModel.routes:
+    route.action = before_action(AuthorizationHook(UsersModel.authorize, AUTH_REALM))(route.action)
 
 
 users_grants = sa.Table(

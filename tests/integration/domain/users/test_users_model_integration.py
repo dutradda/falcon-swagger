@@ -61,7 +61,8 @@ class TestUsersModelIntegrationWithAuthorizationHook(object):
         user = {
             'name': 'test',
             'email': 'test@test',
-            'password': '123'
+            'password': '123',
+            'admin': True
         }
         UsersModel.insert(session, user)
 
@@ -139,7 +140,8 @@ class TestUsersModel(object):
         user = {
             'name': 'test',
             'email': 'test@test',
-            'password': '123'
+            'password': '123',
+            'admin': True
         }
         UsersModel.insert(session, user)
         authorization = b64encode('{}:{}'.format(user['email'], user['password']).encode())
