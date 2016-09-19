@@ -2,6 +2,7 @@
     "$schema": "http://json-schema.org/draft-04/schema#",
     "title": "Recommendations Users",
     "type": "array",
+    "minItems": 1,
     "items": {
         "type": "object",
         "additionalProperties": false,

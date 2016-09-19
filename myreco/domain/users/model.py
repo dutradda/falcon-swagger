@@ -137,9 +137,17 @@ class UsersModel(SQLAlchemyRedisModelBase):
 
     @classmethod
     def update(cls, session, objs, commit=True, todict=True, ids=None, filters=None):
-        objs = cls._to_list(objs)
-        if ids:
-            filters = cls.build_filters_by_ids([{'email': obj.pop('email')} for obj in objs])
+        if not ids:
+            ids = []
+            objs = cls._to_list(objs)
+            for obj in objs:
+                id_ = obj.get('id')
+                email = obj.get('email')
+                if id_ is not None:
+                    ids.append({'id': id_})
+                elif email is not None:
+                    ids.append({'email': email})
+
         insts = type(cls).update(
             cls, session, objs, commit=False, todict=False, filters=filters, ids=ids)
         cls._set_insts_ids(insts)

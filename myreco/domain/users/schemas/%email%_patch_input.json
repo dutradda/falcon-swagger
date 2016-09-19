@@ -3,7 +3,7 @@
     "title": "Recommendations Users",
     "type": "object",
     "additionalProperties": false,
-    "required": ["name", "password", "grants"],
+    "minProperties": 1,
     "properties": {
         "name": {"type": "string"},
         "email": {"type": "string"},

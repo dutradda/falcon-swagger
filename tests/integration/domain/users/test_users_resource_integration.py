@@ -89,7 +89,7 @@ def headers():
 
 class TestUsersResourcePost(object):
     def test_post_valid_grants_update(self, client, headers):
-        user = {
+        user = [{
             'name': 'test2',
             'email': 'test2',
             'password': 'test',
@@ -98,11 +98,11 @@ class TestUsersResourcePost(object):
                 'method_id': 2,
                 '_update': True
             }]
-        }
+        }]
         resp = client.post('/users', data=json.dumps(user), headers=headers)
 
         assert resp.status_code == 201
-        assert json.loads(resp.body) == {
+        assert json.loads(resp.body) == [{
             'id': 'test2:test',
             'name': 'test2',
             'email': 'test2',
@@ -120,11 +120,11 @@ class TestUsersResourcePost(object):
             }],
             'stores': [],
             'admin': False
-        }
+        }]
 
     def test_post_valid_with_grants_insert_and_uri_and_method_update(
             self, client, headers):
-        user = {
+        user = [{
             'name': 'test2',
             'email': 'test2',
             'password': 'test',
@@ -132,11 +132,11 @@ class TestUsersResourcePost(object):
                 'uri': {'id': 2, '_update': True},
                 'method': {'id': 1, '_update': True}
             }]
-        }
+        }]
         resp = client.post('/users', data=json.dumps(user), headers=headers)
 
         assert resp.status_code == 201
-        assert json.loads(resp.body) == {
+        assert json.loads(resp.body) == [{
             'id': 'test2:test',
             'name': 'test2',
             'email': 'test2',
@@ -160,11 +160,11 @@ class TestUsersResourcePost(object):
             }],
             'stores': [],
             'admin': False
-        }
+        }]
 
     def test_post_valid_with_grants_uri_and_method_insert(
             self, client, headers):
-        user = {
+        user = [{
             'name': 'test2',
             'email': 'test2',
             'password': 'test',
@@ -172,11 +172,11 @@ class TestUsersResourcePost(object):
                 'uri': {'uri': '/test4'},
                 'method': {'method': 'delete'}
             }]
-        }
+        }]
         resp = client.post('/users', data=json.dumps(user), headers=headers)
 
         assert resp.status_code == 201
-        assert json.loads(resp.body) == {
+        assert json.loads(resp.body) == [{
             'id': 'test2:test',
             'name': 'test2',
             'email': 'test2',
@@ -200,10 +200,10 @@ class TestUsersResourcePost(object):
             }],
             'stores': [],
             'admin': False
-        }
+        }]
 
     def test_post_invalid_json(self, client, headers):
-        user = {
+        user = [{
             'name': 'test2',
             'email': 'test2',
             'password': 'test',
@@ -211,7 +211,7 @@ class TestUsersResourcePost(object):
                 'uri_id': 1,
                 'method_id': 1
             }]
-        }
+        }]
         resp = client.post('/users', data=json.dumps(user), headers=headers)
 
         assert resp.status_code == 400
@@ -754,13 +754,148 @@ class TestUsersResourcePutUpdateMany(object):
         }]
 
 
-class TestUsersResourcePatchUser(object):
-    pass
-
-
 class TestUsersResourcePatchOne(object):
-    pass
+    def test_patch_one_property(self, client, headers):
+        user = [{
+            'name': 'test2',
+            'email': 'test2',
+            'password': 'test'
+        }]
+        resp = client.post('/users', body=json.dumps(user), headers=headers)
+        assert resp.status_code == 201
+
+        users = {'name': 'test2_updated'}
+        resp = client.patch('/users/test2', body=json.dumps(users), headers=headers)
+
+        assert resp.status_code == 200
+        assert json.loads(resp.body) == {
+            'id': 'test2:test',
+            'name': 'test2_updated',
+            'email': 'test2',
+            'password': 'test',
+            'stores': [],
+            'admin': False,
+            'grants': [{
+                'uri_id': 5,
+                'method': {
+                    'id': 1,
+                    'method': 'patch'
+                },
+                'method_id': 1,
+                'uri': {
+                    'id': 5,
+                    'uri': '/users/test2'
+                }
+            }]
+        }
+
+    def test_patch_two_properties(self, client, headers):
+        user = [{
+            'name': 'test2',
+            'email': 'test2',
+            'password': 'test'
+        }]
+        resp = client.post('/users', body=json.dumps(user), headers=headers)
+        assert resp.status_code == 201
+
+        users = {
+            'email': 'test22',
+            'password': 'test2'
+        }
+        resp = client.patch('/users/test2', body=json.dumps(users), headers=headers)
+
+        assert resp.status_code == 200
+        assert json.loads(resp.body) == {
+            'id': 'test22:test2',
+            'name': 'test2',
+            'email': 'test22',
+            'password': 'test2',
+            'stores': [],
+            'admin': False,
+            'grants': [{
+                'uri_id': 5,
+                'method': {
+                    'id': 1,
+                    'method': 'patch'
+                },
+                'method_id': 1,
+                'uri': {
+                    'id': 5,
+                    'uri': '/users/test2'
+                }
+            }]
+        }
 
 
 class TestUsersResourcePatchMany(object):
-    pass
+    def test_patch_one_property(self, client, headers):
+        user = [{
+            'name': 'test2',
+            'email': 'test2',
+            'password': 'test'
+        }]
+        resp = client.post('/users', body=json.dumps(user), headers=headers)
+        assert resp.status_code == 201
+
+        users = [{'email': 'test2', 'name': 'test2_updated'}]
+        resp = client.patch('/users', body=json.dumps(users), headers=headers)
+
+        assert resp.status_code == 200
+        assert json.loads(resp.body) == [{
+            'id': 'test2:test',
+            'name': 'test2_updated',
+            'email': 'test2',
+            'password': 'test',
+            'stores': [],
+            'admin': False,
+            'grants': [{
+                'uri_id': 5,
+                'method': {
+                    'id': 1,
+                    'method': 'patch'
+                },
+                'method_id': 1,
+                'uri': {
+                    'id': 5,
+                    'uri': '/users/test2'
+                }
+            }]
+        }]
+
+    def test_patch_two_properties(self, client, headers):
+        user = [{
+            'name': 'test2',
+            'email': 'test2',
+            'password': 'test'
+        }]
+        resp = client.post('/users', body=json.dumps(user), headers=headers)
+        assert resp.status_code == 201
+
+        users = {
+            'email': 'test2',
+            'name': 'test22',
+            'password': 'test2'
+        }
+        resp = client.patch('/users/test2', body=json.dumps(users), headers=headers)
+
+        assert resp.status_code == 200
+        assert json.loads(resp.body) == {
+            'id': 'test2:test2',
+            'name': 'test22',
+            'email': 'test2',
+            'password': 'test2',
+            'stores': [],
+            'admin': False,
+            'grants': [{
+                'uri_id': 5,
+                'method': {
+                    'id': 1,
+                    'method': 'patch'
+                },
+                'method_id': 1,
+                'uri': {
+                    'id': 5,
+                    'uri': '/users/test2'
+                }
+            }]
+        }

@@ -238,7 +238,7 @@ class _RoutesBuilderMeta(type):
         req_body = req.context['body']
         req_body_copy = deepcopy(req.context['body'])
 
-        req_body.update({k: v for k, v in kwargs.items() if k not in req_body})
+        cls._update_dict(req_body, kwargs)
         objs = model.update(session, req_body, ids=kwargs)
 
         if not objs:
@@ -256,6 +256,9 @@ class _RoutesBuilderMeta(type):
         else:
             resp.body = objs[0]
 
+    def _update_dict(cls, dict_, other):
+        dict_.update({k: v for k, v in other.items() if k not in dict_})
+
     def _model_name_uri_patch_action(cls, req, resp, **kwargs):
         cls._update(req, resp, **kwargs)
 
@@ -263,7 +266,7 @@ class _RoutesBuilderMeta(type):
         model = req.context['model']
         session = req.context['session']
         req_body = req.context['body']
-        req_body.update(kwargs)
+        cls._update_dict(req_body, kwargs)
         objs = model.update(session, req_body, ids=kwargs)
         if objs:
             resp.body = objs[0]
