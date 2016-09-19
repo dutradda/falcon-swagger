@@ -107,11 +107,11 @@ class UsersModel(SQLAlchemyRedisModelBase):
     @classmethod
     def _set_objs_ids_and_grant(cls, objs, session):
         objs = cls._to_list(objs)
-        method = MethodsModel.get(session, filters=(MethodsModel.method == 'patch'), todict=False)
+        method = MethodsModel.get(session, ids={'method': 'patch'}, todict=False)
 
         for obj in objs:
             user_uri = '/users/{}'.format(obj['email'])
-            uri = URIsModel.get(session, filters=(URIsModel.uri == user_uri), todict=False)
+            uri = URIsModel.get(session, ids={'uri': user_uri}, todict=False)
 
             if uri and method:
                 uri = uri[0]
@@ -136,7 +136,7 @@ class UsersModel(SQLAlchemyRedisModelBase):
             obj['grants'] = grants
 
     @classmethod
-    def update(cls, session, objs, commit=True, todict=True, ids=None, filters=None):
+    def update(cls, session, objs, commit=True, todict=True, ids=None):
         if not ids:
             ids = []
             objs = cls._to_list(objs)
@@ -148,8 +148,7 @@ class UsersModel(SQLAlchemyRedisModelBase):
                 elif email is not None:
                     ids.append({'email': email})
 
-        insts = type(cls).update(
-            cls, session, objs, commit=False, todict=False, filters=filters, ids=ids)
+        insts = type(cls).update(cls, session, objs, commit=False, todict=False, ids=ids)
         cls._set_insts_ids(insts)
 
         if commit:

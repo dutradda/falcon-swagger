@@ -311,14 +311,14 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
             rels_.extend(inserted_objs)
             setattr(instance, attr_name, rels_)
 
-    def update(cls, session, objs, commit=True, todict=True, filters=None, ids=None):
+    def update(cls, session, objs, commit=True, todict=True, ids=None):
         input_ = deepcopy(objs)
 
         objs = cls._to_list(objs)
         ids = [cls.get_ids_from_values(
             obj) for obj in objs] if not ids else cls._to_list(ids)
 
-        insts = cls.get(session, ids, todict=False, filters=filters)
+        insts = cls.get(session, ids, todict=False)
 
         for inst in insts:
             inst.old_redis_key = session.build_inst_redis_key(inst)
@@ -334,10 +334,9 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
         return cls._build_todict_list(insts) if todict else insts
 
-    def delete(cls, session, ids, commit=True, filters=None):
+    def delete(cls, session, ids, commit=True):
         ids = cls._to_list(ids)
-        if filters is None:
-            filters = cls.build_filters_by_ids(ids)
+        filters = cls.build_filters_by_ids(ids)
 
         session.query(cls).filter(filters).delete()
 
@@ -374,13 +373,13 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
     def _to_tuple_items(cls, ids):
         return [id_ if isinstance(id_, tuple) else (id_,) for id_ in ids]
 
-    def get(cls, session, ids=None, limit=None, offset=None, todict=True, filters=None):
+    def get(cls, session, ids=None, limit=None, offset=None, todict=True):
         if (ids is not None) and (limit is not None or offset is not None):
             raise ModelBaseError(
                 "'get' method can't be called with 'ids' and with 'offset' or 'limit'",
                 {'ids': ids, 'limit': limit, 'offset': offset})
 
-        if ids is None and filters is None:
+        if ids is None:
             query = session.query(cls)
 
             if limit is not None:
@@ -391,14 +390,13 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
             return cls._build_todict_list(query.all()) if todict else query.all()
 
-        return cls._get_many(session, ids, todict=todict, filters=filters)
+        return cls._get_many(session, ids, todict=todict)
 
-    def _get_many(cls, session, ids, todict=True, filters=None):
+    def _get_many(cls, session, ids, todict=True):
         ids = cls._to_list(ids)
 
         if not todict or session.redis_bind is None:
-            filters = cls.build_filters_by_ids(
-                ids) if filters is None else filters
+            filters = cls.build_filters_by_ids(ids)
             insts = session.query(cls).filter(filters).all()
             if todict:
                 return [inst.todict() for inst in insts]
@@ -412,11 +410,9 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
         objs = [json.loads(obj) for obj in objs if obj is not None]
 
         if ids:
-            filters = cls.build_filters_by_ids(
-                ids) if filters is None else filters
+            filters = cls.build_filters_by_ids(ids)
             instances = session.query(cls).filter(filters).all()
-            items = [(str(each.get_ids_values()), each.todict())
-                     for each in instances]
+            items = [(str(each.get_ids_values()), each.todict()) for each in instances]
             no_cached_map = OrderedDict(items)
             session.redis_bind.hmset(model_redis_key, no_cached_map)
             objs.extend(no_cached_map.values())
