@@ -25,7 +25,7 @@ from myreco.base.middlewares import FalconRoutesMiddleware, FalconSQLAlchemyRedi
 from myreco.base.routes import Route
 from myreco.exceptions import JSONError
 from unittest import mock
-from falcon import HTTPMethodNotAllowed
+from falcon import HTTPMethodNotAllowed, HTTPNotFound
 
 import pytest
 
@@ -111,6 +111,17 @@ class TestFalconRoutesMiddlewareProcessResource(object):
         routes_middleware.process_resource(req, resp, resource, params)
         assert req.context['body'] == {}
 
+    def test_if_raises_not_found(self, routes_middleware):
+        req = mock.MagicMock(
+            method='POST', uri_template='/', context=dict())
+        req.stream.read().decode.return_value = ''
+        resp = mock.MagicMock()
+        resource = mock.MagicMock()
+        params = mock.MagicMock()
+
+        with pytest.raises(HTTPNotFound):
+            routes_middleware.process_resource(req, resp, resource, params)
+
 
 class TestFalconRoutesMiddlewareProcessResponse(object):
 
@@ -148,6 +159,8 @@ def sqlalchemy_middleware(bind, redis_bind, route):
 
 @mock.patch('myreco.base.middlewares.json', new=mock.MagicMock())
 class TestFalconSQLAlchemyRedisMiddleware(object):
+    def test_init_without_routes(self):
+        assert FalconSQLAlchemyRedisMiddleware(None)._routes == dict()
 
     @mock.patch('myreco.base.middlewares.Session')
     def test_process_resource(self, session, sqlalchemy_middleware, bind, redis_bind):
@@ -164,14 +177,15 @@ class TestFalconSQLAlchemyRedisMiddleware(object):
         assert req.context['session'] == session.return_value
 
     def test_process_response(self, sqlalchemy_middleware):
+        session = mock.MagicMock()
         req = mock.MagicMock(
-            method='POST', uri_template='/test', context={'session': None})
+            method='POST', uri_template='/test', context={'session': session})
         resp = mock.MagicMock()
         resource = mock.MagicMock()
         params = mock.MagicMock()
 
         sqlalchemy_middleware.process_response(req, resp, resource)
-        assert 'session' not in req.context
+        assert session.close.call_count == 1
 
     def test_process_response_without_session(self, sqlalchemy_middleware):
         req = mock.MagicMock(
