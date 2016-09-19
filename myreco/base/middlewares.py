@@ -25,6 +25,7 @@ from myreco.exceptions import JSONError
 from myreco.base.session import Session
 from falcon.errors import HTTPNotFound, HTTPMethodNotAllowed
 import json
+import inspect
 
 
 class FalconRoutesMiddleware(object):
@@ -37,6 +38,9 @@ class FalconRoutesMiddleware(object):
 
     def process_resource(self, req, resp, model, uri_params):
         route = self._get_route(req.uri_template, req.method)
+        if route.authorizer:
+            route.authorizer(req, resp, model, uri_params)
+
         body = req.stream.read().decode()
         if body:
             try:
@@ -53,7 +57,9 @@ class FalconRoutesMiddleware(object):
         if route.validator is not None:
             route.validator.validate(req.context['body'])
 
-        route.action(req, resp, model, uri_params)
+        req.context['route'] = route
+        req.context['model'] = model
+        route.action(req, resp, **uri_params)
 
     def _get_route(self, uri_template, method):
         if not method in self._allowed_methods:
@@ -82,10 +88,10 @@ class FalconSQLAlchemyRedisMiddleware(FalconRoutesMiddleware):
         FalconRoutesMiddleware.__init__(self, routes)
 
     def process_resource(self, req, resp, model, uri_params):
-        FalconRoutesMiddleware.process_resource(
-            self, req, resp, model, uri_params)
         req.context['session'] = Session(
             bind=self._bind, redis_bind=self._redis_bind)
+        FalconRoutesMiddleware.process_resource(
+            self, req, resp, model, uri_params)
 
     def process_response(self, req, resp, model):
         FalconRoutesMiddleware.process_response(self, req, resp, model)

@@ -21,10 +21,10 @@
 # SOFTWARE.
 
 
-from myreco.domain.users.resource import UsersResource
-from myreco.domain.users.model import GrantsModel, URIsModel, MethodsModel
+from myreco.domain.users.model import UsersModel, GrantsModel, URIsModel, MethodsModel
 from myreco.base.model import SQLAlchemyRedisModelBase
 from myreco.base.http_api import HttpAPI
+from myreco.base.routes import RoutesBuilder
 from unittest import mock
 from base64 import b64encode
 
@@ -39,19 +39,13 @@ def model_base():
 
 
 @pytest.fixture
-def app(session):
-    return HttpAPI(session.bind)
-
-
-@pytest.fixture
-def resource(app, session):
-    resource_ = UsersResource(app)
+def init_(session):
     user = {
         'name': 'test',
         'email': 'test',
         'password': 'test'
     }
-    resource_.model.insert(session, user)
+    UsersModel.insert(session, user)
 
     grants = [{
         'uri': {'uri': '/test'},
@@ -78,7 +72,10 @@ def resource(app, session):
     }]
     GrantsModel.insert(session, grants)
 
-    return resource_
+
+@pytest.fixture
+def app(session, init_):
+    return HttpAPI(session.bind, [UsersModel])
 
 
 @pytest.fixture
@@ -89,7 +86,7 @@ def headers():
 
 
 class TestUsersResourcePost(object):
-    def test_post_valid_grants_update(self, resource, client, headers):
+    def test_post_valid_grants_update(self, client, headers):
         user = {
             'name': 'test2',
             'email': 'test2',
@@ -118,7 +115,7 @@ class TestUsersResourcePost(object):
         }
 
     def test_post_valid_with_grants_insert_and_uri_and_method_update(
-            self, resource, client, headers):
+            self, client, headers):
         user = {
             'name': 'test2',
             'email': 'test2',
@@ -146,7 +143,7 @@ class TestUsersResourcePost(object):
         }
 
     def test_post_valid_with_grants_uri_and_method_insert(
-            self, resource, client, headers):
+            self, client, headers):
         user = {
             'name': 'test2',
             'email': 'test2',
@@ -173,7 +170,7 @@ class TestUsersResourcePost(object):
             'stores': []
         }
 
-    def test_post_invalid_json(self, resource, client, headers):
+    def test_post_invalid_json(self, client, headers):
         user = {
             'name': 'test2',
             'email': 'test2',
@@ -188,7 +185,7 @@ class TestUsersResourcePost(object):
         assert resp.status_code == 400
         result = json.loads(resp.body)
         message = result['error'].pop('message')
-        expected_schema = os.path.join(resource.get_schemas_path(), 'grants.json')
+        expected_schema = os.path.join(RoutesBuilder.get_schemas_path(UsersModel), 'grants.json')
         expected_schema = json.load(open(expected_schema))
 
         assert message == \
@@ -204,7 +201,7 @@ class TestUsersResourcePost(object):
 
 
 class TestUsersResourcePutInsert(object):
-    def test_put_with_ambiguous_ids(self, resource, client, headers):
+    def test_put_with_ambiguous_ids(self, client, headers):
         user = {
             'name': 'test2',
             'email': 'test22',
@@ -254,7 +251,7 @@ class TestUsersResourcePutInsert(object):
             'message': "Ambiguous value for 'email'"}
         }
 
-    def test_put_with_insert_and_grants_update(self, resource, client, headers):
+    def test_put_with_insert_and_grants_update(self, client, headers):
         user = {
             'name': 'test2',
             'email': 'test2',
@@ -283,7 +280,7 @@ class TestUsersResourcePutInsert(object):
             ]
         }
 
-    def test_put_with_insert_and_grants_insert(self, resource, client, headers):
+    def test_put_with_insert_and_grants_insert(self, client, headers):
         user = {
             'name': 'test2',
             'email': 'test2',
@@ -312,7 +309,7 @@ class TestUsersResourcePutInsert(object):
 
 
 class TestUsersResourcePutUpdateOne(object):
-    def test_put_update_and_grants_update(self, resource, client, headers):
+    def test_put_update_and_grants_update(self, client, headers):
         user = {
             'name': 'test2',
             'password': 'test',
@@ -358,7 +355,7 @@ class TestUsersResourcePutUpdateOne(object):
             }]
         }
 
-    def test_put_update_and_grants_remove(self, resource, client, headers):
+    def test_put_update_and_grants_remove(self, client, headers):
         user = {
             'name': 'test2',
             'email': 'test2',
@@ -394,7 +391,7 @@ class TestUsersResourcePutUpdateOne(object):
             'grants': []
         }
 
-    def test_put_update_and_grants_update_and_grants_remove(self, resource, client, headers):
+    def test_put_update_and_grants_update_and_grants_remove(self, client, headers):
         user = {
             'name': 'test2',
             'email': 'test2',
@@ -441,7 +438,7 @@ class TestUsersResourcePutUpdateOne(object):
 
 
 class TestUsersResourcePutUpdateMany(object):
-    def test_put_update_and_grants_update(self, resource, client, headers):
+    def test_put_update_and_grants_update(self, client, headers):
         user = {
             'name': 'test2',
             'email': 'test2',
@@ -488,7 +485,7 @@ class TestUsersResourcePutUpdateMany(object):
             }]
         }]
 
-    def test_put_update_and_grants_remove(self, resource, client, headers):
+    def test_put_update_and_grants_remove(self, client, headers):
         user = {
             'name': 'test2',
             'email': 'test2',
@@ -525,7 +522,7 @@ class TestUsersResourcePutUpdateMany(object):
             'grants': []
         }]
 
-    def test_put_update_and_grants_update_and_grants_remove(self, resource, client, headers):
+    def test_put_update_and_grants_update_and_grants_remove(self, client, headers):
         user = {
             'name': 'test2',
             'email': 'test2',

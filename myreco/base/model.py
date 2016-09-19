@@ -74,9 +74,9 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
             cls.routes = getattr(cls, 'routes', set())
             build_routes_from_schemas = getattr(cls, '_build_routes_from_schemas', True)
-            build_basic_routes = getattr(cls, '_build_basic_routes', False)
+            build_generic_routes = getattr(cls, '_build_generic_routes', False)
 
-            routes = RoutesBuilder(cls, build_routes_from_schemas, build_basic_routes)
+            routes = RoutesBuilder(cls, build_routes_from_schemas, build_generic_routes)
             cls.routes.update(routes)
         else:
             cls.all_models = set()

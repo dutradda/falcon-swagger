@@ -25,6 +25,8 @@ from myreco.base.model import SQLAlchemyRedisModelBase
 from myreco.domain.stores.model import StoresModel
 from sqlalchemy.inspection import inspect
 from base64 import b64decode
+from myreco.domain.constants import AUTH_REALM
+from myreco.base.hooks import AuthorizationHook, before_action
 import sqlalchemy as sa
 import re
 
@@ -83,17 +85,14 @@ class UsersModel(SQLAlchemyRedisModelBase):
     @classmethod
     def update(cls, session, objs, commit=True, todict=True, ids=None, filters=None):
         objs = cls._to_list(objs)
-
         if ids:
             filters = cls.build_filters_by_ids([{'email': obj.pop('email')} for obj in objs])
-
         insts = type(cls).update(
             cls, session, objs, commit=False, todict=False, filters=filters, ids=ids)
         cls._set_insts_ids(insts)
 
         if commit:
             session.commit()
-
         return cls._build_todict_list(insts) if todict else insts
 
     @classmethod
@@ -101,6 +100,10 @@ class UsersModel(SQLAlchemyRedisModelBase):
         insts = cls._to_list(insts)
         for inst in insts:
             inst.id = '{}:{}'.format(inst.email, inst.password)
+
+
+for route in UsersModel.routes:
+    route.action = before_action(AuthorizationHook(UsersModel.authorize, AUTH_REALM))(route.action)
 
 
 class GrantsModel(SQLAlchemyRedisModelBase):

@@ -23,65 +23,71 @@
 
 from myreco.base.hooks import AuthorizationHook
 from myreco.base.http_api import HttpAPI
+from myreco.base.routes import Route
 from falcon import before as falcon_before
 from unittest import mock
 
 
 import pytest
 import json
+import sqlalchemy as sa
 
 
 @pytest.fixture
-def app():
-    return HttpAPI(mock.MagicMock())
-
-
-@pytest.fixture
-def resource(app):
+def model(model_base):
     def auth_func(session, auth_token, uri, path, method):
         if auth_token == '1' and uri == '/' and method == 'GET':
             return True
         if auth_token == '2':
             return False
 
-    class Resource(object):
-        allowed_methods = ['GET']
-        routes = {}
+    def action(req, resp):
+        pass
 
-        @falcon_before(AuthorizationHook(auth_func, 'test'))
-        def on_get(self, req, resp):
-            pass
+    class model(model_base):
+        __tablename__ = 'model'
+        _build_routes_from_schema = False
+        id = sa.Column(sa.Integer, primary_key=True)
 
-    app.add_route('/', Resource())
-    return Resource
+        routes = {Route('/', 'GET', action, authorizer=AuthorizationHook(auth_func, 'test'))}
+
+    return model
+
+
+@pytest.fixture
+def app(model):
+    return HttpAPI(mock.MagicMock(), models={model})
 
 
 class TestAuthorizationHook(object):
-    def test_without_header(self, app, resource, client):
+
+    def test_without_header(self, app, model, client):
         resp = client.get('/')
         assert resp.status_code == 401
         assert resp.headers.get('WWW-Authenticate') == 'Basic realm="test"'
-        assert resp.body == json.dumps({'error': 'Authorization header is required'})
+        assert resp.body == json.dumps(
+            {'error': 'Authorization header is required'})
 
-    def test_with_invalid_authorization(self, app, resource, client):
+    def test_with_invalid_authorization(self, app, model, client):
         resp = client.get('/', headers={'Authorization': '3'})
         assert resp.status_code == 401
         assert resp.headers.get('WWW-Authenticate') == 'Basic realm="test"'
         assert resp.body == json.dumps({'error': 'Invalid authorization'})
 
-    def test_with_expired_authorization(self, app, resource, client):
+    def test_with_expired_authorization(self, app, model, client):
         resp = client.get('/', headers={'Authorization': '2'})
         assert resp.status_code == 403
         assert resp.headers.get('WWW-Authenticate') == 'Basic realm="test"'
-        assert resp.body == json.dumps({'error': 'Please refresh your authorization'})
+        assert resp.body == json.dumps(
+            {'error': 'Please refresh your authorization'})
 
-    def test_with_valid_authorization(self, app, resource, client):
+    def test_with_valid_authorization(self, app, model, client):
         resp = client.get('/', headers={'Authorization': '1'})
         assert resp.status_code == 200
         assert resp.headers.get('WWW-Authenticate') == None
         assert resp.body == ''
 
-    def test_with_valid_authorization_using_basic(self, app, resource, client):
+    def test_with_valid_authorization_using_basic(self, app, model, client):
         resp = client.get('/', headers={'Authorization': 'Basic 1'})
         assert resp.status_code == 200
         assert resp.headers.get('WWW-Authenticate') == None

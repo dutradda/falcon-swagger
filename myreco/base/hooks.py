@@ -49,3 +49,12 @@ class AuthorizationHook(object):
         elif authorization is False:
             raise UnauthorizedError(
                 'Please refresh your authorization', self.realm, HTTP_FORBIDDEN)
+
+
+def before_action(func):
+    def _before_action(func_):
+        def do_before(req, resp, **params):
+            func(req, resp, None, params)
+            func_(req, resp, **params)
+        return do_before
+    return _before_action

@@ -32,7 +32,7 @@ import pytest
 
 @pytest.fixture
 def route():
-    return Route('/test', 'POST', lambda x, y, z, w: None)
+    return Route('/test', 'POST', mock.MagicMock())
 
 
 @pytest.fixture
@@ -60,7 +60,7 @@ class TestFalconRoutesMiddlewareProcessResource(object):
             routes_middleware.process_resource(
                 req, resp, resource, params)
 
-    def test_process_resource_with_valid_json(self, routes_middleware):
+    def test_process_resource_with_valid_json(self, routes_middleware, route):
         req = mock.MagicMock(
             method='POST', uri_template='/test', context=dict())
         req.stream.read().decode.return_value = '"test"'
@@ -69,11 +69,11 @@ class TestFalconRoutesMiddlewareProcessResource(object):
         params = mock.MagicMock()
 
         routes_middleware.process_resource(req, resp, resource, params)
-        assert req.context == {'body': 'test'}
+        assert req.context['body'] == 'test'
 
     def test_process_resource_with_validator(self):
         validator = mock.MagicMock()
-        route = Route('/test', 'POST', lambda x, y, z, w: None, validator)
+        route = Route('/test', 'POST', mock.MagicMock(), validator)
         middleware = FalconRoutesMiddleware(set([route]))
         req = mock.MagicMock(
             method='POST', uri_template='/test', context=dict())
@@ -87,7 +87,7 @@ class TestFalconRoutesMiddlewareProcessResource(object):
 
     def test_if_process_resource_adds_schema_link(self):
         validator = mock.MagicMock()
-        route = Route('/test', 'POST', lambda x, y, z, w: None, validator)
+        route = Route('/test', 'POST', mock.MagicMock(), validator)
         middleware = FalconRoutesMiddleware(set([route]))
         req = mock.MagicMock(
             method='POST', uri_template='/test', context=dict())
@@ -109,7 +109,7 @@ class TestFalconRoutesMiddlewareProcessResource(object):
         params = mock.MagicMock()
 
         routes_middleware.process_resource(req, resp, resource, params)
-        assert req.context == {'body': {}}
+        assert req.context['body'] == {}
 
 
 class TestFalconRoutesMiddlewareProcessResponse(object):

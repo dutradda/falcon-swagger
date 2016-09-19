@@ -34,17 +34,27 @@ import json
 class Route(object):
 
     def __init__(self, uri_template, method, action,
-                 validator=None, output_schema=None):
+                 validator=None, output_schema=None,
+                 authorizer=None):
         self.uri_template = uri_template
         self.method = method
         self.action = action
         self.validator = validator
         self._output_schema = output_schema
-        self._schemas = dict()
+        self._schemas_sinks = dict()
+        self.authorizer = authorizer
+
+        if validator:
+            schema_uri = self.uri_template + '/_schemas/input'
+            self._schemas_sinks[self._sink_input_schema] = schema_uri
+
+        if output_schema:
+            schema_uri = self.uri_template + '/_schemas/output'
+            self._schemas_sinks[self._sink_output_schema] = schema_uri
 
     @property
     def has_schemas(self):
-        return bool(self._schemas)
+        return bool(self._schemas_sinks)
 
     def register(self, api, model):
         api.add_route(self.uri_template, model)
@@ -52,12 +62,11 @@ class Route(object):
         if self.validator:
             schema_uri = self.uri_template + '/_schemas/input'
             api.add_sink(self._sink_input_schema, schema_uri)
-            self._schemas[schema_uri] = self.validator.schema
 
         if self._output_schema:
             schema_uri = self.uri_template + '/_schemas/output'
             api.add_sink(self._sink_output_schema, schema_uri)
-            self._schemas[schema_uri] = self._output_schema
+            self._schemas_sinks[schema_uri] = self._output_schema
 
         if self.has_schemas:
             api.add_sink(self._sink_schemas, self.uri_template + '/_schemas')
@@ -73,6 +82,18 @@ class Route(object):
             req.protocol, req.host, uri)
         resp.body = [build_link(schema_uri)
                      for schema_uri in self._schemas_uris]
+
+
+class URISchemaHandler(object):
+
+    def __init__(self, schemas_path):
+        self._schemas_path = schemas_path
+
+    def __call__(self, uri):
+        schema_filename = os.path.join(
+            self._schemas_path, uri.replace('schema:', ''))
+        with open(schema_filename) as json_schema_file:
+            return json.load(json_schema_file)
 
 
 class _RoutesBuilderMeta(type):
@@ -107,7 +128,7 @@ class _RoutesBuilderMeta(type):
             schema = json.load(json_schema_file)
 
         if type_ == 'input':
-            schema = cls._build_validator(schema)
+            schema = cls._build_validator(schema, model)
 
         routes_data[uri_template][method][type_] = schema
 
@@ -124,17 +145,11 @@ class _RoutesBuilderMeta(type):
 
         return base_uri_template
 
-    def _build_validator(cls, schema):
-        handlers = {'schema': cls._handle_schema_uri}
+    def _build_validator(cls, schema, model):
+        handlers = {'schema': URISchemaHandler(cls.get_schemas_path(model))}
         resolver = RefResolver.from_schema(schema, handlers=handlers)
         Draft4Validator.check_schema(schema)
         return Draft4Validator(schema, resolver=resolver)
-
-    def _handle_schema_uri(cls, uri):
-        schema_filename = os.path.join(
-            cls.get_schemas_path(), uri.replace('schema:', ''))
-        with open(schema_filename) as json_schema_file:
-            return json.load(json_schema_file)
 
     def _build_routes(cls, routes_data):
         added_uris = set()
@@ -230,7 +245,7 @@ class _RoutesBuilderMeta(type):
         req_body = req.context['body']
         req_body_copy = deepcopy(req.context['body'])
 
-        req_body.update({k:v for k, v in kwargs.items() if k not in req_body})
+        req_body.update({k: v for k, v in kwargs.items() if k not in req_body})
         objs = model.update(session, req_body, ids=kwargs)
 
         if not objs:

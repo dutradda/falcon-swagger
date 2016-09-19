@@ -31,14 +31,26 @@ import logging
 
 
 class HttpAPI(API):
-    def __init__(self, sqlalchemy_bind, redis_bind=None):
-        sqlalchemy_redis_mid = FalconSQLAlchemyRedisMiddleware(sqlalchemy_bind, redis_bind)
+
+    def __init__(self, sqlalchemy_bind, models, redis_bind=None):
+        routes = set()
+        for model in models:
+            for route in model.routes:
+                routes.add(route)
+
+        sqlalchemy_redis_mid = FalconSQLAlchemyRedisMiddleware(
+            sqlalchemy_bind, redis_bind, routes)
+
         API.__init__(self, middleware=sqlalchemy_redis_mid)
+
+        for route in routes:
+            route.register(self, model)
 
         self.add_error_handler(Exception, self._handle_generic_error)
         self.add_error_handler(HTTPError, self._handle_http_error)
         self.add_error_handler(IntegrityError, self._handle_integrity_error)
-        self.add_error_handler(ValidationError, self._handle_json_validation_error)
+        self.add_error_handler(
+            ValidationError, self._handle_json_validation_error)
         self.add_error_handler(JSONError)
         self.add_error_handler(ModelBaseError)
         self.add_error_handler(UnauthorizedError)
