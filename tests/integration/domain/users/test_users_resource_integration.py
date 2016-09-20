@@ -41,6 +41,11 @@ def model_base():
 
 @pytest.fixture
 def init_(session):
+    uris = [{'uri': '/test2'}, {'uri': '/test3'}, {'uri': '/users/test'}]
+    URIsModel.insert(session, uris[0])
+    URIsModel.insert(session, uris[1])
+    URIsModel.insert(session, uris[2])
+
     user = {
         'name': 'test',
         'email': 'test',
@@ -55,17 +60,9 @@ def init_(session):
     }]
     GrantsModel.insert(session, grants)
 
-    uri = {'uri': '/test2'}
-    URIsModel.insert(session, uri)
-
-    method = {'method': 'get'}
-    MethodsModel.insert(session, method)
-
-    uri = {'uri': '/test3'}
-    URIsModel.insert(session, uri)
-
-    method = {'method': 'put'}
-    MethodsModel.insert(session, method)
+    methods = [{'method': 'put'}, {'method': 'get'}]
+    MethodsModel.insert(session, methods[0])
+    MethodsModel.insert(session, methods[1])
 
 
     grants = [{
@@ -88,15 +85,15 @@ def headers():
 
 
 class TestUsersResourcePost(object):
-    def test_post_valid_grants_update(self, client, headers):
+    def test_post_valid_grants_update(self, client, headers, session):
+        URIsModel.insert(session, {'uri': '/users/test2'})
         user = [{
             'name': 'test2',
             'email': 'test2',
             'password': 'test',
             'grants': [{
                 'uri_id': 2,
-                'method_id': 2,
-                '_update': True
+                'method_id': 2
             }]
         }]
         resp = client.post('/users', data=json.dumps(user), headers=headers)
@@ -111,7 +108,7 @@ class TestUsersResourcePost(object):
                 'method_id': 2,
                 'uri_id': 2,
                 'method': {'id': 2, 'method': 'post'},
-                'uri': {'id': 2, 'uri': '/test'}
+                'uri': {'id': 2, 'uri': '/test3'}
             },{
                 'method_id': 1,
                 'uri_id': 5,
@@ -123,7 +120,8 @@ class TestUsersResourcePost(object):
         }]
 
     def test_post_valid_with_grants_insert_and_uri_and_method_update(
-            self, client, headers):
+            self, client, headers, session):
+        GrantsModel.insert(session, {'uri': {'uri': '/users/test2'}, 'method_id': 1})
         user = [{
             'name': 'test2',
             'email': 'test2',
@@ -145,18 +143,12 @@ class TestUsersResourcePost(object):
                 'method_id': 1,
                 'uri_id': 2,
                 'method': {'id': 1, 'method': 'patch'},
-                'uri': {'id': 2, 'uri': '/test'}
+                'uri': {'id': 2, 'uri': '/test3'}
             },{
                 'uri_id': 5,
-                'method': {
-                    'id': 1,
-                    'method': 'patch'
-                },
+                'method': {'id': 1, 'method': 'patch'},
                 'method_id': 1,
-                'uri': {
-                    'id': 5,
-                    'uri': '/users/test2'
-                }
+                'uri': {'id': 5, 'uri': '/users/test2'}
             }],
             'stores': [],
             'admin': False
@@ -208,7 +200,7 @@ class TestUsersResourcePost(object):
             'email': 'test2',
             'password': 'test',
             'grants': [{
-                'uri_id': 1,
+                'test': 1,
                 'method_id': 1
             }]
         }]
@@ -221,12 +213,12 @@ class TestUsersResourcePost(object):
         expected_schema = json.load(open(expected_schema))
 
         assert message == \
-                "{'method_id': 1, 'uri_id': 1} is not valid under any of the given schemas" \
+                "{'method_id': 1, 'test': 1} is not valid under any of the given schemas" \
             or message == \
-                "{'uri_id': 1, 'method_id': 1} is not valid under any of the given schemas"
+                "{'test': 1, 'method_id': 1} is not valid under any of the given schemas"
         assert result == {
             'error': {
-                'input': {'method_id': 1, 'uri_id': 1},
+                'input': {'method_id': 1, 'test': 1},
                 'schema': expected_schema
             }
         }
@@ -290,8 +282,7 @@ class TestUsersResourcePutInsert(object):
             'password': 'test',
             'grants': [{
                 'uri_id': 1,
-                'method_id': 1,
-                '_update': True
+                'method_id': 1
             }]
         }
         resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
@@ -308,7 +299,7 @@ class TestUsersResourcePutInsert(object):
                 'method_id': 1,
                 'uri_id': 1,
                 'method': {'id': 1, 'method': 'patch'},
-                'uri': {'id': 1, 'uri': '/users/test'}
+                'uri': {'id': 1, 'uri': '/test2'}
             },{
                 'uri_id': 5,
                 'method': {
@@ -371,8 +362,7 @@ class TestUsersResourcePutUpdateOne(object):
             'email': 'test2',
             'grants': [{
                 'uri_id': 1,
-                'method_id': 1,
-                '_update': True
+                'method_id': 1
             }]
         }
         resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
@@ -402,7 +392,7 @@ class TestUsersResourcePutUpdateOne(object):
                 'method_id': 1,
                 'uri_id': 1,
                 'method': {'id': 1, 'method': 'patch'},
-                'uri': {'id': 1, 'uri': '/users/test'}
+                'uri': {'id': 1, 'uri': '/test2'}
             },{
                 'uri_id': 5,
                 'method': {
@@ -417,8 +407,8 @@ class TestUsersResourcePutUpdateOne(object):
             },{
                 'method_id': 3,
                 'uri_id': 3,
-                'method': {'id': 3, 'method': 'get'},
-                'uri': {'id': 3, 'uri': '/test2'}
+                'method': {'id': 3, 'method': 'put'},
+                'uri': {'id': 3, 'uri': '/users/test'}
             }]
         }
 
@@ -429,8 +419,7 @@ class TestUsersResourcePutUpdateOne(object):
             'password': 'test',
             'grants': [{
                 'uri_id': 1,
-                'method_id': 1,
-                '_update': True
+                'method_id': 1
             }]
         }
         resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
@@ -477,8 +466,7 @@ class TestUsersResourcePutUpdateOne(object):
             'password': 'test',
             'grants': [{
                 'uri_id': 1,
-                'method_id': 1,
-                '_update': True
+                'method_id': 1
             }]
         }
         resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
@@ -522,8 +510,8 @@ class TestUsersResourcePutUpdateOne(object):
             },{
                 'method_id': 3,
                 'uri_id': 3,
-                'method': {'id': 3, 'method': 'get'},
-                'uri': {'id': 3, 'uri': '/test2'}
+                'method': {'id': 3, 'method': 'put'},
+                'uri': {'id': 3, 'uri': '/users/test'}
             }]
         }
 
@@ -537,8 +525,7 @@ class TestUsersResourcePutUpdateOne(object):
             'email': 'test2',
             'grants': [{
                 'uri_id': 1,
-                'method_id': 1,
-                '_update': True
+                'method_id': 1
             }]
         }
         resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
@@ -569,7 +556,7 @@ class TestUsersResourcePutUpdateOne(object):
                 'method_id': 1,
                 'uri_id': 1,
                 'method': {'id': 1, 'method': 'patch'},
-                'uri': {'id': 1, 'uri': '/users/test'}
+                'uri': {'id': 1, 'uri': '/test2'}
             },{
                 'uri_id': 5,
                 'method': {
@@ -594,8 +581,7 @@ class TestUsersResourcePutUpdateMany(object):
             'password': 'test',
             'grants': [{
                 'uri_id': 1,
-                'method_id': 1,
-                '_update': True
+                'method_id': 1
             }]
         }
         resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
@@ -626,7 +612,7 @@ class TestUsersResourcePutUpdateMany(object):
                 'method_id': 1,
                 'uri_id': 1,
                 'method': {'id': 1, 'method': 'patch'},
-                'uri': {'id': 1, 'uri': '/users/test'}
+                'uri': {'id': 1, 'uri': '/test2'}
             },{
                 'uri_id': 5,
                 'method': {
@@ -641,8 +627,8 @@ class TestUsersResourcePutUpdateMany(object):
             },{
                 'method_id': 3,
                 'uri_id': 3,
-                'method': {'id': 3, 'method': 'get'},
-                'uri': {'id': 3, 'uri': '/test2'}
+                'method': {'id': 3, 'method': 'put'},
+                'uri': {'id': 3, 'uri': '/users/test'}
             }]
         }]
 
@@ -653,8 +639,7 @@ class TestUsersResourcePutUpdateMany(object):
             'password': 'test',
             'grants': [{
                 'uri_id': 1,
-                'method_id': 1,
-                '_update': True
+                'method_id': 1
             }]
         }
         resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
@@ -702,8 +687,7 @@ class TestUsersResourcePutUpdateMany(object):
             'password': 'test',
             'grants': [{
                 'uri_id': 1,
-                'method_id': 1,
-                '_update': True
+                'method_id': 1
             }]
         }
         resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
@@ -748,8 +732,8 @@ class TestUsersResourcePutUpdateMany(object):
             },{
                 'method_id': 3,
                 'uri_id': 3,
-                'method': {'id': 3, 'method': 'get'},
-                'uri': {'id': 3, 'uri': '/test2'}
+                'method': {'id': 3, 'method': 'put'},
+                'uri': {'id': 3, 'uri': '/users/test'}
             }]
         }]
 

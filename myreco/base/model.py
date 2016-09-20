@@ -267,7 +267,8 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
                 if rel_inst.get_ids_map() == rel_id:
                     rel_model._update_instance(
                         session, rel_inst, rel_values, input_)
-                    setattr(instance, attr_name, rel_insts)
+                    if rel_inst not in getattr(instance, attr_name):
+                        getattr(instance, attr_name).append(rel_inst)
                     break
         else:
             rel_model._update_instance(
@@ -285,8 +286,8 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
                     break
 
             if rel_to_remove is not None:
-                rel_insts.remove(rel_to_remove)
-                setattr(instance, attr_name, rel_insts)
+                if rel_to_remove in getattr(instance, attr_name):
+                        getattr(instance, attr_name).remove(rel_to_remove)
 
             else:
                 columns_str = ', '.join(rel_model.primaries_keys)
@@ -307,9 +308,8 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
         if relationship.prop.uselist is not True:
             setattr(instance, attr_name, inserted_objs[0])
         else:
-            rels_ = getattr(instance, attr_name, [])
-            rels_.extend(inserted_objs)
-            setattr(instance, attr_name, rels_)
+            if inserted_objs[0] not in getattr(instance, attr_name):
+                getattr(instance, attr_name).append(inserted_objs[0])
 
     def update(cls, session, objs, commit=True, todict=True, ids=None):
         input_ = deepcopy(objs)

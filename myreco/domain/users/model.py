@@ -123,7 +123,7 @@ class UsersModel(SQLAlchemyRedisModelBase):
                     grant = {'uri_id': uri.id, 'method_id': method.id}
             elif uri:
                 uri = uri[0]
-                grant = {'uri_id': uri.id, 'method': {'method': 'patch'}, '_update': True}
+                grant = {'uri_id': uri.id, 'method': {'method': 'patch'}}
             elif method:
                 method = method[0]
                 grant = {'method': {'id': method.id, '_update': True}, 'uri': {'uri': user_uri}}

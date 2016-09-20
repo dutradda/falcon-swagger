@@ -5,7 +5,7 @@
         {
             "type": "object",
             "additionalProperties": false,
-            "required": ["uri_id", "method_id", "_update"],
+            "required": ["uri_id", "method_id"],
             "properties": {
                 "uri_id": {"type": "integer"},
                 "method_id": {"type": "integer"},
@@ -26,7 +26,8 @@
             "required": ["uri", "method"],
             "properties": {
                 "uri": {"$ref": "schema:grants.json#/uri"},
-                "method": {"$ref": "schema:grants.json#/method"}
+                "method": {"$ref": "schema:grants.json#/method"},
+                "_update": {"enum": [true]}
             }
         }
     ],
@@ -35,7 +36,7 @@
             {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["id", "_update"],
+                "required": ["id"],
                 "properties": {
                     "id": {"type": "integer"},
                     "uri": {"type": "string"},
@@ -56,7 +57,7 @@
             {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["id", "_update"],
+                "required": ["id"],
                 "properties": {
                     "id": {"type": "integer"},
                     "_update": {"enum": [true]}
