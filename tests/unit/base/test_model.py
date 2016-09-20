@@ -306,8 +306,10 @@ class TestModelBaseNestedOperations(object):
             ("ambiguous operations 'update', 'delete' or 'remove'",)
 
     def test_raises_model_error_with_invalid_nested_id(self, model1, model2_mtm):
+        session = mock.MagicMock()
+        session.query().filter().all().__getitem__.return_value = model1(id=1)
         with pytest.raises(ModelBaseError) as exc_info:
-            model2_mtm.insert(mock.MagicMock(), {
+            model2_mtm.insert(session, {
                               'model1': [{'id': 1, '_remove': True}]})
         assert exc_info.value.args == \
             ("can't remove model 'model1' on column(s) 'id' with value(s) 1",)

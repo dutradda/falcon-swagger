@@ -28,7 +28,6 @@ from sqlalchemy.ext.declarative.clsregistry import _class_resolver
 from sqlalchemy.orm.properties import RelationshipProperty, ColumnProperty
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlalchemy.orm.collections import InstrumentedList
-from sqlalchemy.inspection import inspect
 from sqlalchemy import or_, and_
 from copy import deepcopy
 from collections import OrderedDict
@@ -179,47 +178,28 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
                 if relationship.prop.uselist is not True:
                     rels_values = [rels_values]
 
-                rel_insts = cls._get_relationship_instances(
+                rel_insts = cls._get_instances_from_values(
                     session, rel_model, attr_name, rels_values, instance)
 
-                for rel_values in rels_values:
+                for rel_values, rel_inst in zip(rels_values, rel_insts):
                     to_update = rel_values.pop('_update', None)
                     to_delete = rel_values.pop('_delete', None)
                     to_remove = rel_values.pop('_remove', None)
-                    rel_id = rel_model.get_ids_from_values(rel_values)
-                    op_count = [op for op in (
-                        to_update, to_delete, to_remove) if op is not None]
-                    no_rel_insts_message = "Can't execute nested '_{}'"
-
-                    if len(op_count) > 1:
-                        raise ModelBaseError(
-                            "ambiguous operations 'update'"
-                            ", 'delete' or 'remove'", input_)
+                    cls._raise_ambiguous_operations_error(to_update, to_delete, to_remove, input_)
+                    if rel_inst is None:
+                        cls._raise_nested_operation_error(to_update, to_delete, to_remove, input_)
 
                     if to_update:
-                        if not rel_insts:
-                            raise ModelBaseError(
-                                no_rel_insts_message.format('update'), input_)
-
                         cls._exec_update_on_instance(
-                            session, rel_model, attr_name, relationship, rel_id,
-                            rel_values, rel_insts, instance, input_)
+                            session, rel_model, attr_name, relationship,
+                            rel_inst, rel_values, instance, input_)
 
                     elif to_delete:
-                        if not rel_insts:
-                            raise ModelBaseError(
-                                no_rel_insts_message.format('delete'), input_)
-
-                        rel_model.delete(session, rel_id, commit=False)
+                        rel_model.delete(session, rel_inst.get_ids_map(), commit=False)
 
                     elif to_remove:
-                        if not rel_insts:
-                            raise ModelBaseError(
-                                no_rel_insts_message.format('remove'), input_)
-
                         cls._exec_remove_on_instance(
-                            rel_model, attr_name, relationship,
-                            rel_id, rel_insts, instance, input_)
+                            rel_model, attr_name, relationship, rel_inst, instance, input_)
 
                     else:
                         cls._exec_insert_on_instance(
@@ -227,24 +207,19 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
 
         instance.update_(**values)
 
-    def _get_relationship_instances(cls, session, rel_model, attr_name, rels_values, instance):
+    def _get_instances_from_values(cls, session, rel_model, attr_name, rels_values, instance):
         ids_to_get = cls._get_ids_from_rels_values(rel_model, rels_values)
+        if not ids_to_get:
+            return []
 
-        if not instance in session.identity_map.values():
-            rel_insts = rel_model.get(
-                session, ids_to_get, todict=False) if ids_to_get else []
-        else:
-            rel_insts = getattr(instance, attr_name)
-            if isinstance(rel_insts, InstrumentedList):
-                rel_insts = set(rel_insts)
-                rel_insts.update(
-                    set(rel_model.get(session, ids_to_get, todict=False)))
-                rel_insts = list(rel_insts)
+        rel_model.get(session, ids_to_get, todict=False)
+        rels_ints = []
+        for rel_ids in ids_to_get:
+            rel_inst = rel_model.get(session, rel_ids, todict=False)
+            rel_inst = rel_inst[0] if rel_inst else None
+            rels_ints.append(rel_inst)
 
-            elif rel_insts is None:
-                return rel_model.get(session, ids_to_get, todict=False)
-
-        return rel_insts
+        return rels_ints
 
     def _get_ids_from_rels_values(cls, rel_model, rels_values):
         ids = []
@@ -259,44 +234,46 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
             if value is not None else None
         return {id_name: cast(id_name, values.get(id_name)) for id_name in cls.primaries_keys}
 
+    def _raise_ambiguous_operations_error(cls, to_update, to_delete, to_remove, input_):
+        op_count = [op for op in (to_update, to_delete, to_remove) if op is not None]
+        if len(op_count) > 1:
+            raise ModelBaseError(
+                "ambiguous operations 'update'"
+                ", 'delete' or 'remove'", input_)
+
+    def _raise_nested_operation_error(cls, to_update, to_delete, to_remove, input_):
+        operation = ('update' if to_update else
+            ('delete' if to_delete else ('remove' if to_remove else None)))
+
+        if operation is not None:
+            no_rel_insts_message = "Can't execute nested '_{}'"
+            raise ModelBaseError(no_rel_insts_message.format(operation), input_)
+
     def _exec_update_on_instance(
             cls, session, rel_model, attr_name, relationship,
-            rel_id, rel_values, rel_insts, instance, input_):
+            rel_inst, rel_values, instance, input_):
         if relationship.prop.uselist is True:
-            for rel_inst in rel_insts:
-                if rel_inst.get_ids_map() == rel_id:
-                    rel_model._update_instance(
-                        session, rel_inst, rel_values, input_)
-                    if rel_inst not in getattr(instance, attr_name):
-                        getattr(instance, attr_name).append(rel_inst)
-                    break
+            rel_model._update_instance(session, rel_inst, rel_values, input_)
+            if rel_inst not in getattr(instance, attr_name):
+                getattr(instance, attr_name).append(rel_inst)
+
         else:
             rel_model._update_instance(
-                session, rel_insts[0], rel_values, input_)
-            setattr(instance, attr_name, rel_insts[0])
+                session, rel_inst, rel_values, input_)
+            setattr(instance, attr_name, rel_inst)
 
     def _exec_remove_on_instance(
             cls, rel_model, attr_name, relationship,
-            rel_id, rel_insts, instance, input_):
-        rel_to_remove = None
+            rel_inst, instance, input_):
         if relationship.prop.uselist is True:
-            for rel_inst in rel_insts:
-                if rel_inst.get_ids_map() == rel_id:
-                    rel_to_remove = rel_inst
-                    break
-
-            if rel_to_remove is not None:
-                if rel_to_remove in getattr(instance, attr_name):
-                        getattr(instance, attr_name).remove(rel_to_remove)
-
+            if rel_inst in getattr(instance, attr_name):
+                getattr(instance, attr_name).remove(rel_inst)
             else:
                 columns_str = ', '.join(rel_model.primaries_keys)
-                ids_str = ', '.join([str(id_) for id_ in rel_id.values()])
+                ids_str = ', '.join([str(id_) for id_ in rel_inst.get_ids_values()])
                 error_message = "can't remove model '{}' on column(s) '{}' with value(s) {}"
-                error_message = error_message.format(
-                    rel_model.tablename, columns_str, ids_str)
+                error_message = error_message.format(rel_model.tablename, columns_str, ids_str)
                 raise ModelBaseError(error_message, input_)
-
         else:
             setattr(instance, attr_name, None)
 
@@ -370,9 +347,6 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
     def _build_id_attribute_comparison(cls, pk_name, pk_attributes):
         return getattr(cls, pk_name) == pk_attributes[pk_name]
 
-    def _to_tuple_items(cls, ids):
-        return [id_ if isinstance(id_, tuple) else (id_,) for id_ in ids]
-
     def get(cls, session, ids=None, limit=None, offset=None, todict=True):
         if (ids is not None) and (limit is not None or offset is not None):
             raise ModelBaseError(
@@ -418,9 +392,6 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
             objs.extend(no_cached_map.values())
 
         return objs
-
-    def build_id_dict(cls, id_values):
-        return {id_name: id_value for id_name, id_value in zip(cls.primaries_keys, id_values)}
 
     def get_module_filename(cls):
         return import_module(cls.__module__).__file__
