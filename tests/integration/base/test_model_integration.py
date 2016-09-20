@@ -45,7 +45,6 @@ def model1_two_ids(model_base):
     class model1(model_base):
         __tablename__ = 'model1'
         __table_args__ = {'mysql_engine':'innodb'}
-        id_names = ('id', 'id2')
         id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
         id2 = sa.Column(sa.Integer, primary_key=True)
 
@@ -57,7 +56,6 @@ def model1_three_ids(model_base):
     class model1(model_base):
         __tablename__ = 'model1'
         __table_args__ = {'mysql_engine':'innodb'}
-        id_names = ('id', 'id2', 'id3')
         id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
         id2 = sa.Column(sa.Integer, primary_key=True)
         id3 = sa.Column(sa.Integer, primary_key=True)

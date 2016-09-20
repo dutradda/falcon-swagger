@@ -70,7 +70,7 @@ class FalconRoutesMiddleware(object):
         return route
 
     def process_response(self, req, resp, model):
-        if resp.body and resp.body != 0:
+        if resp.body != '' and resp.body is not None:
             resp.body = json.dumps(resp.body)
 
 

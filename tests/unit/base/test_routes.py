@@ -21,10 +21,14 @@
 # SOFTWARE.
 
 
-from myreco.base.routes import Route, RoutesBuilder, ValidationError
+from myreco.base.routes import Route, RoutesBuilder
+from myreco.base.actions import (DefaultPostActions, DefaultPutActions,
+    DefaultPatchActions, DefaultDeleteActions, DefaultGetActions)
+from jsonschema import ValidationError
 from unittest import mock
 from io import StringIO
 from falcon import HTTPNotFound, HTTP_NOT_FOUND, HTTP_NO_CONTENT, HTTP_CREATED
+from collections import OrderedDict
 
 import pytest
 import sqlalchemy as sa
@@ -43,8 +47,8 @@ class TestRouteRegister(object):
         api, model = mock.MagicMock(), mock.MagicMock()
         route.register(api, model)
         assert api.add_sink.call_args_list == [
-            mock.call(route._sink_input_schema, '/test/_schemas/input'),
-            mock.call(route._sink_schemas, '/test/_schemas')
+            mock.call(route._sink_schemas, '/test/_schemas/post'),
+            mock.call(route._sink_input_schema, '/test/_schemas/post/input')
         ]
 
     def test_without_validator_and_with_output_schema(self):
@@ -53,19 +57,20 @@ class TestRouteRegister(object):
         api, model = mock.MagicMock(), mock.MagicMock()
         route.register(api, model)
         assert api.add_sink.call_args_list == [
-            mock.call(route._sink_output_schema, '/test/_schemas/output'),
-            mock.call(route._sink_schemas, '/test/_schemas')
+            mock.call(route._sink_schemas, '/test/_schemas/post'),
+            mock.call(route._sink_output_schema, '/test/_schemas/post/output')
         ]
 
+    @mock.patch('myreco.base.routes.dict', new=OrderedDict)
     def test_with_validator_and_output_schema(self):
         route = Route('/test', 'POST', lambda x: x,
                       mock.MagicMock(), mock.MagicMock())
         api, model = mock.MagicMock(), mock.MagicMock()
         route.register(api, model)
         assert api.add_sink.call_args_list == [
-            mock.call(route._sink_input_schema, '/test/_schemas/input'),
-            mock.call(route._sink_output_schema, '/test/_schemas/output'),
-            mock.call(route._sink_schemas, '/test/_schemas')
+            mock.call(route._sink_schemas, '/test/_schemas/post'),
+            mock.call(route._sink_input_schema, '/test/_schemas/post/input'),
+            mock.call(route._sink_output_schema, '/test/_schemas/post/output')
         ]
 
 
@@ -76,6 +81,10 @@ def model(model_base):
         id = sa.Column(sa.Integer, primary_key=True)
 
     return model
+
+
+def _get_sorted_key_from_route(route):
+    return (route.action.__self__.__class__.__name__, route.action.__name__)
 
 
 class TestRoutesBuilderWithDefaultArguments(object):
@@ -101,7 +110,7 @@ class TestRoutesBuilderWithDefaultArguments(object):
 
         assert routes[0].uri_template == '/model'
         assert routes[0].method == 'POST'
-        assert routes[0].action == RoutesBuilder._model_name_uri_post_action
+        assert routes[0].action == DefaultPostActions.base_action
         assert routes[0].validator.schema == {'type': 'object'}
 
     @mock.patch('myreco.base.routes.glob')
@@ -115,7 +124,7 @@ class TestRoutesBuilderWithDefaultArguments(object):
 
         assert routes[0].uri_template == '/model'
         assert routes[0].method == 'POST'
-        assert routes[0].action == RoutesBuilder._model_name_uri_post_action
+        assert routes[0].action == DefaultPostActions.base_action
         assert routes[0].validator.schema == {'type': 'object'}
         assert routes[0].output_schema == {'type': 'string'}
 
@@ -130,7 +139,7 @@ class TestRoutesBuilderWithDefaultArguments(object):
         assert routes[0].uri_template == '/model/{test}/{test2}'
         assert routes[0].method == 'POST'
         assert routes[
-            0].action == RoutesBuilder._primaries_keys_uri_post_action
+            0].action == DefaultPostActions.ids_action
         assert routes[0].validator.schema == {'test': 'test'}
 
     @mock.patch('myreco.base.routes.glob')
@@ -142,17 +151,16 @@ class TestRoutesBuilderWithDefaultArguments(object):
         open_.side_effect = [
             StringIO('{"test": "test"}'), StringIO('{"test": "test"}')]
         routes = list(RoutesBuilder(model))
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
 
         assert routes[0].uri_template == '/model/{test}/{test2}'
         assert routes[0].method == 'POST'
-        assert routes[
-            0].action == RoutesBuilder._primaries_keys_uri_post_action
+        assert routes[0].action == DefaultPostActions.ids_action
         assert routes[0].validator.schema == {'test': 'test'}
 
         assert routes[1].uri_template == '/model/{test}_{test2}'
         assert routes[1].method == 'PUT'
-        assert routes[1].action == RoutesBuilder._primaries_keys_uri_put_action
+        assert routes[1].action == DefaultPutActions.ids_action
         assert routes[1].validator.schema == {'test': 'test'}
 
 
@@ -162,68 +170,65 @@ class TestRoutesBuilderJustWithGenericRoutes(object):
         routes = RoutesBuilder(
             model, build_from_schemas=False, build_generic=True)
         assert len(routes) == 10
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
 
         assert routes[0].uri_template == '/model'
         assert routes[0].method == 'DELETE'
-        assert routes[0].action == RoutesBuilder._model_name_uri_delete_action
+        assert routes[0].action == DefaultDeleteActions.base_action
         assert routes[0].validator is None
         assert routes[0].output_schema is None
 
-        assert routes[1].uri_template == '/model'
-        assert routes[1].method == 'GET'
-        assert routes[1].action == RoutesBuilder._model_name_uri_get_action
+        assert routes[1].uri_template == '/model/{id}'
+        assert routes[1].method == 'DELETE'
+        assert routes[1].action == DefaultDeleteActions.ids_action
         assert routes[1].validator is None
         assert routes[1].output_schema is None
 
         assert routes[2].uri_template == '/model'
-        assert routes[2].method == 'PATCH'
-        assert routes[2].action == RoutesBuilder._model_name_uri_patch_action
+        assert routes[2].method == 'GET'
+        assert routes[2].action == DefaultGetActions.base_action
         assert routes[2].validator is None
         assert routes[2].output_schema is None
 
-        assert routes[3].uri_template == '/model'
-        assert routes[3].method == 'POST'
-        assert routes[3].action == RoutesBuilder._model_name_uri_post_action
+        assert routes[3].uri_template == '/model/{id}'
+        assert routes[3].method == 'GET'
+        assert routes[3].action == DefaultGetActions.ids_action
         assert routes[3].validator is None
         assert routes[3].output_schema is None
 
         assert routes[4].uri_template == '/model'
-        assert routes[4].method == 'PUT'
-        assert routes[4].action == RoutesBuilder._model_name_uri_put_action
+        assert routes[4].method == 'PATCH'
+        assert routes[4].action == DefaultPatchActions.base_action
         assert routes[4].validator is None
         assert routes[4].output_schema is None
 
         assert routes[5].uri_template == '/model/{id}'
-        assert routes[5].method == 'DELETE'
-        assert routes[
-            5].action == RoutesBuilder._primaries_keys_uri_delete_action
+        assert routes[5].method == 'PATCH'
+        assert routes[5].action == DefaultPatchActions.ids_action
         assert routes[5].validator is None
         assert routes[5].output_schema is None
 
-        assert routes[6].uri_template == '/model/{id}'
-        assert routes[6].method == 'GET'
-        assert routes[6].action == RoutesBuilder._primaries_keys_uri_get_action
+        assert routes[6].uri_template == '/model'
+        assert routes[6].method == 'POST'
+        assert routes[6].action == DefaultPostActions.base_action
         assert routes[6].validator is None
         assert routes[6].output_schema is None
 
         assert routes[7].uri_template == '/model/{id}'
-        assert routes[7].method == 'PATCH'
-        assert routes[
-            7].action == RoutesBuilder._primaries_keys_uri_patch_action
+        assert routes[7].method == 'POST'
+        assert routes[7].action == DefaultPostActions.ids_action
         assert routes[7].validator is None
         assert routes[7].output_schema is None
 
-        assert routes[8].uri_template == '/model/{id}'
-        assert routes[8].method == 'POST'
-        assert routes[
-            8].action == RoutesBuilder._primaries_keys_uri_post_action
+        assert routes[8].uri_template == '/model'
+        assert routes[8].method == 'PUT'
+        assert routes[8].action == DefaultPutActions.base_action
         assert routes[8].validator is None
         assert routes[8].output_schema is None
 
         assert routes[9].uri_template == '/model/{id}'
         assert routes[9].method == 'PUT'
-        assert routes[9].action == RoutesBuilder._primaries_keys_uri_put_action
+        assert routes[9].action == DefaultPutActions.ids_action
         assert routes[9].validator is None
         assert routes[9].output_schema is None
 
@@ -236,68 +241,65 @@ class TestRoutesBuilderJustWithGenericRoutes(object):
         routes = RoutesBuilder(
             model, build_from_schemas=False, build_generic=True)
         assert len(routes) == 10
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
 
         assert routes[0].uri_template == '/model'
         assert routes[0].method == 'DELETE'
-        assert routes[0].action == RoutesBuilder._model_name_uri_delete_action
+        assert routes[0].action == DefaultDeleteActions.base_action
         assert routes[0].validator is None
         assert routes[0].output_schema is None
 
-        assert routes[1].uri_template == '/model'
-        assert routes[1].method == 'GET'
-        assert routes[1].action == RoutesBuilder._model_name_uri_get_action
+        assert routes[1].uri_template == '/model/{id}/{id2}'
+        assert routes[1].method == 'DELETE'
+        assert routes[1].action == DefaultDeleteActions.ids_action
         assert routes[1].validator is None
         assert routes[1].output_schema is None
 
         assert routes[2].uri_template == '/model'
-        assert routes[2].method == 'PATCH'
-        assert routes[2].action == RoutesBuilder._model_name_uri_patch_action
+        assert routes[2].method == 'GET'
+        assert routes[2].action == DefaultGetActions.base_action
         assert routes[2].validator is None
         assert routes[2].output_schema is None
 
-        assert routes[3].uri_template == '/model'
-        assert routes[3].method == 'POST'
-        assert routes[3].action == RoutesBuilder._model_name_uri_post_action
+        assert routes[3].uri_template == '/model/{id}/{id2}'
+        assert routes[3].method == 'GET'
+        assert routes[3].action == DefaultGetActions.ids_action
         assert routes[3].validator is None
         assert routes[3].output_schema is None
 
         assert routes[4].uri_template == '/model'
-        assert routes[4].method == 'PUT'
-        assert routes[4].action == RoutesBuilder._model_name_uri_put_action
+        assert routes[4].method == 'PATCH'
+        assert routes[4].action == DefaultPatchActions.base_action
         assert routes[4].validator is None
         assert routes[4].output_schema is None
 
         assert routes[5].uri_template == '/model/{id}/{id2}'
-        assert routes[5].method == 'DELETE'
-        assert routes[
-            5].action == RoutesBuilder._primaries_keys_uri_delete_action
+        assert routes[5].method == 'PATCH'
+        assert routes[5].action == DefaultPatchActions.ids_action
         assert routes[5].validator is None
         assert routes[5].output_schema is None
 
-        assert routes[6].uri_template == '/model/{id}/{id2}'
-        assert routes[6].method == 'GET'
-        assert routes[6].action == RoutesBuilder._primaries_keys_uri_get_action
+        assert routes[6].uri_template == '/model'
+        assert routes[6].method == 'POST'
+        assert routes[6].action == DefaultPostActions.base_action
         assert routes[6].validator is None
         assert routes[6].output_schema is None
 
         assert routes[7].uri_template == '/model/{id}/{id2}'
-        assert routes[7].method == 'PATCH'
-        assert routes[
-            7].action == RoutesBuilder._primaries_keys_uri_patch_action
+        assert routes[7].method == 'POST'
+        assert routes[7].action == DefaultPostActions.ids_action
         assert routes[7].validator is None
         assert routes[7].output_schema is None
 
-        assert routes[8].uri_template == '/model/{id}/{id2}'
-        assert routes[8].method == 'POST'
-        assert routes[
-            8].action == RoutesBuilder._primaries_keys_uri_post_action
+        assert routes[8].uri_template == '/model'
+        assert routes[8].method == 'PUT'
+        assert routes[8].action == DefaultPutActions.base_action
         assert routes[8].validator is None
         assert routes[8].output_schema is None
 
         assert routes[9].uri_template == '/model/{id}/{id2}'
         assert routes[9].method == 'PUT'
-        assert routes[9].action == RoutesBuilder._primaries_keys_uri_put_action
+        assert routes[9].action == DefaultPutActions.ids_action
         assert routes[9].validator is None
         assert routes[9].output_schema is None
 
@@ -308,7 +310,7 @@ class TestRoutesModelNameUriDeleteAction(object):
         model.delete = mock.MagicMock()
         routes = RoutesBuilder(
             model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
             'session': mock.MagicMock(),
@@ -326,7 +328,7 @@ class TestRoutesModelNameUriGetAction(object):
         model.get = mock.MagicMock(return_value=[{'test': 'test'}])
         routes = RoutesBuilder(
             model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
             'session': mock.MagicMock(),
@@ -334,7 +336,7 @@ class TestRoutesModelNameUriGetAction(object):
         }
         req = mock.MagicMock(context=context)
         resp = mock.MagicMock()
-        routes[1].action(req, resp)
+        routes[2].action(req, resp)
         assert model.get.call_args_list == [mock.call(context['session'])]
         assert resp.body == [{'test': 'test'}]
 
@@ -342,7 +344,7 @@ class TestRoutesModelNameUriGetAction(object):
         model.get = mock.MagicMock(return_value=[{'test': 'test'}])
         routes = RoutesBuilder(
             model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
             'session': mock.MagicMock(),
@@ -350,7 +352,7 @@ class TestRoutesModelNameUriGetAction(object):
         }
         req = mock.MagicMock(context=context)
         resp = mock.MagicMock()
-        routes[1].action(req, resp)
+        routes[2].action(req, resp)
         assert model.get.call_args_list == [
             mock.call(context['session'], context['body'])]
         assert resp.body == [{'test': 'test'}]
@@ -362,75 +364,7 @@ class TestRoutesModelNameUriPatchAction(object):
         model.update = mock.MagicMock(return_value=[])
         routes = RoutesBuilder(
             model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
-        context = {
-            'model': model,
-            'session': mock.MagicMock(),
-            'body': {}
-        }
-        req = mock.MagicMock(context=context)
-        resp = mock.MagicMock()
-        with pytest.raises(HTTPNotFound):
-            routes[2].action(req, resp)
-
-    def test_action(self, model):
-        model.update = mock.MagicMock(return_value=[{'test': 'test'}])
-        routes = RoutesBuilder(
-            model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
-        context = {
-            'model': model,
-            'session': mock.MagicMock(),
-            'body': [{}]
-        }
-        req = mock.MagicMock(context=context)
-        resp = mock.MagicMock()
-        routes[2].action(req, resp)
-        assert resp.body == [{'test': 'test'}]
-
-
-class TestRoutesModelNameUriPostAction(object):
-
-    def test_with_a_object_in_body(self, model):
-        model.insert = mock.MagicMock(return_value=[{'test': 'test'}])
-        routes = RoutesBuilder(
-            model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
-        context = {
-            'model': model,
-            'session': mock.MagicMock(),
-            'body': {}
-        }
-        req = mock.MagicMock(context=context)
-        resp = mock.MagicMock()
-        routes[3].action(req, resp)
-        assert resp.body == {'test': 'test'}
-        assert resp.status == HTTP_CREATED
-
-    def test_with_a_list_in_body(self, model):
-        model.insert = mock.MagicMock(return_value=[{'test': 'test'}])
-        routes = RoutesBuilder(
-            model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
-        context = {
-            'model': model,
-            'session': mock.MagicMock(),
-            'body': [{}]
-        }
-        req = mock.MagicMock(context=context)
-        resp = mock.MagicMock()
-        routes[3].action(req, resp)
-        assert resp.body == [{'test': 'test'}]
-        assert resp.status == HTTP_CREATED
-
-
-class TestRoutesModelNameUriPutAction(object):
-
-    def test_raises_not_found(self, model):
-        model.update = mock.MagicMock(return_value=[])
-        routes = RoutesBuilder(
-            model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
             'session': mock.MagicMock(),
@@ -445,7 +379,7 @@ class TestRoutesModelNameUriPutAction(object):
         model.update = mock.MagicMock(return_value=[{'test': 'test'}])
         routes = RoutesBuilder(
             model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
             'session': mock.MagicMock(),
@@ -457,13 +391,13 @@ class TestRoutesModelNameUriPutAction(object):
         assert resp.body == [{'test': 'test'}]
 
 
-class TestRoutesPrimariesKeysUriDeleteAction(object):
+class TestRoutesModelNameUriPostAction(object):
 
-    def test_action(self, model):
-        model.delete = mock.MagicMock()
+    def test_with_a_object_in_body(self, model):
+        model.insert = mock.MagicMock(return_value=[{'test': 'test'}])
         routes = RoutesBuilder(
             model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
             'session': mock.MagicMock(),
@@ -471,7 +405,75 @@ class TestRoutesPrimariesKeysUriDeleteAction(object):
         }
         req = mock.MagicMock(context=context)
         resp = mock.MagicMock()
-        routes[5].action(req, resp, test='test')
+        routes[6].action(req, resp)
+        assert resp.body == {'test': 'test'}
+        assert resp.status == HTTP_CREATED
+
+    def test_with_a_list_in_body(self, model):
+        model.insert = mock.MagicMock(return_value=[{'test': 'test'}])
+        routes = RoutesBuilder(
+            model, build_from_schemas=False, build_generic=True)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
+        context = {
+            'model': model,
+            'session': mock.MagicMock(),
+            'body': [{}]
+        }
+        req = mock.MagicMock(context=context)
+        resp = mock.MagicMock()
+        routes[6].action(req, resp)
+        assert resp.body == [{'test': 'test'}]
+        assert resp.status == HTTP_CREATED
+
+
+class TestRoutesModelNameUriPutAction(object):
+
+    def test_raises_not_found(self, model):
+        model.update = mock.MagicMock(return_value=[])
+        routes = RoutesBuilder(
+            model, build_from_schemas=False, build_generic=True)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
+        context = {
+            'model': model,
+            'session': mock.MagicMock(),
+            'body': {}
+        }
+        req = mock.MagicMock(context=context)
+        resp = mock.MagicMock()
+        with pytest.raises(HTTPNotFound):
+            routes[8].action(req, resp)
+
+    def test_action(self, model):
+        model.update = mock.MagicMock(return_value=[{'test': 'test'}])
+        routes = RoutesBuilder(
+            model, build_from_schemas=False, build_generic=True)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
+        context = {
+            'model': model,
+            'session': mock.MagicMock(),
+            'body': [{}]
+        }
+        req = mock.MagicMock(context=context)
+        resp = mock.MagicMock()
+        routes[8].action(req, resp)
+        assert resp.body == [{'test': 'test'}]
+
+
+class TestRoutesPrimariesKeysUriDeleteAction(object):
+
+    def test_action(self, model):
+        model.delete = mock.MagicMock()
+        routes = RoutesBuilder(
+            model, build_from_schemas=False, build_generic=True)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
+        context = {
+            'model': model,
+            'session': mock.MagicMock(),
+            'body': {}
+        }
+        req = mock.MagicMock(context=context)
+        resp = mock.MagicMock()
+        routes[1].action(req, resp, test='test')
         assert model.delete.call_args_list == [
             mock.call(context['session'], {'test': 'test'})]
         assert resp.status == HTTP_NO_CONTENT
@@ -483,7 +485,7 @@ class TestRoutesPrimariesKeysUriGetAction(object):
         model.get = mock.MagicMock()
         routes = RoutesBuilder(
             model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
             'session': mock.MagicMock(),
@@ -491,7 +493,7 @@ class TestRoutesPrimariesKeysUriGetAction(object):
         }
         req = mock.MagicMock(context=context)
         resp = mock.MagicMock()
-        routes[6].action(req, resp, test='test')
+        routes[3].action(req, resp, test='test')
         assert model.get.call_args_list == [
             mock.call(context['session'], {'test': 'test'})]
 
@@ -502,7 +504,7 @@ class TestRoutesPrimariesKeysUriPatchAction(object):
         model.update = mock.MagicMock(return_value=[])
         routes = RoutesBuilder(
             model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
             'session': mock.MagicMock(),
@@ -511,13 +513,13 @@ class TestRoutesPrimariesKeysUriPatchAction(object):
         req = mock.MagicMock(context=context)
         resp = mock.MagicMock()
         with pytest.raises(HTTPNotFound):
-            routes[7].action(req, resp, test='test')
+            routes[5].action(req, resp, test='test')
 
     def test_action(self, model):
         model.update = mock.MagicMock(return_value=[{'test': 'test'}])
         routes = RoutesBuilder(
             model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
             'session': mock.MagicMock(),
@@ -525,7 +527,7 @@ class TestRoutesPrimariesKeysUriPatchAction(object):
         }
         req = mock.MagicMock(context=context)
         resp = mock.MagicMock()
-        routes[7].action(req, resp, test='test')
+        routes[5].action(req, resp, test='test')
         assert resp.body == {'test': 'test'}
         assert model.update.call_args_list == [
             mock.call(context['session'], {'test': 'test'}, ids={'test': 'test'})]
@@ -537,7 +539,7 @@ class TestRoutesPrimariesKeysUriPostAction(object):
         model.insert = mock.MagicMock(return_value=[{'test': 'test'}])
         routes = RoutesBuilder(
             model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
             'session': mock.MagicMock(),
@@ -545,7 +547,7 @@ class TestRoutesPrimariesKeysUriPostAction(object):
         }
         req = mock.MagicMock(context=context)
         resp = mock.MagicMock()
-        routes[8].action(req, resp, test='test')
+        routes[7].action(req, resp, test='test')
         assert resp.body == {'test': 'test'}
         assert resp.status == HTTP_CREATED
         assert model.insert.call_args_list == [
@@ -555,7 +557,7 @@ class TestRoutesPrimariesKeysUriPostAction(object):
         model.insert = mock.MagicMock(return_value=[{'test': 'test'}])
         routes = RoutesBuilder(
             model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
             'session': mock.MagicMock(),
@@ -563,7 +565,7 @@ class TestRoutesPrimariesKeysUriPostAction(object):
         }
         req = mock.MagicMock(context=context)
         resp = mock.MagicMock()
-        routes[8].action(req, resp, test='test')
+        routes[7].action(req, resp, test='test')
         assert resp.body == [{'test': 'test'}]
         assert resp.status == HTTP_CREATED
         assert model.insert.call_args_list == [
@@ -577,7 +579,7 @@ class TestRoutesPrimariesKeysUriPutAction(object):
         model.insert = mock.MagicMock(return_value=[{'test': 'test'}])
         routes = RoutesBuilder(
             model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
             'session': mock.MagicMock(),
@@ -596,7 +598,7 @@ class TestRoutesPrimariesKeysUriPutAction(object):
         model.update = mock.MagicMock(return_value=[{'test': 'test'}])
         routes = RoutesBuilder(
             model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
             'session': mock.MagicMock(),
@@ -614,7 +616,7 @@ class TestRoutesPrimariesKeysUriPutAction(object):
         model.update = mock.MagicMock(return_value=[])
         routes = RoutesBuilder(
             model, build_from_schemas=False, build_generic=True)
-        routes = sorted(routes, key=lambda route: route.action.__name__)
+        routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
             'session': mock.MagicMock(),

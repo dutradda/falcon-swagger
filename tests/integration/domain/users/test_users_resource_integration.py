@@ -883,3 +883,95 @@ class TestUsersResourcePatchMany(object):
                 }
             }]
         }
+
+
+class TestUsersResourceDeleteGet(object):
+    def test_delete_one(self, client, headers):
+        user = [{
+            'name': 'test2',
+            'email': 'test2',
+            'password': 'test'
+        }]
+        resp = client.post('/users', body=json.dumps(user), headers=headers)
+        assert resp.status_code == 201
+
+        resp = client.get('/users/test2', body='', headers=headers)
+        assert resp.status_code == 200
+
+        resp = client.delete('/users/test2', headers=headers)
+        assert resp.status_code == 204
+
+        resp = client.get('/users/test2', headers=headers)
+        assert resp.status_code == 404
+
+    def test_delete_many(self, client, headers):
+        user = [{
+            'name': 'test2',
+            'email': 'test2',
+            'password': 'test'
+        }]
+        resp = client.post('/users', body=json.dumps(user), headers=headers)
+        assert resp.status_code == 201
+
+        resp = client.get('/users', body=json.dumps([{'email': 'test2'}]), headers=headers)
+        assert resp.status_code == 200
+
+        resp = client.delete('/users', body=json.dumps([{'email': 'test2'}]), headers=headers)
+        assert resp.status_code == 204
+
+        resp = client.get('/users', body=json.dumps([{'email': 'test2'}]), headers=headers)
+        assert resp.status_code == 404
+
+
+class TestUsersResourceSchemas(object):
+    def test_get_put_schemas(self, client, headers):
+        resp = client.get('/users/{email}/_schemas/put/')
+        assert resp.status_code == 200
+        assert sorted(json.loads(resp.body)) == [
+            'http://falconframework.org/users/{email}/_schemas/put/input',
+            'http://falconframework.org/users/{email}/_schemas/put/output'
+        ]
+
+    def test_get_put_input_schema(self, client, headers):
+        resp = client.get('/users/{email}/_schemas/put/input/')
+        assert resp.status_code == 200
+        assert json.loads(resp.body) == {
+            '$schema': 'http://json-schema.org/draft-04/schema#',
+            'title': 'Recommendations Users',
+            'type': 'object',
+            'additionalProperties': False,
+            'required': ['name', 'password', 'email', 'grants'],
+            'properties': {
+                'name': {'type': 'string'},
+                'email': {'type': 'string'},
+                'password': {'type': 'string'},
+                'grants': {
+                    'type': 'array',
+                    'minItems': 1,
+                    'uniqueItems': True,
+                    'items': {'$ref': 'schema:grants.json'}
+                }
+            }
+        }
+
+    def test_get_put_output_schema(self, client, headers):
+        resp = client.get('/users/{email}/_schemas/put/output/')
+        assert resp.status_code == 200
+        assert json.loads(resp.body) == {
+            '$schema': 'http://json-schema.org/draft-04/schema#',
+            'title': 'Recommendations Users',
+            'type': 'object',
+            'additionalProperties': False,
+            'required': ['name', 'password', 'email', 'grants'],
+            'properties': {
+                'name': {'type': 'string'},
+                'email': {'type': 'string'},
+                'password': {'type': 'string'},
+                'grants': {
+                    'type': 'array',
+                    'minItems': 1,
+                    'uniqueItems': True,
+                    'items': {'$ref': 'schema:grants.json'}
+                }
+            }
+        }

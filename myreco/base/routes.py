@@ -21,57 +21,69 @@
 # SOFTWARE.
 
 
-from collections import defaultdict
+from myreco.base.actions import (DefaultPostActions, DefaultPutActions,
+    DefaultPatchActions, DefaultDeleteActions, DefaultGetActions)
 from glob import glob
 from re import match as re_match, sub as re_sub
-from jsonschema import RefResolver, Draft4Validator, ValidationError
-from falcon import HTTP_CREATED, HTTPNotFound, HTTP_NO_CONTENT
-from copy import deepcopy
+from jsonschema import RefResolver, Draft4Validator
+from sys import modules
 import os.path
 import json
+
+
+ROUTES_MODULE = modules[__name__]
 
 
 class Route(object):
 
     def __init__(self, uri_template, method, action,
                  validator=None, output_schema=None, hooks=None):
+        self._schemas_sinks = dict()
         self.uri_template = uri_template
         self.method = method
         self.action = action
         self.validator = validator
         self.output_schema = output_schema
-        self._schemas_sinks = dict()
 
         if hooks:
             for hook in hooks:
                 self.action = hook(self.action)
 
-        if validator:
-            schema_uri = self.uri_template + '/_schemas/input'
-            self._schemas_sinks[self._sink_input_schema] = schema_uri
-
-        if output_schema:
-            schema_uri = self.uri_template + '/_schemas/output'
-            self._schemas_sinks[self._sink_output_schema] = schema_uri
-
     @property
     def has_schemas(self):
         return bool(self._schemas_sinks)
 
+    @property
+    def output_schema(self):
+        return self._output_schema
+
+    @property
+    def validator(self):
+        return self._validator
+
+    @output_schema.setter
+    def output_schema(self, schema):
+        if schema:
+            schema_uri = self.uri_template + '/_schemas/{}/output'.format(self.method.lower())
+            self._schemas_sinks[schema_uri] = self._sink_output_schema
+        self._output_schema = schema
+
+    @validator.setter
+    def validator(self, validator):
+        if validator:
+            schema_uri = self.uri_template + '/_schemas/{}/input'.format(self.method.lower())
+            self._schemas_sinks[schema_uri] = self._sink_input_schema
+        self._validator = validator
+
     def register(self, api, model):
         api.add_route(self.uri_template, model)
 
-        if self.validator:
-            schema_uri = self.uri_template + '/_schemas/input'
-            api.add_sink(self._sink_input_schema, schema_uri)
-
-        if self.output_schema:
-            schema_uri = self.uri_template + '/_schemas/output'
-            api.add_sink(self._sink_output_schema, schema_uri)
-            self._schemas_sinks[schema_uri] = self.output_schema
-
         if self.has_schemas:
-            api.add_sink(self._sink_schemas, self.uri_template + '/_schemas')
+            schema_uri = self.uri_template + '/_schemas/{}'.format(self.method.lower())
+            api.add_sink(self._sink_schemas, schema_uri)
+
+        for uri_sink, callback in self._schemas_sinks.items():
+            api.add_sink(callback, uri_sink)
 
     def _sink_input_schema(self, req, resp):
         resp.body = self.validator.schema
@@ -82,8 +94,7 @@ class Route(object):
     def _sink_schemas(self, req, resp):
         build_link = lambda uri: '{}://{}{}'.format(
             req.protocol, req.host, uri)
-        resp.body = [build_link(schema_uri)
-                     for schema_uri in self._schemas_uris]
+        resp.body = [build_link(schema_uri) for schema_uri in self._schemas_sinks]
 
 
 class URISchemaHandler(object):
@@ -169,13 +180,15 @@ class _RoutesBuilderMeta(type):
         return Draft4Validator(schema, resolver=resolver)
 
     def _get_action(cls, uri_template, method):
-        uri_name = 'model_name'
+        uri_name = 'base'
         try:
             uri_template.format()
         except KeyError:
-            uri_name = 'primaries_keys'
+            uri_name = 'ids'
 
-        return getattr(cls, '_{}_uri_{}_action'.format(uri_name, method.lower()))
+        action_class_name = 'Default{}Actions'.format(method.capitalize())
+        action_class = getattr(ROUTES_MODULE, action_class_name)
+        return getattr(action_class, '{}_action'.format(uri_name))
 
     def _build_generic_routes(cls, model):
         uri = uri_single = model.api_prefix + model.tablename
@@ -194,117 +207,6 @@ class _RoutesBuilderMeta(type):
             routes.add(route)
 
         return routes
-
-    def _model_name_uri_post_action(cls, req, resp, **kwargs):
-        cls._insert(req, resp, with_update=False, **kwargs)
-
-    def _insert(cls, req, resp, with_update=False, **kwargs):
-        model = req.context['model']
-        session = req.context['session']
-        req_body = req.context['body']
-
-        if with_update:
-            if isinstance(req_body, list):
-                [obj.update(kwargs) for obj in req_body]
-            elif isinstance(req_body, dict):
-                req_body.update(kwargs)
-
-        resp.body = model.insert(session, req_body)
-        resp.body = resp.body if isinstance(req_body, list) else resp.body[0]
-        resp.status = HTTP_CREATED
-
-    def _primaries_keys_uri_post_action(cls, req, resp, **kwargs):
-        cls._insert(req, resp, with_update=True, **kwargs)
-
-    def _model_name_uri_put_action(cls, req, resp, **kwargs):
-        cls._update(req, resp, **kwargs)
-
-    def _update(cls, req, resp, **kwargs):
-        model = req.context['model']
-        session = req.context['session']
-        req_body = req.context['body']
-
-        objs = model.update(session, req_body)
-
-        if objs:
-            resp.body = objs
-        else:
-            raise HTTPNotFound()
-
-    def _primaries_keys_uri_put_action(cls, req, resp, **kwargs):
-        model = req.context['model']
-        session = req.context['session']
-        route = req.context['route']
-        req_body = req.context['body']
-        req_body_copy = deepcopy(req.context['body'])
-
-        cls._update_dict(req_body, kwargs)
-        objs = model.update(session, req_body, ids=kwargs)
-
-        if not objs:
-            req_body = req_body_copy
-            ambigous_keys = [
-                kwa for kwa in kwargs if kwa in req_body and req_body[kwa] != kwargs[kwa]]
-            if ambigous_keys:
-                raise ValidationError(
-                    "Ambiguous value for '{}'".format(
-                        "', '".join(ambigous_keys)),
-                    instance={'body': req_body, 'uri': kwargs}, schema=route.validator.schema)
-
-            req.context['body'] = req_body
-            cls._insert(req, resp, with_update=True, **kwargs)
-        else:
-            resp.body = objs[0]
-
-    def _update_dict(cls, dict_, other):
-        dict_.update({k: v for k, v in other.items() if k not in dict_})
-
-    def _model_name_uri_patch_action(cls, req, resp, **kwargs):
-        cls._update(req, resp, **kwargs)
-
-    def _primaries_keys_uri_patch_action(cls, req, resp, **kwargs):
-        model = req.context['model']
-        session = req.context['session']
-        req_body = req.context['body']
-        cls._update_dict(req_body, kwargs)
-        objs = model.update(session, req_body, ids=kwargs)
-        if objs:
-            resp.body = objs[0]
-        else:
-            raise HTTPNotFound()
-
-    def _model_name_uri_delete_action(cls, req, resp, **kwargs):
-        model = req.context['model']
-        session = req.context['session']
-        req_body = req.context['body']
-        model.delete(session, req.context['body'])
-        resp.status = HTTP_NO_CONTENT
-
-    def _primaries_keys_uri_delete_action(cls, req, resp, **kwargs):
-        model = req.context['model']
-        session = req.context['session']
-        model.delete(session, kwargs)
-        resp.status = HTTP_NO_CONTENT
-
-    def _model_name_uri_get_action(cls, req, resp, **kwargs):
-        model = req.context['model']
-        session = req.context['session']
-        req_body = req.context['body']
-
-        if req_body:
-            resp.body = model.get(session, req_body)
-        else:
-            resp.body = model.get(session)
-
-        if not resp.body:
-            raise HTTPNotFound()
-
-    def _primaries_keys_uri_get_action(cls, req, resp, **kwargs):
-        model = req.context['model']
-        session = req.context['session']
-        resp.body = model.get(session, kwargs)
-        if resp.body:
-            resp.body = resp.body[0]
 
 
 class RoutesBuilder(metaclass=_RoutesBuilderMeta):
