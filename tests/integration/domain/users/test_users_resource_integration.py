@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.domain.users.model import UsersModel, GrantsModel, URIsModel, MethodsModel
+from myreco.domain.users.models import UsersModel, GrantsModel, URIsModel, MethodsModel
 from myreco.base.model import SQLAlchemyRedisModelBase
 from myreco.base.http_api import HttpAPI
 from myreco.base.routes import RoutesBuilder
@@ -394,6 +394,11 @@ class TestUsersResourcePutUpdateOne(object):
                 'method': {'id': 1, 'method': 'patch'},
                 'uri': {'id': 1, 'uri': '/test2'}
             },{
+                'method_id': 3,
+                'uri_id': 3,
+                'method': {'id': 3, 'method': 'put'},
+                'uri': {'id': 3, 'uri': '/users/test'}
+            },{
                 'uri_id': 5,
                 'method': {
                     'id': 1,
@@ -404,11 +409,6 @@ class TestUsersResourcePutUpdateOne(object):
                     'id': 5,
                     'uri': '/users/test2'
                 }
-            },{
-                'method_id': 3,
-                'uri_id': 3,
-                'method': {'id': 3, 'method': 'put'},
-                'uri': {'id': 3, 'uri': '/users/test'}
             }]
         }
 
@@ -497,6 +497,11 @@ class TestUsersResourcePutUpdateOne(object):
             'stores': [],
             'admin': False,
             'grants': [{
+                'method_id': 3,
+                'uri_id': 3,
+                'method': {'id': 3, 'method': 'put'},
+                'uri': {'id': 3, 'uri': '/users/test'}
+            },{
                 'uri_id': 5,
                 'method': {
                     'id': 1,
@@ -507,11 +512,6 @@ class TestUsersResourcePutUpdateOne(object):
                     'id': 5,
                     'uri': '/users/test2'
                 }
-            },{
-                'method_id': 3,
-                'uri_id': 3,
-                'method': {'id': 3, 'method': 'put'},
-                'uri': {'id': 3, 'uri': '/users/test'}
             }]
         }
 
@@ -614,6 +614,11 @@ class TestUsersResourcePutUpdateMany(object):
                 'method': {'id': 1, 'method': 'patch'},
                 'uri': {'id': 1, 'uri': '/test2'}
             },{
+                'method_id': 3,
+                'uri_id': 3,
+                'method': {'id': 3, 'method': 'put'},
+                'uri': {'id': 3, 'uri': '/users/test'}
+            },{
                 'uri_id': 5,
                 'method': {
                     'id': 1,
@@ -624,11 +629,6 @@ class TestUsersResourcePutUpdateMany(object):
                     'id': 5,
                     'uri': '/users/test2'
                 }
-            },{
-                'method_id': 3,
-                'uri_id': 3,
-                'method': {'id': 3, 'method': 'put'},
-                'uri': {'id': 3, 'uri': '/users/test'}
             }]
         }]
 
@@ -719,21 +719,15 @@ class TestUsersResourcePutUpdateMany(object):
             'stores': [],
             'admin': False,
             'grants': [{
-                'uri_id': 5,
-                'method': {
-                    'id': 1,
-                    'method': 'patch'
-                },
-                'method_id': 1,
-                'uri': {
-                    'id': 5,
-                    'uri': '/users/test2'
-                }
-            },{
                 'method_id': 3,
                 'uri_id': 3,
                 'method': {'id': 3, 'method': 'put'},
                 'uri': {'id': 3, 'uri': '/users/test'}
+            },{
+                'uri_id': 5,
+                'method': {'id': 1, 'method': 'patch'},
+                'method_id': 1,
+                'uri': {'id': 5, 'uri': '/users/test2'}
             }]
         }]
 

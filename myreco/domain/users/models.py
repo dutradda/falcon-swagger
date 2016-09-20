@@ -170,15 +170,14 @@ for route in UsersModel.routes:
 
 users_grants = sa.Table(
     'users_grants', SQLAlchemyRedisModelBase.metadata,
-    sa.Column('user_id', sa.String(255), sa.ForeignKey(
-        'users.id', ondelete='CASCADE', onupdate='CASCADE')),
-    sa.Column('grant_uri_id', sa.Integer, sa.ForeignKey('grants.uri_id', ondelete='CASCADE')),
-    sa.Column('grant_method_id', sa.Integer, sa.ForeignKey('grants.method_id', ondelete='CASCADE')),
+    sa.Column('user_id', sa.String(255), sa.ForeignKey('users.id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
+    sa.Column('grant_uri_id', sa.Integer, sa.ForeignKey('grants.uri_id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
+    sa.Column('grant_method_id', sa.Integer, sa.ForeignKey('grants.method_id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
     mysql_engine='innodb')
 
 
 users_stores = sa.Table(
     'users_stores', SQLAlchemyRedisModelBase.metadata,
-    sa.Column('user_id', sa.String(255), sa.ForeignKey('users.id', ondelete='CASCADE')),
-    sa.Column('store_id', sa.Integer, sa.ForeignKey('stores.id', ondelete='CASCADE')),
+    sa.Column('user_id', sa.String(255), sa.ForeignKey('users.id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
+    sa.Column('store_id', sa.Integer, sa.ForeignKey('stores.id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
     mysql_engine='innodb')
