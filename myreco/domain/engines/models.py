@@ -60,12 +60,11 @@ class EnginesVariablesModel(SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}
     _build_routes_from_schemas = False
 
-    engine_id = sa.Column(sa.ForeignKey('engines.id'), primary_key=True)
     variable_id = sa.Column(sa.ForeignKey('variables.id'), primary_key=True)
-    override_value = sa.Column(sa.String(255))
+    engine_id = sa.Column(sa.ForeignKey('engines.id'), primary_key=True)
     override = sa.Column(sa.Boolean, default=False)
-    is_filter = sa.Column(sa.Boolean, default=False)
-    score = sa.Column(sa.Float, default=False)
+    override_value = sa.Column(sa.String(255))
+    score = sa.Column(sa.Float)
 
     variable = sa.orm.relationship('VariablesModel')
 
@@ -77,6 +76,17 @@ class VariablesModel(SQLAlchemyRedisModelBase):
 
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.Integer, unique=True, nullable=False)
+
+
+class EnginesFiltersModel(SQLAlchemyRedisModelBase):
+    __tablename__ = 'engines_filters'
+    __table_args__ = {'mysql_engine':'innodb'}
+    _build_routes_from_schemas = False
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    name = sa.Column(sa.String(255), unique=True, nullable=False)
+    object_attr = sa.Column(sa.String(255))
+    item_type_id = sa.Column(sa.ForeignKey('items_types.id'), nullable=False)
 
 
 engines_fallbacks = sa.Table("engines_fallbacks", SQLAlchemyRedisModelBase.metadata,
