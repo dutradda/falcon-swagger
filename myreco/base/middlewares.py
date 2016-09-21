@@ -23,6 +23,7 @@
 
 from myreco.exceptions import JSONError
 from myreco.base.session import Session
+from myreco.base.model import SQLAlchemyModelMeta, RedisModelMeta
 from falcon.errors import HTTPNotFound, HTTPMethodNotAllowed
 import json
 import inspect
@@ -86,13 +87,16 @@ class FalconSQLAlchemyRedisMiddleware(FalconRoutesMiddleware):
         FalconRoutesMiddleware.__init__(self, routes)
 
     def process_resource(self, req, resp, model, uri_params):
-        req.context['session'] = Session(
-            bind=self._bind, redis_bind=self._redis_bind)
+        if isinstance(model, SQLAlchemyModelMeta):
+            req.context['session'] = Session(
+                bind=self._bind, redis_bind=self._redis_bind)
+        elif isinstance(model, RedisModelMeta):
+            req.context['session'] = self._redis_bind
         FalconRoutesMiddleware.process_resource(
             self, req, resp, model, uri_params)
 
     def process_response(self, req, resp, model):
         FalconRoutesMiddleware.process_response(self, req, resp, model)
         session = req.context.pop('session', None)
-        if session is not None:
+        if session is not None and isinstance(model, SQLAlchemyModelMeta):
             session.close()

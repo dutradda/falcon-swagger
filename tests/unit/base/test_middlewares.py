@@ -23,6 +23,7 @@
 
 from myreco.base.middlewares import FalconRoutesMiddleware, FalconSQLAlchemyRedisMiddleware
 from myreco.base.routes import Route
+from myreco.base.model import SQLAlchemyRedisModelBase
 from myreco.exceptions import JSONError
 from unittest import mock
 from falcon import HTTPMethodNotAllowed, HTTPNotFound
@@ -167,7 +168,7 @@ class TestFalconSQLAlchemyRedisMiddleware(object):
         req = mock.MagicMock(
             method='POST', uri_template='/test', context=dict())
         resp = mock.MagicMock()
-        resource = mock.MagicMock()
+        resource = SQLAlchemyRedisModelBase
         params = mock.MagicMock()
 
         sqlalchemy_middleware.process_resource(req, resp, resource, params)
@@ -181,7 +182,7 @@ class TestFalconSQLAlchemyRedisMiddleware(object):
         req = mock.MagicMock(
             method='POST', uri_template='/test', context={'session': session})
         resp = mock.MagicMock()
-        resource = mock.MagicMock()
+        resource = SQLAlchemyRedisModelBase
         params = mock.MagicMock()
 
         sqlalchemy_middleware.process_response(req, resp, resource)
@@ -191,7 +192,7 @@ class TestFalconSQLAlchemyRedisMiddleware(object):
         req = mock.MagicMock(
             method='POST', uri_template='/test', context=dict())
         resp = mock.MagicMock()
-        resource = mock.MagicMock()
+        resource = SQLAlchemyRedisModelBase
         params = mock.MagicMock()
 
         sqlalchemy_middleware.process_response(req, resp, resource)

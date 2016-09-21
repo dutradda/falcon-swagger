@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.base.model import model_base_builder, _SQLAlchemyModelMeta
+from myreco.base.model import model_base_builder, SQLAlchemyModelMeta
 from myreco.base.session import Session
 from myreco.exceptions import ModelBaseError
 from unittest import mock
@@ -180,7 +180,7 @@ class TestModelBaseInit(object):
 
         with pytest.raises(ModelBaseError) as error:
             sa.ext.declarative.declarative_base(
-                metaclass=_SQLAlchemyModelMeta, cls=model)
+                metaclass=SQLAlchemyModelMeta, cls=model)
 
         assert error.value.args == (
             "'Base' class must inherit from 'SQLAlchemyRedisModelBase'",)

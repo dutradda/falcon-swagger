@@ -42,7 +42,29 @@ import json
 MODEL_BASE_CLASS_NAME = 'SQLAlchemyRedisModelBase'
 
 
-class _SQLAlchemyModelMeta(DeclarativeMeta):
+class ModelBaseMeta(type):
+
+    def on_post(cls, *args, **kwargs):
+        pass
+
+    def on_put(cls, *args, **kwargs):
+        pass
+
+    def on_patch(cls, *args, **kwargs):
+        pass
+
+    def on_delete(cls, *args, **kwargs):
+        pass
+
+    def on_get(cls, *args, **kwargs):
+        pass
+
+
+class RedisModelMeta(ModelBaseMeta):
+    pass
+
+
+class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
 
     def __init__(cls, name, bases_classes, attributes):
         DeclarativeMeta.__init__(cls, name, bases_classes, attributes)
@@ -396,21 +418,6 @@ class _SQLAlchemyModelMeta(DeclarativeMeta):
     def get_module_filename(cls):
         return import_module(cls.__module__).__file__
 
-    def on_post(cls, *args, **kwargs):
-        pass
-
-    def on_put(cls, *args, **kwargs):
-        pass
-
-    def on_patch(cls, *args, **kwargs):
-        pass
-
-    def on_delete(cls, *args, **kwargs):
-        pass
-
-    def on_get(cls, *args, **kwargs):
-        pass
-
 
 class _SQLAlchemyModel(object):
     api_prefix = '/'
@@ -503,7 +510,7 @@ def model_base_builder(
         raise ModelBaseError("'api_prefix' attribute must ends with a '/'")
 
     return declarative_base(
-        name=MODEL_BASE_CLASS_NAME, metaclass=_SQLAlchemyModelMeta,
+        name=MODEL_BASE_CLASS_NAME, metaclass=SQLAlchemyModelMeta,
         cls=_SQLAlchemyModel, bind=bind, metadata=metadata,
         mapper=mapper, constructor=constructor)
 

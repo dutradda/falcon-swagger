@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.base.model import SQLAlchemyRedisModelBase
+from myreco.base.model import SQLAlchemyRedisModelBase, RedisModelMeta
 from myreco.base.routes import Route
 from myreco.exceptions import ModelBaseError
 from jsonschema import Draft4Validator
@@ -32,18 +32,39 @@ import json
 
 class ItemsTypesModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'items_types'
-    __table_args__ = {'mysql_engine':'innodb'}
+    __table_args__ = {'mysql_engine': 'innodb'}
     _build_routes_from_schemas = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.Integer, unique=True, nullable=False)
-    
-    json_schemas = sa.orm.relationships('JsonSchemasModel', uselist=True, secondary='engines_fallbacks')
+    id_names_json = sa.Column(sa.String(255), default='["id"]')
+
+    json_schemas = sa.orm.relationships(
+        'JsonSchemasModel', uselist=True, secondary='engines_fallbacks')
+
+    def insert(cls, session, objs, commit=True, todict=True):
+        cls._validate_json(objs)
+        type(cls).insert(cls, session, objs, commit, todict)
+
+    def _validate_json(cls, objs_):
+        objs = cls._to_list(objs_)
+        for obj in ojbs:
+            id_names_json = obj.get('id_names_json')
+            if id_names_json:
+                try:
+                    json.loads(id_names_json)
+                except ValueError as error:
+                    raise JSONError(*error.args, input_=objs_)
+
+    def update(cls, session, objs, commit=True, todict=True):
+        cls._validate_json(objs)
+        type(cls).update(cls, session, objs, commit, todict)
+
 
 
 class JsonSchemasModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'json_schemas'
-    __table_args__ = {'mysql_engine':'innodb'}
+    __table_args__ = {'mysql_engine': 'innodb'}
     _build_routes_from_schemas = False
 
     id = sa.Column(sa.Integer, primary_key=True)
@@ -57,7 +78,7 @@ class JsonSchemasModel(SQLAlchemyRedisModelBase):
 
 class JsonSchemasTypesModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'json_schemas_types'
-    __table_args__ = {'mysql_engine':'innodb'}
+    __table_args__ = {'mysql_engine': 'innodb'}
     _build_routes_from_schemas = False
 
     id = sa.Column(sa.Integer, primary_key=True)
@@ -65,10 +86,12 @@ class JsonSchemasTypesModel(SQLAlchemyRedisModelBase):
 
 
 engines_fallbacks = sa.Table("items_types_json_schemas", SQLAlchemyRedisModelBase.metadata,
-    sa.Column("item_type_id", sa.Integer, sa.ForeignKey("items_types.id", ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
-    sa.Column("json_schema_id", sa.Integer, sa.ForeignKey("json_schemas.id", ondelete='CASCADE', onupdate='CASCADE'), primary_key=True)
-    mysql_engine='innodb'
-)
+                             sa.Column("item_type_id", sa.Integer, sa.ForeignKey(
+                                 "items_types.id", ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
+                             sa.Column("json_schema_id", sa.Integer, sa.ForeignKey("json_schemas.id",
+                                        ondelete='CASCADE', onupdate='CASCADE'), primary_key=True)
+                             mysql_engine='innodb'
+                             )
 
 
 class _ItemsActionsMeta(type):
@@ -93,49 +116,56 @@ class ItemsActions(metaclass=_ItemsActionsMeta):
     pass
 
 
-class _ItemsRoutesBuilderMeta(type):
-    def _build_routes(cls, session):
-        routes = set()
+class ItemsModelsBuilder(object):
+
+    def __new__(cls, session):
+        return cls._build_models(session)
+
+    @classmethod
+    def _build_models(cls, session):
+        models = set()
         for item_type in ItemsTypesModel.get(session):
             uri_template = '/items/{}'.format(item_type['name'])
-            schemas = defaultdict(list)
-            for schema in item_type['json_schemas']:
-                method = schema['method']['name']
-                type_ = schema['type']['name']
-                schema_ = schema['schema'] if type_ == 'output' else Draft4Validator(schema['schema'])
-                schemas[method].append(schema_)
+            method_schemas_map = self._build_method_schemas_map(item_type)
+            routes = set()
 
-            for method, schemas in schemas.items():
-                validator = None
-                output_schema = None
-                for schema in schemas:
-                    if isinstance(schema, Draft4Validator):
-                        validator = schema
-                    else:
-                        output_schema = schema
+            for method, schemas in method_schemas_map.items():
+                routes.add(cls._build_route(uri_template, method, schemas))
 
-                action = getattr(ItemsActions, '{}_action',format(method.lower()))
-                route = Route(uri_template, method, action, validator, output_schema)
-                routes.add(route)
+            models.add(cls._build_model(item_type['name'], routes))
 
-        return routes
+        return models
 
-class ItemsRoutesBuilder(metaclass=_ItemsRoutesBuilderMeta):
-    def __new__(cls, session):
-        return cls._build_routes(session)
+    @classmethod
+    def _build_model(cls, item_type, routes):
+        name = item_type['name'].capitalize() + 'Model'
+        attributes = {
+            'key': item_type['name'],
+            'routes': routes,
+            'id_names': tuple(json.loads(item_type['id_names_json']))
+        }
+        return RedisModelMeta(name, (object,), attributes)
 
+    @classmethod
+    def _build_method_schemas_map(cls, item_type):
+        method_schemas_map = defaultdict(list)
+        for schema in item_type['json_schemas']:
+            method = schema['method']['name']
+            type_ = schema['type']['name']
+            schema_ = schema['schema'] if type_ == 'output' else Draft4Validator(schema[
+                                                                                 'schema'])
+            method_schemas_map[method].append(schema_)
+        return schemas
 
-class _ItemsModelMeta(type):
-    def get(cls, item_type_name):
-        instance = cls._instances.get(item_type_name, cls(item_type_name))
+    @classmethod
+    def _build_route(cls, uri_template, method, schemas):
+        validator = None
+        output_schema = None
+        for schema in schemas:
+            if isinstance(schema, Draft4Validator):
+                validator = schema
+            else:
+                output_schema = schema
 
-
-class ItemsModel(metaclass=_ItemsModelMeta):
-    _instances = dict()
-
-    def __init__(self, item_type_name):
-        type_ = ItemsTypesModel.get({'name': item_type_name})
-        if not type_:
-            raise ModelBaseError("Item type with id '{}' was not found".format(type_id))
-
-        self._validator = Draft4Validator(json.loads(type_['schema']))
+        action = getattr(ItemsActions, '{}_action', format(method.lower()))
+        return Route(uri_template, method, action, validator, output_schema)
