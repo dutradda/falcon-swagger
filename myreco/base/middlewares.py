@@ -23,7 +23,8 @@
 
 from myreco.exceptions import JSONError
 from myreco.base.session import Session
-from myreco.base.model import SQLAlchemyModelMeta, RedisModelMeta
+from myreco.base.models.sqlalchemy_redis import SQLAlchemyModelMeta
+from myreco.base.models.redis import RedisModelMeta
 from falcon.errors import HTTPNotFound, HTTPMethodNotAllowed
 import json
 import inspect

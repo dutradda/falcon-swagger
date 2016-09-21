@@ -21,16 +21,19 @@
 # SOFTWARE.
 
 
-import os
-import sys
-import pytest
+class ModelBaseMeta(type):
 
-ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(ROOT_PATH, '..'))
+    def on_post(cls, *args, **kwargs):
+        pass
 
-from myreco.base.models.sqlalchemy_redis import model_base_builder
+    def on_put(cls, *args, **kwargs):
+        pass
 
+    def on_patch(cls, *args, **kwargs):
+        pass
 
-@pytest.fixture
-def model_base():
-    return model_base_builder()
+    def on_delete(cls, *args, **kwargs):
+        pass
+
+    def on_get(cls, *args, **kwargs):
+        pass

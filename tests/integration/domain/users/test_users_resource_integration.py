@@ -22,7 +22,7 @@
 
 
 from myreco.domain.users.models import UsersModel, GrantsModel, URIsModel, MethodsModel
-from myreco.base.model import SQLAlchemyRedisModelBase
+from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.base.http_api import HttpAPI
 from myreco.base.routes import RoutesBuilder
 from unittest import mock

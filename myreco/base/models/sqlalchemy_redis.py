@@ -35,33 +35,12 @@ from importlib import import_module
 
 from myreco.exceptions import ModelBaseError
 from myreco.base.routes import RoutesBuilder
+from myreco.base.models.base import ModelBaseMeta
 
 import json
 
 
 MODEL_BASE_CLASS_NAME = 'SQLAlchemyRedisModelBase'
-
-
-class ModelBaseMeta(type):
-
-    def on_post(cls, *args, **kwargs):
-        pass
-
-    def on_put(cls, *args, **kwargs):
-        pass
-
-    def on_patch(cls, *args, **kwargs):
-        pass
-
-    def on_delete(cls, *args, **kwargs):
-        pass
-
-    def on_get(cls, *args, **kwargs):
-        pass
-
-
-class RedisModelMeta(ModelBaseMeta):
-    pass
 
 
 class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):

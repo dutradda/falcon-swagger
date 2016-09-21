@@ -23,7 +23,7 @@
 
 from myreco.base.middlewares import FalconRoutesMiddleware, FalconSQLAlchemyRedisMiddleware
 from myreco.base.routes import Route
-from myreco.base.model import SQLAlchemyRedisModelBase
+from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.exceptions import JSONError
 from unittest import mock
 from falcon import HTTPMethodNotAllowed, HTTPNotFound

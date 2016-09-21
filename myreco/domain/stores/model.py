@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.base.model import SQLAlchemyRedisModelBase
+from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from base64 import b64decode
 import sqlalchemy as sa
 import re

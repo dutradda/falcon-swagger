@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.base.model import model_base_builder, SQLAlchemyModelMeta
+from myreco.base.models.sqlalchemy_redis import model_base_builder, SQLAlchemyModelMeta
 from myreco.base.session import Session
 from myreco.exceptions import ModelBaseError
 from unittest import mock

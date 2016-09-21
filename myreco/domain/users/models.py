@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.base.model import SQLAlchemyRedisModelBase
+from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.base.hooks import AuthorizationHook, before_action
 from myreco.base.routes import Route
 from myreco.domain.stores.model import StoresModel

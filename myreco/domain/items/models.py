@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.base.model import SQLAlchemyRedisModelBase, RedisModelMeta
+from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase, RedisModelMeta
 from myreco.base.routes import Route
 from myreco.exceptions import ModelBaseError
 from jsonschema import Draft4Validator
@@ -92,80 +92,3 @@ engines_fallbacks = sa.Table("items_types_json_schemas", SQLAlchemyRedisModelBas
                                         ondelete='CASCADE', onupdate='CASCADE'), primary_key=True)
                              mysql_engine='innodb'
                              )
-
-
-class _ItemsActionsMeta(type):
-
-    def post_action(cls, req, resp, **kwargs):
-        pass
-
-    def put_action(cls, req, resp, **kwargs):
-        pass
-
-    def patch_action(cls, req, resp, **kwargs):
-        pass
-
-    def delete_action(cls, req, resp, **kwargs):
-        pass
-
-    def get_action(cls, req, resp, **kwargs):
-        pass
-
-
-class ItemsActions(metaclass=_ItemsActionsMeta):
-    pass
-
-
-class ItemsModelsBuilder(object):
-
-    def __new__(cls, session):
-        return cls._build_models(session)
-
-    @classmethod
-    def _build_models(cls, session):
-        models = set()
-        for item_type in ItemsTypesModel.get(session):
-            uri_template = '/items/{}'.format(item_type['name'])
-            method_schemas_map = self._build_method_schemas_map(item_type)
-            routes = set()
-
-            for method, schemas in method_schemas_map.items():
-                routes.add(cls._build_route(uri_template, method, schemas))
-
-            models.add(cls._build_model(item_type['name'], routes))
-
-        return models
-
-    @classmethod
-    def _build_model(cls, item_type, routes):
-        name = item_type['name'].capitalize() + 'Model'
-        attributes = {
-            'key': item_type['name'],
-            'routes': routes,
-            'id_names': tuple(json.loads(item_type['id_names_json']))
-        }
-        return RedisModelMeta(name, (object,), attributes)
-
-    @classmethod
-    def _build_method_schemas_map(cls, item_type):
-        method_schemas_map = defaultdict(list)
-        for schema in item_type['json_schemas']:
-            method = schema['method']['name']
-            type_ = schema['type']['name']
-            schema_ = schema['schema'] if type_ == 'output' else Draft4Validator(schema[
-                                                                                 'schema'])
-            method_schemas_map[method].append(schema_)
-        return schemas
-
-    @classmethod
-    def _build_route(cls, uri_template, method, schemas):
-        validator = None
-        output_schema = None
-        for schema in schemas:
-            if isinstance(schema, Draft4Validator):
-                validator = schema
-            else:
-                output_schema = schema
-
-        action = getattr(ItemsActions, '{}_action', format(method.lower()))
-        return Route(uri_template, method, action, validator, output_schema)
