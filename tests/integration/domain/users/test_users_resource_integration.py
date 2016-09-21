@@ -22,9 +22,8 @@
 
 
 from myreco.domain.users.models import UsersModel, GrantsModel, URIsModel, MethodsModel
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
+from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase, SQLAlchemyRedisModelRoutesBuilderBase
 from myreco.base.http_api import HttpAPI
-from myreco.base.routes import SQLAlchemyRedisModelRoutesBuilder
 from unittest import mock
 from base64 import b64encode
 from pytest_falcon.plugin import Client
@@ -209,7 +208,7 @@ class TestUsersResourcePost(object):
         assert resp.status_code == 400
         result = json.loads(resp.body)
         message = result['error'].pop('message')
-        expected_schema = os.path.join(SQLAlchemyRedisModelRoutesBuilder.get_schemas_path(UsersModel), 'grants.json')
+        expected_schema = os.path.join(UsersModel.get_schemas_path(), 'grants.json')
         expected_schema = json.load(open(expected_schema))
 
         assert message == \

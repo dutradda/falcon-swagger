@@ -189,11 +189,7 @@ class TestModelBaseInit(object):
         with pytest.raises(ModelBaseError) as error:
             model_base = model_base_builder(api_prefix='/test')
         assert error.value.args == (
-            "'api_prefix' attribute must ends with a '/'",)
-
-
-def test_model_base_get_module_filename(model1):
-    assert model1.get_module_filename() == __file__
+            "'api_prefix' must starts and ends with a '/'",)
 
 
 class TestModelBaseTodict(object):

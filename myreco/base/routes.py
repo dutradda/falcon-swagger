@@ -97,107 +97,24 @@ class Route(object):
         resp.body = [build_link(schema_uri) for schema_uri in self._schemas_sinks]
 
 
-class URISchemaHandler(object):
+class RoutesBuilderBase(object):
 
-    def __init__(self, schemas_path):
-        self._schemas_path = schemas_path
+    def __new__(cls, model, build_from_schemas=True, build_generic=False, auth_hook=None):
+        routes = set()
 
-    def __call__(self, uri):
-        schema_filename = os.path.join(
-            self._schemas_path, uri.replace('schema:', ''))
-        with open(schema_filename) as json_schema_file:
-            return json.load(json_schema_file)
+        if build_from_schemas:
+            routes.update(cls._build_default_routes(model, auth_hook))
 
+        if build_generic:
+            routes.update(cls._build_generic_routes(model))
 
-class _SQLAlchemyRedisModelRoutesBuilderMeta(type):
+        return routes
 
-    def _build_routes_from_schemas(cls, model, auth_hook):
-        schemas_path = cls.get_schemas_path(model)
-        schemas_glob = os.path.join(schemas_path, '*.json')
-        schema_regex = r'(([\w\d_-]+)_)?(([\w\d%_-]+)_)?(post|put|patch|delete|get)_(input|output)(_auth)?.json'
-        routes = dict()
-
-        for json_schema_filename in glob(schemas_glob):
-            json_schema_basename = os.path.basename(json_schema_filename)
-            match = re_match(schema_regex, json_schema_basename)
-            if match:
-                route = cls._set_route(routes, model, match,
-                                       json_schema_filename,
-                                       auth_hook)
-
-        return set(routes.values())
-
-    def get_schemas_path(cls, model):
-        module_filename = model.get_module_filename()
-        module_path = os.path.dirname(os.path.abspath(module_filename))
-        return os.path.join(module_path, 'schemas')
-
-    def _set_route(cls, routes, model, match, json_schema_filename, auth_hook):
-        model_name = match.groups()[1]
-        uri_template = cls._build_uri(model, match.groups()[3])
-        method = match.groups()[4].upper()
-        type_ = match.groups()[5]
-        auth = match.groups()[6]
-        hooks = {auth_hook} if auth and auth_hook else None
-        output_schema = None
-        validator = None
-
-        if model_name and model_name != model.tablename:
-            return
-
-        with open(json_schema_filename) as json_schema_file:
-            schema = json.load(json_schema_file)
-
-        if type_ == 'input':
-            validator = cls._build_validator(schema, model)
-        else:
-            output_schema = schema
-
-        if (uri_template, method) in routes:
-            if output_schema is not None:
-                routes[(uri_template, method)].output_schema = output_schema
-            if validator is not None:
-                routes[(uri_template, method)].validator = validator
-            return
-
-        action = cls._get_action(uri_template, method)
-        routes[(uri_template, method)] = Route(uri_template, method, action, validator=validator,
-                                               output_schema=output_schema, hooks=hooks)
-
-    def _build_uri(cls, model, uri_template_sufix):
-        base_uri_template = model.api_prefix + model.tablename
-        uri_template_sufix_regex = r'%([\d\w_-]+)%'
-
-        if uri_template_sufix is not None:
-            uri_template_sufix = re_sub(
-                uri_template_sufix_regex, r'{\1}', uri_template_sufix)
-            uri_template_sufix = uri_template_sufix.replace('__', '/')
-
-            return '/'.join((base_uri_template, uri_template_sufix))
-
-        return base_uri_template
-
-    def _build_validator(cls, schema, model):
-        handlers = {'schema': URISchemaHandler(cls.get_schemas_path(model))}
-        resolver = RefResolver.from_schema(schema, handlers=handlers)
-        Draft4Validator.check_schema(schema)
-        return Draft4Validator(schema, resolver=resolver)
-
-    def _get_action(cls, uri_template, method):
-        uri_name = 'base'
-        try:
-            uri_template.format()
-        except KeyError:
-            uri_name = 'ids'
-
-        action_class_name = 'Default{}Actions'.format(method.capitalize())
-        action_class = getattr(ROUTES_MODULE, action_class_name)
-        return getattr(action_class, '{}_action'.format(uri_name))
-
+    @classmethod
     def _build_generic_routes(cls, model):
-        uri = uri_single = model.api_prefix + model.tablename
+        uri = uri_single = model.__api_prefix__ + model.__name__
 
-        for id_name in model.primaries_keys:
+        for id_name in model.__ids_names__:
             uri_single += '/{' + id_name + '}'
 
         routes = set()
@@ -212,16 +129,14 @@ class _SQLAlchemyRedisModelRoutesBuilderMeta(type):
 
         return routes
 
+    @classmethod
+    def _get_action(cls, uri_template, method):
+        uri_name = 'base'
+        try:
+            uri_template.format()
+        except KeyError:
+            uri_name = 'ids'
 
-class SQLAlchemyRedisModelRoutesBuilder(metaclass=_SQLAlchemyRedisModelRoutesBuilderMeta):
-
-    def __new__(cls, model, build_from_schemas=True, build_generic=False, auth_hook=None):
-        routes = set()
-
-        if build_from_schemas:
-            routes.update(cls._build_routes_from_schemas(model, auth_hook))
-
-        if build_generic:
-            routes.update(cls._build_generic_routes(model))
-
-        return routes
+        action_class_name = 'Default{}Actions'.format(method.capitalize())
+        action_class = getattr(ROUTES_MODULE, action_class_name)
+        return getattr(action_class, '{}_action'.format(uri_name))

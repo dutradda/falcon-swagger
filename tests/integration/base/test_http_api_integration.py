@@ -46,8 +46,8 @@ def model1_with_schema(session, model_base):
         m2_id = sa.Column(sa.ForeignKey('model2.id'))
         model2_ = sa.orm.relationship('model2')
 
-        routes = {Route('/model1/', 'POST', lambda x, y: None,
-                        Draft4Validator({'type': 'object'}))}
+        __routes__ = {Route('/model1/', 'POST', lambda x, y: None,
+                      Draft4Validator({'type': 'object'}))}
 
     return model1
 

@@ -35,7 +35,7 @@ class HttpAPI(API):
     def __init__(self, sqlalchemy_bind, models, redis_bind=None):
         routes = set()
         for model in models:
-            for route in model.routes:
+            for route in model.__routes__:
                 routes.add(route)
 
         sqlalchemy_redis_mid = FalconSQLAlchemyRedisMiddleware(

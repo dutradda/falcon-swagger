@@ -164,7 +164,7 @@ class UsersModel(SQLAlchemyRedisModelBase):
             inst.id = '{}:{}'.format(inst.email, inst.password)
 
 
-for route in UsersModel.routes:
+for route in UsersModel.__routes__:
     route.action = before_action(AuthorizationHook(UsersModel.authorize, AUTH_REALM))(route.action)
 
 

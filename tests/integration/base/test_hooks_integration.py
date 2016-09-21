@@ -48,7 +48,7 @@ def model(model_base):
         _build_routes_from_schema = False
         id = sa.Column(sa.Integer, primary_key=True)
 
-        routes = {Route('/', 'GET', action, hooks=[before_action(AuthorizationHook(auth_func, 'test'))])}
+        __routes__ = {Route('/', 'GET', action, hooks=[before_action(AuthorizationHook(auth_func, 'test'))])}
 
     return model
 

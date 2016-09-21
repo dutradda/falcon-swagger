@@ -29,18 +29,108 @@ from sqlalchemy.orm.properties import RelationshipProperty, ColumnProperty
 from sqlalchemy.orm.attributes import InstrumentedAttribute
 from sqlalchemy.orm.collections import InstrumentedList
 from sqlalchemy import or_, and_
+from jsonschema import RefResolver, Draft4Validator
 from copy import deepcopy
 from collections import OrderedDict
 from importlib import import_module
+from re import match as re_match, sub as re_sub
+from glob import glob
 
 from myreco.exceptions import ModelBaseError
-from myreco.base.routes import SQLAlchemyRedisModelRoutesBuilder
+from myreco.base.routes import RoutesBuilderBase, Route
 from myreco.base.models.base import ModelBaseMeta
 
 import json
+import os.path
 
 
 MODEL_BASE_CLASS_NAME = 'SQLAlchemyRedisModelBase'
+
+
+class URISchemaHandler(object):
+
+    def __init__(self, schemas_path):
+        self._schemas_path = schemas_path
+
+    def __call__(self, uri):
+        schema_filename = os.path.join(
+            self._schemas_path, uri.replace('schema:', ''))
+        with open(schema_filename) as json_schema_file:
+            return json.load(json_schema_file)
+
+
+class SQLAlchemyRedisModelRoutesBuilderBase(RoutesBuilderBase):
+
+    @classmethod
+    def _build_default_routes(cls, model, auth_hook):
+        schemas_path = model.get_schemas_path()
+        schemas_glob = os.path.join(schemas_path, '*.json')
+        schema_regex = r'(([\w\d_-]+)_)?(([\w\d%_-]+)_)?(post|put|patch|delete|get)_(input|output)(_auth)?.json'
+        routes = dict()
+
+        for json_schema_filename in glob(schemas_glob):
+            json_schema_basename = os.path.basename(json_schema_filename)
+            match = re_match(schema_regex, json_schema_basename)
+            if match:
+                route = cls._set_route(routes, model, match,
+                                       json_schema_filename,
+                                       auth_hook)
+
+        return set(routes.values())
+
+    @classmethod
+    def _set_route(cls, routes, model, match, json_schema_filename, auth_hook):
+        model_name = match.groups()[1]
+        uri_template = cls._build_uri(model, match.groups()[3])
+        method = match.groups()[4].upper()
+        type_ = match.groups()[5]
+        auth = match.groups()[6]
+        hooks = {auth_hook} if auth and auth_hook else None
+        output_schema = None
+        validator = None
+
+        if model_name and model_name != model.tablename:
+            return
+
+        with open(json_schema_filename) as json_schema_file:
+            schema = json.load(json_schema_file)
+
+        if type_ == 'input':
+            validator = cls._build_validator(schema, model)
+        else:
+            output_schema = schema
+
+        if (uri_template, method) in routes:
+            if output_schema is not None:
+                routes[(uri_template, method)].output_schema = output_schema
+            if validator is not None:
+                routes[(uri_template, method)].validator = validator
+            return
+
+        action = cls._get_action(uri_template, method)
+        routes[(uri_template, method)] = Route(uri_template, method, action, validator=validator,
+                                               output_schema=output_schema, hooks=hooks)
+
+    @classmethod
+    def _build_uri(cls, model, uri_template_sufix):
+        base_uri_template = model.__api_prefix__ + model.tablename
+        uri_template_sufix_regex = r'%([\d\w_-]+)%'
+
+        if uri_template_sufix is not None:
+            uri_template_sufix = re_sub(
+                uri_template_sufix_regex, r'{\1}', uri_template_sufix)
+            uri_template_sufix = uri_template_sufix.replace('__', '/')
+
+            return '/'.join((base_uri_template, uri_template_sufix))
+
+        return base_uri_template
+
+    @classmethod
+    def _build_validator(cls, schema, model):
+        handlers = {'schema': URISchemaHandler(model.get_schemas_path())}
+        resolver = RefResolver.from_schema(schema, handlers=handlers)
+        Draft4Validator.check_schema(schema)
+        return Draft4Validator(schema, resolver=resolver)
 
 
 class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
@@ -65,7 +155,7 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
             cls.backrefs = set()
             cls.relationships = set()
             cls.columns = set(cls.__table__.c)
-            cls.tablename = str(cls.__table__.name)
+            cls.tablename = cls.__name__ = str(cls.__table__.name)
             cls.todict_schema = {}
             cls.valid_attributes = set()
             base_class.all_models.add(cls)
@@ -73,13 +163,13 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
             cls._build_backrefs_for_all_models(base_class.all_models)
 
             cls.auth_hook = getattr(cls, 'auth_hook', None)
-            cls.routes = getattr(cls, 'routes', set())
+            cls.__routes__ = getattr(cls, '__routes__', set())
             build_routes_from_schemas = getattr(
                 cls, '_build_routes_from_schemas', True)
             build_generic_routes = getattr(cls, '_build_generic_routes', False)
-            routes = SQLAlchemyRedisModelRoutesBuilder(
+            routes = SQLAlchemyRedisModelRoutesBuilderBase(
                 cls, build_routes_from_schemas, build_generic_routes, cls.auth_hook)
-            cls.routes.update(routes)
+            cls.__routes__.update(routes)
         else:
             cls.all_models = set()
 
@@ -91,7 +181,7 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
             if primary_key:
                 primaries_keys[attr_name] = primary_key
 
-        cls.primaries_keys = OrderedDict(sorted(primaries_keys.items()))
+        cls.primaries_keys = cls.__ids_names__ = OrderedDict(sorted(primaries_keys.items()))
 
     def _get_primary_key(cls, attr_name):
         attr = getattr(cls, attr_name)
@@ -394,12 +484,14 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
 
         return objs
 
-    def get_module_filename(cls):
-        return import_module(cls.__module__).__file__
+    def get_schemas_path(cls):
+        module_filename = import_module(cls.__module__).__file__
+        module_path = os.path.dirname(os.path.abspath(module_filename))
+        return os.path.join(module_path, 'schemas')
 
 
 class _SQLAlchemyModel(object):
-    api_prefix = '/'
+    __api_prefix__ = '/'
 
     def get_ids_values(self):
         pk_names = sorted(type(self).primaries_keys.keys())
@@ -481,12 +573,10 @@ def model_base_builder(
         constructor=_declarative_constructor,
         class_registry=None, api_prefix=None):
     if api_prefix is not None:
-        old_prefix = _SQLAlchemyModel.api_prefix
-        _SQLAlchemyModel.api_prefix = api_prefix
+        if not api_prefix.startswith('/') or not api_prefix.endswith('/'):
+            raise ModelBaseError("'api_prefix' must starts and ends with a '/'")
 
-    if not _SQLAlchemyModel.api_prefix.endswith('/'):
-        _SQLAlchemyModel.api_prefix = old_prefix
-        raise ModelBaseError("'api_prefix' attribute must ends with a '/'")
+        _SQLAlchemyModel.__api_prefix__ = api_prefix
 
     return declarative_base(
         name=MODEL_BASE_CLASS_NAME, metaclass=SQLAlchemyModelMeta,

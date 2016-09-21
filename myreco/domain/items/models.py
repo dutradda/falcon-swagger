@@ -39,8 +39,7 @@ class ItemsTypesModel(SQLAlchemyRedisModelBase):
     name = sa.Column(sa.Integer, unique=True, nullable=False)
     id_names_json = sa.Column(sa.String(255), default='["id"]')
 
-    json_schemas = sa.orm.relationships(
-        'JsonSchemasModel', uselist=True, secondary='engines_fallbacks')
+    routes = sa.orm.relationships('RoutesModel', uselist=True)
 
     def insert(cls, session, objs, commit=True, todict=True):
         cls._validate_json(objs)
@@ -61,34 +60,15 @@ class ItemsTypesModel(SQLAlchemyRedisModelBase):
         type(cls).update(cls, session, objs, commit, todict)
 
 
-
-class JsonSchemasModel(SQLAlchemyRedisModelBase):
+class RoutesModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'json_schemas'
     __table_args__ = {'mysql_engine': 'innodb'}
     _build_routes_from_schemas = False
 
-    id = sa.Column(sa.Integer, primary_key=True)
-    method_id = sa.Column(sa.ForeignKey('methods.id'), nullable=False)
-    type_id = sa.Column(sa.ForeignKey('json_schemas_types.id'), nullable=False)
-    schema = sa.Column(sa.Text, nullable=False)
+    item_type_id = sa.Column(sa.ForeignKey('items_types.id'), primary_key=True)
+    method_id = sa.Column(sa.ForeignKey('methods.id'), primary_key=True)
+    uri_template = sa.Column(sa.String(255), nullable=False)
+    output_schema = sa.Column(sa.Text)
+    input_schema = sa.Column(sa.Text)
 
     method = sa.orm.relationship('MethodsModel')
-    type = sa.orm.relationship('JsonSchemasTypesModel')
-
-
-class JsonSchemasTypesModel(SQLAlchemyRedisModelBase):
-    __tablename__ = 'json_schemas_types'
-    __table_args__ = {'mysql_engine': 'innodb'}
-    _build_routes_from_schemas = False
-
-    id = sa.Column(sa.Integer, primary_key=True)
-    name = sa.Column(sa.String(255), nullable=False)
-
-
-engines_fallbacks = sa.Table("items_types_json_schemas", SQLAlchemyRedisModelBase.metadata,
-                             sa.Column("item_type_id", sa.Integer, sa.ForeignKey(
-                                 "items_types.id", ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
-                             sa.Column("json_schema_id", sa.Integer, sa.ForeignKey("json_schemas.id",
-                                        ondelete='CASCADE', onupdate='CASCADE'), primary_key=True)
-                             mysql_engine='innodb'
-                             )

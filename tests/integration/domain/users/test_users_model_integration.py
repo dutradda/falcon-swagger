@@ -47,8 +47,8 @@ class model(SQLAlchemyRedisModelBase):
         pass
 
 action = before_action(AuthorizationHook(UsersModel.authorize, 'test'))(model.action)
-model.routes = {Route('/test', 'POST', action)}
-model.routes.add(Route('/test/{id}', 'POST', action))
+model.__routes__ = {Route('/test', 'POST', action)}
+model.__routes__.add(Route('/test/{id}', 'POST', action))
 
 
 @pytest.fixture
