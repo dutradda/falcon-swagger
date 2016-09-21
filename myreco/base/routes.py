@@ -109,7 +109,7 @@ class URISchemaHandler(object):
             return json.load(json_schema_file)
 
 
-class _RoutesBuilderMeta(type):
+class _SQLAlchemyRedisModelRoutesBuilderMeta(type):
 
     def _build_routes_from_schemas(cls, model, auth_hook):
         schemas_path = cls.get_schemas_path(model)
@@ -209,7 +209,7 @@ class _RoutesBuilderMeta(type):
         return routes
 
 
-class RoutesBuilder(metaclass=_RoutesBuilderMeta):
+class SQLAlchemyRedisModelRoutesBuilder(metaclass=_SQLAlchemyRedisModelRoutesBuilderMeta):
 
     def __new__(cls, model, build_from_schemas=True, build_generic=False, auth_hook=None):
         routes = set()

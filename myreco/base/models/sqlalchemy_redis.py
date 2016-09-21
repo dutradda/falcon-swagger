@@ -34,7 +34,7 @@ from collections import OrderedDict
 from importlib import import_module
 
 from myreco.exceptions import ModelBaseError
-from myreco.base.routes import RoutesBuilder
+from myreco.base.routes import SQLAlchemyRedisModelRoutesBuilder
 from myreco.base.models.base import ModelBaseMeta
 
 import json
@@ -77,7 +77,7 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
             build_routes_from_schemas = getattr(
                 cls, '_build_routes_from_schemas', True)
             build_generic_routes = getattr(cls, '_build_generic_routes', False)
-            routes = RoutesBuilder(
+            routes = SQLAlchemyRedisModelRoutesBuilder(
                 cls, build_routes_from_schemas, build_generic_routes, cls.auth_hook)
             cls.routes.update(routes)
         else:

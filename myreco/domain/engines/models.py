@@ -65,8 +65,18 @@ class EnginesVariablesModel(SQLAlchemyRedisModelBase):
     override_value = sa.Column(sa.String(255))
     override = sa.Column(sa.Boolean, default=False)
     is_filter = sa.Column(sa.Boolean, default=False)
+    score = sa.Column(sa.Float, default=False)
 
     variable = sa.orm.relationship('VariablesModel')
+
+
+class VariablesModel(SQLAlchemyRedisModelBase):
+    __tablename__ = 'slots'
+    __table_args__ = {'mysql_engine':'innodb'}
+    _build_routes_from_schemas = False
+
+    id = sa.Column(sa.Integer, primary_key=True)
+    name = sa.Column(sa.Integer, unique=True, nullable=False)
 
 
 engines_fallbacks = sa.Table("engines_fallbacks", SQLAlchemyRedisModelBase.metadata,
