@@ -114,7 +114,7 @@ class _SQLAlchemyRedisModelRoutesBuilderMeta(type):
     def _build_routes_from_schemas(cls, model, auth_hook):
         schemas_path = cls.get_schemas_path(model)
         schemas_glob = os.path.join(schemas_path, '*.json')
-        schema_regex = r'(([\w\d%_-]+)_)?(post|put|patch|delete|get)_(input|output)(_auth)?.json'
+        schema_regex = r'(([\w\d_-]+)_)?(([\w\d%_-]+)_)?(post|put|patch|delete|get)_(input|output)(_auth)?.json'
         routes = dict()
 
         for json_schema_filename in glob(schemas_glob):
@@ -133,13 +133,17 @@ class _SQLAlchemyRedisModelRoutesBuilderMeta(type):
         return os.path.join(module_path, 'schemas')
 
     def _set_route(cls, routes, model, match, json_schema_filename, auth_hook):
-        uri_template = cls._build_uri(model, match.groups()[1])
-        method = match.groups()[2].upper()
-        type_ = match.groups()[3]
-        auth = match.groups()[4]
+        model_name = match.groups()[1]
+        uri_template = cls._build_uri(model, match.groups()[3])
+        method = match.groups()[4].upper()
+        type_ = match.groups()[5]
+        auth = match.groups()[6]
         hooks = {auth_hook} if auth and auth_hook else None
         output_schema = None
         validator = None
+
+        if model_name and model_name != model.tablename:
+            return
 
         with open(json_schema_filename) as json_schema_file:
             schema = json.load(json_schema_file)
