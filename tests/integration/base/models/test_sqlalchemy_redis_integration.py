@@ -21,12 +21,13 @@
 # SOFTWARE.
 
 
-from myreco.base.models.sqlalchemy_redis import model_base_builder
+from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBuilder
 from myreco.base.session import Session
 from myreco.exceptions import ModelBaseError
 from unittest import mock
 
 import pytest
+import msgpack
 import sqlalchemy as sa
 
 
@@ -866,8 +867,8 @@ class TestModelBaseGet(object):
             self, model1, session, redis):
         session.add(model1(id=1))
         session.commit()
-        redis.hmget.return_value = [None, '{"id": 2}']
-        assert model1.get(session, [{'id': 1}, {'id': 2}]) == [{'id': 2}, {'id': 1}]
+        redis.hmget.return_value = [None, msgpack.dumps({'id': 2})]
+        assert model1.get(session, [{'id': 1}, {'id': 2}]) == [{'id': 1}, {'id': 2}]
 
     def test_with_missing_id(self, model1, session, redis):
         session.add(model1(id=1))

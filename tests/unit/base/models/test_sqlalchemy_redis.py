@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.base.models.sqlalchemy_redis import model_base_builder, SQLAlchemyModelMeta
+from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBuilder, SQLAlchemyModelMeta
 from myreco.base.session import Session
 from myreco.exceptions import ModelBaseError
 from unittest import mock
@@ -32,7 +32,7 @@ import sqlalchemy as sa
 
 @pytest.fixture
 def model_base():
-    return model_base_builder()
+    return SQLAlchemyRedisModelBuilder()
 
 
 @pytest.fixture
@@ -184,12 +184,6 @@ class TestModelBaseInit(object):
 
         assert error.value.args == (
             "'Base' class must inherit from 'SQLAlchemyRedisModelBase'",)
-
-    def test_raises_model_error_with_invalid_api_prefix(self):
-        with pytest.raises(ModelBaseError) as error:
-            model_base = model_base_builder(api_prefix='/test')
-        assert error.value.args == (
-            "'api_prefix' must starts and ends with a '/'",)
 
 
 class TestModelBaseTodict(object):

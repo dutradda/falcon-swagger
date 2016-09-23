@@ -26,7 +26,7 @@ from sqlalchemy.orm.query import Query
 from sqlalchemy import event, or_
 from collections import defaultdict
 
-import json
+import msgpack
 
 class _SessionBase(SessionSA):
     def __init__(
@@ -66,8 +66,8 @@ class _SessionBase(SessionSA):
         models_keys_insts_keys_map = defaultdict(set)
 
         for inst in self._insts_to_hdel:
-            model_redis_key = self.build_model_redis_key(type(inst))
-            inst_redis_key = self.build_inst_redis_key(inst)
+            model_redis_key = type(inst).__key__
+            inst_redis_key = inst.get_key()
             models_keys_insts_keys_map[model_redis_key].add(inst_redis_key)
 
         for model_key, insts_keys in models_keys_insts_keys_map.items():
@@ -78,25 +78,19 @@ class _SessionBase(SessionSA):
         models_keys_insts_keys_map = defaultdict(set)
 
         for inst in insts:
-            model_redis_key = self.build_model_redis_key(type(inst))
-            inst_redis_key = self.build_inst_redis_key(inst)
+            model_redis_key = type(inst).__key__
+            inst_redis_key = inst.get_key()
             inst_old_redis_key = getattr(inst, 'old_redis_key', None)
             if inst_old_redis_key is not None and inst_old_redis_key != inst_redis_key:
                 models_keys_insts_keys_map[model_redis_key].add(inst_old_redis_key)
 
-            models_keys_insts_keys_insts_map[model_redis_key][inst_redis_key] = inst.todict()
+            models_keys_insts_keys_insts_map[model_redis_key][inst_redis_key] = msgpack.dumps(inst.todict())
 
         for model_key, insts_keys_insts_map in models_keys_insts_keys_insts_map.items():
             self.redis_bind.hmset(model_key, insts_keys_insts_map)
 
         for model_key, insts_keys in models_keys_insts_keys_map.items():
             self.redis_bind.hdel(model_key, *insts_keys)
-
-    def build_inst_redis_key(self, inst):
-        return str(tuple(sorted(inst.get_ids_map().values())))
-
-    def build_model_redis_key(self, model):
-        return model.tablename
 
     def _update_back_references_on_redis(self):
         references = set.union(self._insts_to_hdel, self._insts_to_hmset)
@@ -126,3 +120,8 @@ def deleted_from_database(session, instance):
 def added_to_database(session, instance):
     if session.redis_bind is not None and instance is not None:
         session.mark_for_hmset(instance)
+
+
+class RedisSession(object):
+    def __init__(bind=None):
+        self.bind = bind

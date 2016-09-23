@@ -21,7 +21,29 @@
 # SOFTWARE.
 
 
+from myreco.exceptions import ModelBaseError
+
+
 class ModelBaseMeta(type):
+
+    def __init__(cls, name, bases, attributes):
+        auth_hook = attributes.get('__auth_hook__', None)
+        build_default_routes = attributes.get('__build_default_routes__', True)
+        build_generic_routes = attributes.get('__build_generic_routes__', False)
+
+        routes = attributes.get('__routes__', set())
+        if hasattr(cls, '__routes_builder__'):
+            routes = cls.__routes_builder__(cls, build_default_routes, build_generic_routes, routes, auth_hook)
+            cls.__routes__ = routes
+
+    def _to_list(cls, objs):
+        return objs if isinstance(objs, list) else [objs]
+
+    def _raises_ids_limit_offset_error(cls, ids, limit, offset):
+        if (ids is not None) and (limit is not None or offset is not None):
+            raise ModelBaseError(
+                "'get' method can't be called with 'ids' and with 'offset' or 'limit'",
+                {'ids': ids, 'limit': limit, 'offset': offset})
 
     def on_post(cls, *args, **kwargs):
         pass
@@ -37,3 +59,17 @@ class ModelBaseMeta(type):
 
     def on_get(cls, *args, **kwargs):
         pass
+
+
+class ModelBase(object):
+    __api_prefix__ = '/'
+
+    def get_key(self):
+        return str(self.get_ids_values())
+
+
+class ModelBuilderBaseMeta(type):
+
+    def _set_api_prefix(cls, api_prefix):
+        if api_prefix is not None:
+            ModelBase.__api_prefix__ =  '/' + api_prefix.strip('/') + '/'

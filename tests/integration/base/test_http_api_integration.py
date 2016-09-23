@@ -21,7 +21,7 @@ def model1(model_base):
         id = sa.Column(sa.Integer, primary_key=True)
         m2_id = sa.Column(sa.ForeignKey('model2.id'))
         model2_ = sa.orm.relationship('model2')
-        _build_generic_routes = True
+        __build_generic_routes__ = True
 
     return model1
 

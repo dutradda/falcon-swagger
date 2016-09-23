@@ -2,3 +2,4 @@ SQLAlchemy==1.1.0b3
 Cython==0.24.1
 https://github.com/dutradda/falcon/tarball/master
 jsonschema==2.5.1
+msgpack-python==0.4.8

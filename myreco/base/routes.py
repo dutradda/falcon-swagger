@@ -99,16 +99,16 @@ class Route(object):
 
 class RoutesBuilderBase(object):
 
-    def __new__(cls, model, build_from_schemas=True, build_generic=False, auth_hook=None):
-        routes = set()
+    def __new__(cls, model, build_default=True, build_generic=False, routes=None, auth_hook=None):
+        new_routes = set()
 
-        if build_from_schemas:
-            routes.update(cls._build_default_routes(model, auth_hook))
+        if build_default:
+            new_routes.update(cls._build_default_routes(model, routes, auth_hook))
 
         if build_generic:
-            routes.update(cls._build_generic_routes(model))
+            new_routes.update(cls._build_generic_routes(model))
 
-        return routes
+        return new_routes
 
     @classmethod
     def _build_generic_routes(cls, model):

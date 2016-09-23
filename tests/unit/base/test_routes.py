@@ -24,7 +24,7 @@
 from myreco.base.routes import Route
 from myreco.base.actions import (DefaultPostActions, DefaultPutActions,
     DefaultPatchActions, DefaultDeleteActions, DefaultGetActions)
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelRoutesBuilderBase
+from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelRoutesBuilder
 from jsonschema import ValidationError
 from unittest import mock
 from io import StringIO
@@ -88,17 +88,17 @@ def _get_sorted_key_from_route(route):
     return (route.action.__self__.__class__.__name__, route.action.__name__)
 
 
-class TestSQLAlchemyRedisModelRoutesBuilderBaseWithDefaultArguments(object):
+class TestSQLAlchemyRedisModelRoutesBuilderWithDefaultArguments(object):
 
     def test_without_schemas_dir(self, model):
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(model)
+        routes = SQLAlchemyRedisModelRoutesBuilder(model)
         assert routes == set()
 
     def test_with_schemas_dir_without_matched_files(self, model):
         routes = None
         with mock.patch('myreco.base.models.sqlalchemy_redis.glob') as glob:
             glob.return_value = ['test', 'test2']
-            routes = SQLAlchemyRedisModelRoutesBuilderBase(model)
+            routes = SQLAlchemyRedisModelRoutesBuilder(model)
         assert routes == set()
 
     @mock.patch('myreco.base.models.sqlalchemy_redis.glob')
@@ -107,7 +107,7 @@ class TestSQLAlchemyRedisModelRoutesBuilderBaseWithDefaultArguments(object):
         routes = None
         glob.return_value = ['post_input.json']
         open_.return_value = StringIO('{"type": "object"}')
-        routes = list(SQLAlchemyRedisModelRoutesBuilderBase(model))
+        routes = list(SQLAlchemyRedisModelRoutesBuilder(model))
 
         assert routes[0].uri_template == '/model'
         assert routes[0].method == 'POST'
@@ -121,7 +121,7 @@ class TestSQLAlchemyRedisModelRoutesBuilderBaseWithDefaultArguments(object):
         glob.return_value = ['post_input.json', 'post_output.json']
         open_.side_effect = [
             StringIO('{"type": "object"}'), StringIO('{"type": "string"}')]
-        routes = list(SQLAlchemyRedisModelRoutesBuilderBase(model))
+        routes = list(SQLAlchemyRedisModelRoutesBuilder(model))
 
         assert routes[0].uri_template == '/model'
         assert routes[0].method == 'POST'
@@ -135,7 +135,7 @@ class TestSQLAlchemyRedisModelRoutesBuilderBaseWithDefaultArguments(object):
         routes = None
         glob.return_value = ['%test%__%test2%_post_input.json']
         open_.return_value = StringIO('{"test": "test"}')
-        routes = list(SQLAlchemyRedisModelRoutesBuilderBase(model))
+        routes = list(SQLAlchemyRedisModelRoutesBuilder(model))
 
         assert routes[0].uri_template == '/model/{test}/{test2}'
         assert routes[0].method == 'POST'
@@ -151,7 +151,7 @@ class TestSQLAlchemyRedisModelRoutesBuilderBaseWithDefaultArguments(object):
             '%test%__%test2%_post_input.json', '%test%_%test2%_put_input.json']
         open_.side_effect = [
             StringIO('{"test": "test"}'), StringIO('{"test": "test"}')]
-        routes = list(SQLAlchemyRedisModelRoutesBuilderBase(model))
+        routes = list(SQLAlchemyRedisModelRoutesBuilder(model))
         routes = sorted(routes, key=_get_sorted_key_from_route)
 
         assert routes[0].uri_template == '/model/{test}/{test2}'
@@ -165,11 +165,11 @@ class TestSQLAlchemyRedisModelRoutesBuilderBaseWithDefaultArguments(object):
         assert routes[1].validator.schema == {'test': 'test'}
 
 
-class TestSQLAlchemyRedisModelRoutesBuilderBaseJustWithGenericRoutes(object):
+class TestSQLAlchemyRedisModelRoutesBuilderJustWithGenericRoutes(object):
 
     def test_with_one_id(self, model):
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         assert len(routes) == 10
         routes = sorted(routes, key=_get_sorted_key_from_route)
 
@@ -239,8 +239,8 @@ class TestSQLAlchemyRedisModelRoutesBuilderBaseJustWithGenericRoutes(object):
             id = sa.Column(sa.Integer, primary_key=True)
             id2 = sa.Column(sa.Integer, primary_key=True)
 
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         assert len(routes) == 10
         routes = sorted(routes, key=_get_sorted_key_from_route)
 
@@ -309,8 +309,8 @@ class TestRoutesModelNameUriDeleteAction(object):
 
     def test_action(self, model):
         model.delete = mock.MagicMock()
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -327,8 +327,8 @@ class TestRoutesModelNameUriGetAction(object):
 
     def test_without_body(self, model):
         model.get = mock.MagicMock(return_value=[{'test': 'test'}])
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -343,8 +343,8 @@ class TestRoutesModelNameUriGetAction(object):
 
     def test_with_body(self, model):
         model.get = mock.MagicMock(return_value=[{'test': 'test'}])
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -363,8 +363,8 @@ class TestRoutesModelNameUriPatchAction(object):
 
     def test_raises_not_found(self, model):
         model.update = mock.MagicMock(return_value=[])
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -378,8 +378,8 @@ class TestRoutesModelNameUriPatchAction(object):
 
     def test_action(self, model):
         model.update = mock.MagicMock(return_value=[{'test': 'test'}])
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -396,8 +396,8 @@ class TestRoutesModelNameUriPostAction(object):
 
     def test_with_a_object_in_body(self, model):
         model.insert = mock.MagicMock(return_value=[{'test': 'test'}])
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -412,8 +412,8 @@ class TestRoutesModelNameUriPostAction(object):
 
     def test_with_a_list_in_body(self, model):
         model.insert = mock.MagicMock(return_value=[{'test': 'test'}])
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -431,8 +431,8 @@ class TestRoutesModelNameUriPutAction(object):
 
     def test_raises_not_found(self, model):
         model.update = mock.MagicMock(return_value=[])
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -446,8 +446,8 @@ class TestRoutesModelNameUriPutAction(object):
 
     def test_action(self, model):
         model.update = mock.MagicMock(return_value=[{'test': 'test'}])
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -464,8 +464,8 @@ class TestRoutesPrimariesKeysUriDeleteAction(object):
 
     def test_action(self, model):
         model.delete = mock.MagicMock()
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -484,8 +484,8 @@ class TestRoutesPrimariesKeysUriGetAction(object):
 
     def test_action(self, model):
         model.get = mock.MagicMock()
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -503,8 +503,8 @@ class TestRoutesPrimariesKeysUriPatchAction(object):
 
     def test_raises_not_found(self, model):
         model.update = mock.MagicMock(return_value=[])
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -518,8 +518,8 @@ class TestRoutesPrimariesKeysUriPatchAction(object):
 
     def test_action(self, model):
         model.update = mock.MagicMock(return_value=[{'test': 'test'}])
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -538,8 +538,8 @@ class TestRoutesPrimariesKeysUriPostAction(object):
 
     def test_with_a_object_in_body(self, model):
         model.insert = mock.MagicMock(return_value=[{'test': 'test'}])
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -556,8 +556,8 @@ class TestRoutesPrimariesKeysUriPostAction(object):
 
     def test_with_a_list_in_body(self, model):
         model.insert = mock.MagicMock(return_value=[{'test': 'test'}])
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -578,8 +578,8 @@ class TestRoutesPrimariesKeysUriPutAction(object):
     def test_with_insert(self, model):
         model.update = mock.MagicMock(return_value=[])
         model.insert = mock.MagicMock(return_value=[{'test': 'test'}])
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -597,8 +597,8 @@ class TestRoutesPrimariesKeysUriPutAction(object):
 
     def test_with_update(self, model):
         model.update = mock.MagicMock(return_value=[{'test': 'test'}])
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,
@@ -615,8 +615,8 @@ class TestRoutesPrimariesKeysUriPutAction(object):
 
     def test_raises_ambigous_values(self, model):
         model.update = mock.MagicMock(return_value=[])
-        routes = SQLAlchemyRedisModelRoutesBuilderBase(
-            model, build_from_schemas=False, build_generic=True)
+        routes = SQLAlchemyRedisModelRoutesBuilder(
+            model, build_default=False, build_generic=True)
         routes = sorted(routes, key=_get_sorted_key_from_route)
         context = {
             'model': model,

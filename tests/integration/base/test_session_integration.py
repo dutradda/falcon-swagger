@@ -25,15 +25,16 @@ from sqlalchemy.ext.declarative import declarative_base
 from unittest import mock
 
 from myreco.base.session import Session
-from myreco.base.models.sqlalchemy_redis import model_base_builder
+from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBuilder
 
+import msgpack
 import pytest
 import sqlalchemy as sa
 
 
 @pytest.fixture
 def model_base():
-    return model_base_builder()
+    return SQLAlchemyRedisModelBuilder()
 
 
 @pytest.fixture
@@ -99,7 +100,7 @@ class TestSessionCommitRedisSet(object):
         session.add(model1(id=1))
         session.commit()
 
-        assert redis.hmset.call_args_list == [mock.call('test1', {'(1,)': {'id': 1}})]
+        assert redis.hmset.call_args_list == [mock.call('test1', {'(1,)': msgpack.dumps({'id': 1})})]
 
     def test_if_two_instance_are_seted_on_redis(self, session, model1, redis):
         session.add(model1(id=1))
@@ -107,7 +108,7 @@ class TestSessionCommitRedisSet(object):
         session.commit()
 
         assert redis.hmset.call_args_list == [
-            mock.call('test1', {'(1,)': {'id': 1}, '(2,)': {'id': 2}})]
+            mock.call('test1', {'(1,)': msgpack.dumps({'id': 1}), '(2,)': msgpack.dumps({'id': 2})})]
 
     def test_if_two_commits_sets_redis_correctly(self, session, model1, redis):
         session.add(model1(id=1))
@@ -116,8 +117,8 @@ class TestSessionCommitRedisSet(object):
         session.commit()
 
         assert redis.hmset.call_args_list == [
-            mock.call('test1', {'(1,)': {'id': 1}}),
-            mock.call('test1', {'(2,)': {'id': 2}})]
+            mock.call('test1', {'(1,)': msgpack.dumps({'id': 1})}),
+            mock.call('test1', {'(2,)': msgpack.dumps({'id': 2})})]
 
     def test_if_error_right_raised(self, session, model1, redis):
         class ExceptionTest(Exception):
@@ -137,8 +138,8 @@ class TestSessionCommitRedisSet(object):
         session.commit()
 
         expected = [
-            mock.call('test1', {'(1,)': {'id': 1}, '(2,)': {'id': 2}}),
-            mock.call('test2', {'(1,)': {'id': 1}, '(2,)': {'id': 2}})
+            mock.call('test1', {'(1,)': msgpack.dumps({'id': 1}), '(2,)': msgpack.dumps({'id': 2})}),
+            mock.call('test2', {'(1,)': msgpack.dumps({'id': 1}), '(2,)': msgpack.dumps({'id': 2})})
         ]
 
         assert len(expected) == len(redis.hmset.call_args_list)
@@ -156,10 +157,10 @@ class TestSessionCommitRedisSet(object):
         session.commit()
 
         expected = [
-            mock.call('test1', {'(1,)': {'id': 1}}),
-            mock.call('test2', {'(1,)': {'id': 1}}),
-            mock.call('test1', {'(2,)': {'id': 2}}),
-            mock.call('test2', {'(2,)': {'id': 2}})
+            mock.call('test1', {'(1,)': msgpack.dumps({'id': 1})}),
+            mock.call('test2', {'(1,)': msgpack.dumps({'id': 1})}),
+            mock.call('test1', {'(2,)': msgpack.dumps({'id': 2})}),
+            mock.call('test2', {'(2,)': msgpack.dumps({'id': 2})})
         ]
 
         assert len(expected) == len(redis.hmset.call_args_list)

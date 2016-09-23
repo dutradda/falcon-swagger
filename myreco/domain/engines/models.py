@@ -49,7 +49,7 @@ class EnginesModel(SQLAlchemyRedisModelBase):
 class EnginesTypesModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'engines_types'
     __table_args__ = {'mysql_engine':'innodb'}
-    _build_routes_from_schemas = False
+    __build_default_routes__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.Integer, unique=True, nullable=False)
@@ -58,7 +58,7 @@ class EnginesTypesModel(SQLAlchemyRedisModelBase):
 class EnginesVariablesModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'engines_variables'
     __table_args__ = {'mysql_engine':'innodb'}
-    _build_routes_from_schemas = False
+    __build_default_routes__ = False
 
     variable_id = sa.Column(sa.ForeignKey('variables.id'), primary_key=True)
     engine_id = sa.Column(sa.ForeignKey('engines.id'), primary_key=True)
@@ -72,7 +72,7 @@ class EnginesVariablesModel(SQLAlchemyRedisModelBase):
 class VariablesModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'slots'
     __table_args__ = {'mysql_engine':'innodb'}
-    _build_routes_from_schemas = False
+    __build_default_routes__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.Integer, unique=True, nullable=False)
@@ -81,7 +81,7 @@ class VariablesModel(SQLAlchemyRedisModelBase):
 class EnginesFiltersModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'engines_filters'
     __table_args__ = {'mysql_engine':'innodb'}
-    _build_routes_from_schemas = False
+    __build_default_routes__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.String(255), unique=True, nullable=False)

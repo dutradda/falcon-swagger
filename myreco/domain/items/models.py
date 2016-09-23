@@ -33,7 +33,7 @@ import json
 class ItemsTypesModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'items_types'
     __table_args__ = {'mysql_engine': 'innodb'}
-    _build_routes_from_schemas = False
+    __build_default_routes__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.Integer, unique=True, nullable=False)
@@ -63,7 +63,7 @@ class ItemsTypesModel(SQLAlchemyRedisModelBase):
 class RoutesModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'json_schemas'
     __table_args__ = {'mysql_engine': 'innodb'}
-    _build_routes_from_schemas = False
+    __build_default_routes__ = False
 
     item_type_id = sa.Column(sa.ForeignKey('items_types.id'), primary_key=True)
     method_id = sa.Column(sa.ForeignKey('methods.id'), primary_key=True)

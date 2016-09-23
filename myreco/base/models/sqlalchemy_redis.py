@@ -38,9 +38,10 @@ from glob import glob
 
 from myreco.exceptions import ModelBaseError
 from myreco.base.routes import RoutesBuilderBase, Route
-from myreco.base.models.base import ModelBaseMeta
+from myreco.base.models.base import ModelBaseMeta, ModelBase, ModelBuilderBaseMeta
 
 import json
+import msgpack
 import os.path
 
 
@@ -59,24 +60,28 @@ class URISchemaHandler(object):
             return json.load(json_schema_file)
 
 
-class SQLAlchemyRedisModelRoutesBuilderBase(RoutesBuilderBase):
+class SQLAlchemyRedisModelRoutesBuilder(RoutesBuilderBase):
 
     @classmethod
-    def _build_default_routes(cls, model, auth_hook):
+    def _build_default_routes(cls, model, routes, auth_hook):
+        if routes is None:
+            routes = set()
+
         schemas_path = model.get_schemas_path()
         schemas_glob = os.path.join(schemas_path, '*.json')
         schema_regex = r'(([\w\d_-]+)_)?(([\w\d%_-]+)_)?(post|put|patch|delete|get)_(input|output)(_auth)?.json'
-        routes = dict()
+        new_routes = dict()
 
         for json_schema_filename in glob(schemas_glob):
             json_schema_basename = os.path.basename(json_schema_filename)
             match = re_match(schema_regex, json_schema_basename)
             if match:
-                route = cls._set_route(routes, model, match,
+                route = cls._set_route(new_routes, model, match,
                                        json_schema_filename,
                                        auth_hook)
 
-        return set(routes.values())
+        routes.update(set(new_routes.values()))
+        return routes
 
     @classmethod
     def _set_route(cls, routes, model, match, json_schema_filename, auth_hook):
@@ -155,21 +160,13 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
             cls.backrefs = set()
             cls.relationships = set()
             cls.columns = set(cls.__table__.c)
-            cls.tablename = cls.__name__ = str(cls.__table__.name)
+            cls.tablename = cls.__name__ = cls.__key__ = str(cls.__table__.name)
             cls.todict_schema = {}
             cls.valid_attributes = set()
             base_class.all_models.add(cls)
-
             cls._build_backrefs_for_all_models(base_class.all_models)
 
-            cls.auth_hook = getattr(cls, 'auth_hook', None)
-            cls.__routes__ = getattr(cls, '__routes__', set())
-            build_routes_from_schemas = getattr(
-                cls, '_build_routes_from_schemas', True)
-            build_generic_routes = getattr(cls, '_build_generic_routes', False)
-            routes = SQLAlchemyRedisModelRoutesBuilderBase(
-                cls, build_routes_from_schemas, build_generic_routes, cls.auth_hook)
-            cls.__routes__.update(routes)
+            ModelBaseMeta.__init__(cls, name, bases_classes, attributes)
         else:
             cls.all_models = set()
 
@@ -254,9 +251,6 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
 
     def _build_todict_list(cls, insts):
         return [inst.todict() for inst in insts]
-
-    def _to_list(cls, objs):
-        return objs if isinstance(objs, list) else [objs]
 
     def _update_instance(cls, session, instance, values, input_):
         for attr_name in set(values.keys()):
@@ -389,10 +383,9 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
         insts = cls.get(session, ids, todict=False)
 
         for inst in insts:
-            inst.old_redis_key = session.build_inst_redis_key(inst)
+            inst.old_redis_key = inst.get_key()
 
-        id_insts_zip = [(inst.get_ids_map(ids[0].keys()), inst)
-                        for inst in insts]
+        id_insts_zip = [(inst.get_ids_map(ids[0].keys()), inst) for inst in insts]
 
         for id_, inst in id_insts_zip:
             cls._update_instance(session, inst, objs[ids.index(id_)], input_)
@@ -439,10 +432,7 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
         return getattr(cls, pk_name) == pk_attributes[pk_name]
 
     def get(cls, session, ids=None, limit=None, offset=None, todict=True):
-        if (ids is not None) and (limit is not None or offset is not None):
-            raise ModelBaseError(
-                "'get' method can't be called with 'ids' and with 'offset' or 'limit'",
-                {'ids': ids, 'limit': limit, 'offset': offset})
+        cls._raises_ids_limit_offset_error(ids, limit, offset)
 
         if ids is None:
             query = session.query(cls)
@@ -468,19 +458,23 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
             else:
                 return insts
 
-        model_redis_key = session.build_model_redis_key(cls)
+        model_redis_key = cls.__key__
         ids_redis_keys = [str(tuple(sorted(id_.values()))) for id_ in ids]
         objs = session.redis_bind.hmget(model_redis_key, ids_redis_keys)
-        ids = [id_ for id_, obj in zip(ids, objs) if obj is None]
-        objs = [json.loads(obj) for obj in objs if obj is not None]
+        ids_not_cached = [id_ for i, (id_, obj) in enumerate(zip(ids, objs)) if obj is None]
+        objs = [msgpack.loads(obj, encoding='utf-8') for obj in objs if obj is not None]
 
-        if ids:
-            filters = cls.build_filters_by_ids(ids)
+        if ids_not_cached:
+            filters = cls.build_filters_by_ids(ids_not_cached)
             instances = session.query(cls).filter(filters).all()
-            items = [(str(each.get_ids_values()), each.todict()) for each in instances]
-            no_cached_map = OrderedDict(items)
-            session.redis_bind.hmset(model_redis_key, no_cached_map)
-            objs.extend(no_cached_map.values())
+            items_to_set = {
+                inst.get_key(): msgpack.dumps(inst.todict()) for inst in instances}
+            session.redis_bind.hmset(model_redis_key, items_to_set)
+
+            for inst in instances:
+                inst_ids = inst.get_ids_map()
+                index = ids_not_cached.index(inst_ids)
+                objs.insert(index, inst.todict())
 
         return objs
 
@@ -490,12 +484,12 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
         return os.path.join(module_path, 'schemas')
 
 
-class _SQLAlchemyModel(object):
-    __api_prefix__ = '/'
+class _SQLAlchemyModel(ModelBase):
+    __routes_builder__ = SQLAlchemyRedisModelRoutesBuilder
 
     def get_ids_values(self):
-        pk_names = sorted(type(self).primaries_keys.keys())
-        return tuple([getattr(self, id_name) for id_name in pk_names])
+        ids_names = sorted(type(self).__ids_names__)
+        return tuple([getattr(self, id_name) for id_name in ids_names])
 
     def get_ids_map(self, keys=None):
         if keys is None:
@@ -568,20 +562,17 @@ class _SQLAlchemyModel(object):
         type(self).__init__(self, **kwargs)
 
 
-def model_base_builder(
-        bind=None, metadata=None, mapper=None,
-        constructor=_declarative_constructor,
-        class_registry=None, api_prefix=None):
-    if api_prefix is not None:
-        if not api_prefix.startswith('/') or not api_prefix.endswith('/'):
-            raise ModelBaseError("'api_prefix' must starts and ends with a '/'")
 
-        _SQLAlchemyModel.__api_prefix__ = api_prefix
+class SQLAlchemyRedisModelBuilder(metaclass=ModelBuilderBaseMeta):
 
-    return declarative_base(
-        name=MODEL_BASE_CLASS_NAME, metaclass=SQLAlchemyModelMeta,
-        cls=_SQLAlchemyModel, bind=bind, metadata=metadata,
-        mapper=mapper, constructor=constructor)
+    def __new__(cls, bind=None, metadata=None, mapper=None,
+            constructor=_declarative_constructor,
+            class_registry=None, api_prefix=None):
+        cls._set_api_prefix(api_prefix)
+        return declarative_base(
+            name=MODEL_BASE_CLASS_NAME, metaclass=SQLAlchemyModelMeta,
+            cls=_SQLAlchemyModel, bind=bind, metadata=metadata,
+            mapper=mapper, constructor=constructor)
 
 
-SQLAlchemyRedisModelBase = model_base_builder()
+SQLAlchemyRedisModelBase = SQLAlchemyRedisModelBuilder()

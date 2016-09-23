@@ -28,9 +28,9 @@ import pytest
 ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(os.path.join(ROOT_PATH, '..'))
 
-from myreco.base.models.sqlalchemy_redis import model_base_builder
+from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBuilder
 
 
 @pytest.fixture
 def model_base():
-    return model_base_builder()
+    return SQLAlchemyRedisModelBuilder()

@@ -41,7 +41,7 @@ class PlacementsModel(SQLAlchemyRedisModelBase):
 class VariationsModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'variations'
     __table_args__ = {'mysql_engine':'innodb'}
-    _build_routes_from_schemas = False
+    __build_default_routes__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.Integer, nullable=False)
@@ -53,7 +53,7 @@ class VariationsModel(SQLAlchemyRedisModelBase):
 class ABTestUsersModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'ab_test_users'
     __table_args__ = {'mysql_engine':'innodb'}
-    _build_routes_from_schemas = False
+    __build_default_routes__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     variation_id = sa.Column(sa.ForeignKey('variations.id'), nullable=False)
