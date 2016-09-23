@@ -28,7 +28,7 @@ def model1(model_base):
 
 @pytest.fixture
 def app(model1, session):
-    app_ = HttpAPI(session.bind, [model1], session.redis_bind)
+    app_ = HttpAPI([model1], session.bind, session.redis_bind)
     return app_
 
 
@@ -54,7 +54,7 @@ def model1_with_schema(session, model_base):
 
 @pytest.fixture
 def client_with_schema(model1_with_schema, session):
-    app_ = HttpAPI(session.bind, [model1_with_schema], session.redis_bind)
+    app_ = HttpAPI([model1_with_schema], session.bind, session.redis_bind)
     return Client(app_)
 
 

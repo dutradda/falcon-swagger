@@ -32,7 +32,7 @@ import logging
 
 class HttpAPI(API):
 
-    def __init__(self, sqlalchemy_bind, models, redis_bind=None):
+    def __init__(self, models, sqlalchemy_bind=None, redis_bind=None):
         routes = set()
         for model in models:
             for route in model.__routes__:
@@ -43,8 +43,9 @@ class HttpAPI(API):
 
         API.__init__(self, middleware=sqlalchemy_redis_mid)
 
-        for route in routes:
-            route.register(self, model)
+        for model in models:
+            for route in model.__routes__:
+                route.register(self, model)
 
         self.add_error_handler(Exception, self._handle_generic_error)
         self.add_error_handler(HTTPError, self._handle_http_error)

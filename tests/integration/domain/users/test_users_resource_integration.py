@@ -73,7 +73,7 @@ def init_(session):
 
 @pytest.fixture
 def app(session, init_):
-    return HttpAPI(session.bind, [UsersModel])
+    return HttpAPI([UsersModel], session.bind)
 
 
 @pytest.fixture
@@ -517,7 +517,7 @@ class TestUsersResourcePutUpdateOne(object):
     def test_put_update_primary_key_with_redis(self, session, init_, headers):
         redis = mock.MagicMock()
         redis.hmget.return_value = [None]
-        client = Client(HttpAPI(session.bind, [UsersModel], redis))
+        client = Client(HttpAPI([UsersModel], session.bind, redis))
         user = {
             'name': 'test2',
             'password': 'test',

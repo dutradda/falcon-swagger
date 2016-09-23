@@ -87,7 +87,7 @@ class _DefaultPutActionsMeta(_DefaultPostActionsMeta):
         if not objs:
             req_body = req_body_copy
             ambigous_keys = [
-                kwa for kwa in kwargs if kwa in req_body and req_body[kwa] != kwargs[kwa]]
+                kwa for kwa in kwargs if kwa in req_body and str(req_body[kwa]) != kwargs[kwa]]
             if ambigous_keys:
                 raise ValidationError(
                     "Ambiguous value for '{}'".format(

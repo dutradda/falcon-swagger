@@ -53,7 +53,7 @@ model.__routes__.add(Route('/test/{id}', 'POST', action))
 
 @pytest.fixture
 def app(session):
-    return HttpAPI(session.bind, [model])
+    return HttpAPI([model], session.bind)
 
 
 class TestUsersModelIntegrationWithAuthorizationHook(object):

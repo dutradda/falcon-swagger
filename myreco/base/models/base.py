@@ -39,12 +39,6 @@ class ModelBaseMeta(type):
     def _to_list(cls, objs):
         return objs if isinstance(objs, list) else [objs]
 
-    def _raises_ids_limit_offset_error(cls, ids, limit, offset):
-        if (ids is not None) and (limit is not None or offset is not None):
-            raise ModelBaseError(
-                "'get' method can't be called with 'ids' and with 'offset' or 'limit'",
-                {'ids': ids, 'limit': limit, 'offset': offset})
-
     def on_post(cls, *args, **kwargs):
         pass
 

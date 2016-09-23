@@ -385,7 +385,8 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
         for inst in insts:
             inst.old_redis_key = inst.get_key()
 
-        id_insts_zip = [(inst.get_ids_map(ids[0].keys()), inst) for inst in insts]
+        ids_keys = ids[0].keys()
+        id_insts_zip = [(inst.get_ids_map(ids_keys), inst) for inst in insts]
 
         for id_, inst in id_insts_zip:
             cls._update_instance(session, inst, objs[ids.index(id_)], input_)
@@ -432,8 +433,6 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
         return getattr(cls, pk_name) == pk_attributes[pk_name]
 
     def get(cls, session, ids=None, limit=None, offset=None, todict=True):
-        cls._raises_ids_limit_offset_error(ids, limit, offset)
-
         if ids is None:
             query = session.query(cls)
 
@@ -445,11 +444,13 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
 
             return cls._build_todict_list(query.all()) if todict else query.all()
 
-        return cls._get_many(session, ids, todict=todict)
+        if limit is not None and offset is not None:
+            limit += offset
+
+        ids = cls._to_list(ids)
+        return cls._get_many(session, ids[offset:limit], todict=todict)
 
     def _get_many(cls, session, ids, todict=True):
-        ids = cls._to_list(ids)
-
         if not todict or session.redis_bind is None:
             filters = cls.build_filters_by_ids(ids)
             insts = session.query(cls).filter(filters).all()
@@ -560,7 +561,6 @@ class _SQLAlchemyModel(ModelBase):
 
     def update_(self, **kwargs):
         type(self).__init__(self, **kwargs)
-
 
 
 class SQLAlchemyRedisModelBuilder(metaclass=ModelBuilderBaseMeta):

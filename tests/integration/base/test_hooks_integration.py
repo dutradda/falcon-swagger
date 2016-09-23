@@ -55,7 +55,7 @@ def model(model_base):
 
 @pytest.fixture
 def app(model):
-    return HttpAPI(mock.MagicMock(), models={model})
+    return HttpAPI({model}, sqlalchemy_bind=mock.MagicMock())
 
 
 class TestAuthorizationHook(object):

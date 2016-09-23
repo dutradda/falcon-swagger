@@ -70,15 +70,18 @@ class RedisModelMeta(ModelBaseMeta):
         input_ = deepcopy(objs)
         objs = cls._to_list(objs)
         ids_objs_map = dict()
+        counter = 0
 
         for obj in objs:
             obj = cls(obj)
             obj_key = obj.get_key()
             ids_objs_map[obj_key] = msgpack.dumps(obj)
+            counter += 1
 
-            if len(ids_objs_map) == cls.CHUNKS:
+            if counter == cls.CHUNKS:
                 session.bind.hmset(cls.__key__, ids_objs_map)
                 ids_objs_map = dict()
+                counter = 0
 
         if ids_objs_map:
             session.bind.hmset(cls.__key__, ids_objs_map)
@@ -90,19 +93,11 @@ class RedisModelMeta(ModelBaseMeta):
 
         objs = cls._to_list(objs)
         if ids:
-            ids = cls._to_list(ids)
-            ids_keys = ids[0].keys()
-            keys = set([cls._build_key(id_) for id_ in ids])
-            keys_objs_map = OrderedDict()
-            for obj in objs:
-                obj_ids = cls(obj).get_ids_map(ids_keys)
-                if obj_ids in ids:
-                    keys_objs_map[cls._build_key(obj_ids)] = obj
-
+            keys_objs_map = cls._build_keys_objs_map_with_ids(objs, ids)
         else:
-            keys_objs_map = OrderedDict([(cls(obj).get_key(), obj) for obj in objs])
-            keys = set(keys_objs_map.keys())
+            keys_objs_map = OrderedDict([(cls(obj).get_key().encode(), obj) for obj in objs])
 
+        keys = set(keys_objs_map.keys())
         keys.difference_update(set(session.bind.hkeys(cls.__key__)))
         keys.intersection_update(keys)
         invalid_keys = keys
@@ -110,47 +105,70 @@ class RedisModelMeta(ModelBaseMeta):
         for key in invalid_keys:
             keys_objs_map.pop(key, None)
 
-        if len(keys_objs_map) > cls.CHUNKS:
-            return cls.insert(session, list(keys_objs_map.values()))
-
-        elif keys_objs_map:
+        if keys_objs_map:
             set_map = OrderedDict()
+            counter = 0
             for key in keys_objs_map:
                 set_map[key] = msgpack.dumps(keys_objs_map[key])
+                counter += 1
 
-            session.bind.hmset(cls.__key__, set_map)
+                if counter == cls.CHUNKS:
+                    session.bind.hmset(cls.__key__, set_map)
+                    set_map = OrderedDict()
+                    counter = 0
+
+            if set_map:
+                session.bind.hmset(cls.__key__, set_map)
 
         return list(keys_objs_map.values())
 
+    def _build_keys_objs_map_with_ids(cls, objs, ids):
+        ids = cls._to_list(ids)
+        ids_keys = ids[0].keys()
+        keys_objs_map = OrderedDict()
+
+        for obj in objs:
+            obj_ids = cls(obj).get_ids_map(ids_keys)
+            if obj_ids in ids:
+                keys_objs_map[cls._build_key(obj_ids).encode()] = obj
+
+        return keys_objs_map
+
     def _build_key(cls, id_):
-        return str(tuple(sorted(id_.values())))
+        return str(cls(id_).get_ids_values(id_.keys()))
 
     def delete(cls, session, ids):
-        keys = [cls.get_key(id_) for id_ in cls._to_list(ids)]
-        cls.hdel(cls.__key__, *keys)
+        keys = [cls._build_key(id_) for id_ in cls._to_list(ids)]
+        if keys:
+            session.bind.hdel(cls.__key__, *keys)
 
     def get(cls, session, ids=None, limit=None, offset=None):
-        cls._raises_ids_limit_offset_error(ids, limit, offset)
+        if limit is not None and offset is not None:
+            limit += offset
 
-        if ids is None and limit is None and offset is None:
+        elif ids is None and limit is None and offset is None:
             return cls._unpack_objs(session.bind.hgetall(cls.__key__))
-        elif ids is None:
+
+        if ids is None:
             keys = session.bind.hkeys(cls.__key__)
             return cls._unpack_objs(session.bind.hmget(cls.__key__, *keys[offset:limit]))
         else:
             ids = [cls._build_key(id_) for id_ in cls._to_list(ids)]
-            return cls._unpack_objs(session.bind.hmget(cls.__key__, *ids))
+            return cls._unpack_objs(session.bind.hmget(cls.__key__, *ids[offset:limit]))
+
 
     def _unpack_objs(cls, objs):
-        return [msgpack.loads(obj, enconding='utf-8') for obj in objs]
+        return [msgpack.loads(obj, encoding='utf-8') for obj in objs.values()]
 
 
 class _RedisModel(dict, ModelBase):
     __routes_builder__ = RedisRoutesBuilder
 
-    def get_ids_values(self):
-        ids_names = sorted(type(self).__ids_names__)
-        return tuple([self.get(id_name) for id_name in ids_names])
+    def get_ids_values(self, keys=None):
+        if keys is None:
+            keys = type(self).__ids_names__
+
+        return tuple([self.get_(key) for key in sorted(keys)])
 
     def get_ids_map(self, keys=None):
         if keys is None:
@@ -185,4 +203,6 @@ class RedisModelsBuilder(metaclass=ModelBuilderBaseMeta):
         model = RedisModelMeta(name, (_RedisModel,), attributes)
         model.update = MethodType(RedisModelMeta.update, model)
         model.update_ = MethodType(dict.update, model)
+        model.get = MethodType(RedisModelMeta.get, model)
+        model.get_ = dict.get
         return model

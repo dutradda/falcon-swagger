@@ -870,6 +870,24 @@ class TestModelBaseGet(object):
         redis.hmget.return_value = [None, msgpack.dumps({'id': 2})]
         assert model1.get(session, [{'id': 1}, {'id': 2}]) == [{'id': 1}, {'id': 2}]
 
+    def test_with_ids_and_limit(self, model1, session, redis):
+        session.add_all([model1(id=1), model1(id=2), model1(id=3)])
+        session.commit()
+        model1.get(session, [{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}], limit=2)
+        assert redis.hmget.call_args_list == [mock.call('model1', ['(1,)', '(2,)'])]
+
+    def test_with_ids_and_offset(self, model1, session, redis):
+        session.add_all([model1(id=1), model1(id=2), model1(id=3)])
+        session.commit()
+        model1.get(session, [{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}], offset=2)
+        assert redis.hmget.call_args_list == [mock.call('model1', ['(3,)', '(4,)'])]
+
+    def test_with_ids_and_limit_and_offset(self, model1, session, redis):
+        session.add_all([model1(id=1), model1(id=2), model1(id=3)])
+        session.commit()
+        model1.get(session, [{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}], limit=2, offset=1)
+        assert redis.hmget.call_args_list == [mock.call('model1', ['(2,)', '(3,)'])]
+
     def test_with_missing_id(self, model1, session, redis):
         session.add(model1(id=1))
         session.commit()
@@ -879,14 +897,6 @@ class TestModelBaseGet(object):
     def test_with_missing_all_ids(self, model1, session, redis):
         redis.hmget.return_value = [None, None]
         assert model1.get(session, [{'id': 1}, {'id': 2}]) == []
-
-    def test_if_raises_ids_offset_error(self, model1, session, redis):
-        with pytest.raises(ModelBaseError):
-            model1.get(session, [{'id': 1}, {'id': 2}], offset=1)
-
-    def test_if_raises_ids_limit_error(self, model1, session, redis):
-        with pytest.raises(ModelBaseError):
-            model1.get(session, [{'id': 1}, {'id': 2}], limit=1)
 
     def test_without_ids(self, model1, session, redis):
         model1.insert(session, {})
