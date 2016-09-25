@@ -66,7 +66,7 @@ class RedisRoutesBuilder(RoutesBuilderBase):
 class RedisModelMeta(ModelBaseMeta):
     CHUNKS = 100
 
-    def insert(cls, session, objs):
+    def insert(cls, session, objs, **kwargs):
         input_ = deepcopy(objs)
         objs = cls._to_list(objs)
         ids_objs_map = dict()
@@ -88,7 +88,7 @@ class RedisModelMeta(ModelBaseMeta):
 
         return objs
 
-    def update(cls, session, objs, ids=None):
+    def update(cls, session, objs, ids=None, **kwargs):
         input_ = deepcopy(objs)
 
         objs = cls._to_list(objs)
@@ -137,12 +137,12 @@ class RedisModelMeta(ModelBaseMeta):
     def _build_key(cls, id_):
         return str(cls(id_).get_ids_values(id_.keys()))
 
-    def delete(cls, session, ids):
+    def delete(cls, session, ids, **kwargs):
         keys = [cls._build_key(id_) for id_ in cls._to_list(ids)]
         if keys:
             session.bind.hdel(cls.__key__, *keys)
 
-    def get(cls, session, ids=None, limit=None, offset=None):
+    def get(cls, session, ids=None, limit=None, offset=None, **kwargs):
         if limit is not None and offset is not None:
             limit += offset
 

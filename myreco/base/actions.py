@@ -67,7 +67,7 @@ class _DefaultPutActionsMeta(_DefaultPostActionsMeta):
         session = req.context['session']
         req_body = req.context['body']
 
-        objs = model.update(session, req_body)
+        objs = model.update(session, req_body, **req.params)
 
         if objs:
             resp.body = objs
@@ -82,7 +82,7 @@ class _DefaultPutActionsMeta(_DefaultPostActionsMeta):
         req_body_copy = deepcopy(req.context['body'])
 
         cls._update_dict(req_body, kwargs)
-        objs = model.update(session, req_body, ids=kwargs)
+        objs = model.update(session, req_body, ids=kwargs, **req.params)
 
         if not objs:
             req_body = req_body_copy
@@ -111,7 +111,7 @@ class _DefaultPatchActionsMeta(_DefaultPutActionsMeta):
         session = req.context['session']
         req_body = req.context['body']
         cls._update_dict(req_body, kwargs)
-        objs = model.update(session, req_body, ids=kwargs)
+        objs = model.update(session, req_body, ids=kwargs, **req.params)
         if objs:
             resp.body = objs[0]
         else:
@@ -128,13 +128,13 @@ class _DefaultDeleteActionsMeta(type):
         model = req.context['model']
         session = req.context['session']
         req_body = req.context['body']
-        model.delete(session, req.context['body'])
+        model.delete(session, req.context['body'], **req.params)
         resp.status = HTTP_NO_CONTENT
 
     def ids_action(cls, req, resp, **kwargs):
         model = req.context['model']
         session = req.context['session']
-        model.delete(session, kwargs)
+        model.delete(session, kwargs, **req.params)
         resp.status = HTTP_NO_CONTENT
 
 
@@ -150,9 +150,9 @@ class _DefaultGetActionsMeta(type):
         req_body = req.context['body']
 
         if req_body:
-            resp.body = model.get(session, req_body)
+            resp.body = model.get(session, req_body, **req.params)
         else:
-            resp.body = model.get(session)
+            resp.body = model.get(session, **req.params)
 
         if not resp.body:
             raise HTTPNotFound()
@@ -160,7 +160,7 @@ class _DefaultGetActionsMeta(type):
     def ids_action(cls, req, resp, **kwargs):
         model = req.context['model']
         session = req.context['session']
-        resp.body = model.get(session, kwargs)
+        resp.body = model.get(session, kwargs, **req.params)
         if not resp.body:
             raise HTTPNotFound()
         resp.body = resp.body[0]

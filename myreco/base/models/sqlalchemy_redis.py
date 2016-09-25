@@ -232,7 +232,7 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
 
         return relationship.prop.argument
 
-    def insert(cls, session, objs, commit=True, todict=True):
+    def insert(cls, session, objs, commit=True, todict=True, **kwargs):
         input_ = deepcopy(objs)
         objs = cls._to_list(objs)
         new_insts = set()
@@ -373,7 +373,7 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
             if inserted_objs[0] not in getattr(instance, attr_name):
                 getattr(instance, attr_name).append(inserted_objs[0])
 
-    def update(cls, session, objs, commit=True, todict=True, ids=None):
+    def update(cls, session, objs, commit=True, todict=True, ids=None, **kwargs):
         input_ = deepcopy(objs)
 
         objs = cls._to_list(objs)
@@ -396,7 +396,7 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
 
         return cls._build_todict_list(insts) if todict else insts
 
-    def delete(cls, session, ids, commit=True):
+    def delete(cls, session, ids, commit=True, **kwargs):
         ids = cls._to_list(ids)
         filters = cls.build_filters_by_ids(ids)
 
@@ -432,7 +432,7 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
     def _build_id_attribute_comparison(cls, pk_name, pk_attributes):
         return getattr(cls, pk_name) == pk_attributes[pk_name]
 
-    def get(cls, session, ids=None, limit=None, offset=None, todict=True):
+    def get(cls, session, ids=None, limit=None, offset=None, todict=True, **kwargs):
         if ids is None:
             query = session.query(cls)
 
