@@ -144,35 +144,31 @@ class TestModelGetRelatedHard(object):
             ])
         session.commit()
 
-        assert m11.get_related(session) == {m21, m31, m32, m42, m43}
-        assert m12.get_related(session) == {m22, m33, m43, m41}
-        assert m13.get_related(session) == {m23, m41, m42}
+        assert m21.get_related(session) == {m11}
+        assert m22.get_related(session) == {m12}
+        assert m23.get_related(session) == {m13}
 
-        assert m21.get_related(session) == {m11, m33, m41, m42, m52, m53}
-        assert m22.get_related(session) == {m12, m43, m51, m53}
-        assert m23.get_related(session) == {m13, m51, m52}
+        assert m31.get_related(session) == {m11}
+        assert m32.get_related(session) == {m11}
+        assert m33.get_related(session) == {m12, m21}
 
-        assert m31.get_related(session) == {m11, m41, m51, m52, m62, m63}
-        assert m32.get_related(session) == {m11, m42, m53, m61, m63}
-        assert m33.get_related(session) == {m12, m21, m43, m61, m62}
+        assert m41.get_related(session) == {m12, m13, m21, m31}
+        assert m42.get_related(session) == {m11, m13, m21, m32}
+        assert m43.get_related(session) == {m11, m12, m22, m33}
 
-        assert m41.get_related(session) == {m12, m13, m21, m31, m53, m61, m62, m72, m73}
-        assert m42.get_related(session) == {m11, m13, m21, m32, m63, m71, m73}
-        assert m43.get_related(session) == {m11, m12, m22, m33, m71, m72}
+        assert m51.get_related(session) == {m22, m23, m31}
+        assert m52.get_related(session) == {m21, m23, m31}
+        assert m53.get_related(session) == {m21, m22, m32, m41}
 
-        assert m51.get_related(session) == {m22, m23, m31, m61, m71, m72, m82, m83}
-        assert m52.get_related(session) == {m21, m23, m31, m62, m73, m81, m83}
-        assert m53.get_related(session) == {m21, m22, m32, m41, m63, m81, m82}
+        assert m61.get_related(session) == {m32, m33, m41, m51}
+        assert m62.get_related(session) == {m31, m33, m41, m52}
+        assert m63.get_related(session) == {m31, m32, m42, m53}
 
-        assert m61.get_related(session) == {m32, m33, m41, m51, m73, m81, m82, m92, m93}
-        assert m62.get_related(session) == {m31, m33, m41, m52, m83, m91, m93}
-        assert m63.get_related(session) == {m31, m32, m42, m53, m91, m92}
+        assert m71.get_related(session) == {m42, m43, m51}
+        assert m72.get_related(session) == {m41, m43, m51}
+        assert m73.get_related(session) == {m41, m42, m52, m61}
 
-        assert m71.get_related(session) == {m42, m43, m51, m81, m91, m92}
-        assert m72.get_related(session) == {m41, m43, m51, m82, m93}
-        assert m73.get_related(session) == {m41, m42, m52, m61, m83}
-
-        assert m81.get_related(session) == {m52, m53, m61, m71, m93}
+        assert m81.get_related(session) == {m52, m53, m61, m71}
         assert m82.get_related(session) == {m51, m53, m61, m72}
         assert m83.get_related(session) == {m51, m52, m62, m73}
 

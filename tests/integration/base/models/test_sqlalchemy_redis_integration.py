@@ -294,7 +294,6 @@ class TestModelBaseGetRelated(object):
 
         assert m21.model1 == m11
         assert m11.get_related(session) == {m21}
-        assert m21.get_related(session) == {m11}
 
     def test_get_related_with_primary_join_get_no_result(
             self, model1, model2_primary_join, session):
@@ -317,7 +316,6 @@ class TestModelBaseGetRelated(object):
         session.commit()
 
         assert m11.model2 == [m21]
-        assert m11.get_related(session) == {m21}
         assert m21.get_related(session) == {m11}
 
     def test_get_related_with_mto_with_two_related(
@@ -330,7 +328,6 @@ class TestModelBaseGetRelated(object):
         session.commit()
 
         assert m11.model2 == [m21, m22]
-        assert m11.get_related(session) == {m21, m22}
         assert m21.get_related(session) == {m11}
 
 

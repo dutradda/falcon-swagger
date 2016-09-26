@@ -502,12 +502,6 @@ class _SQLAlchemyModel(ModelBase):
     def get_related(self, session):
         related = set()
         cls = type(self)
-
-        for relationship in cls.relationships:
-            related_model_insts = self._get_related_model_insts(
-                session, relationship)
-            related.update(related_model_insts)
-
         for relationship in cls.backrefs:
             related_model_insts = self._get_related_model_insts(
                 session, relationship, parent=True)
