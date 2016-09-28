@@ -53,7 +53,7 @@ class MyrecoError(Exception):
     @staticmethod
     def handle(exception, req, resp, params):
         resp.status = exception.status
-        resp.body = exception.to_json()
+        resp.body = json.dumps(exception.to_json())
         [resp.append_header(key, value) for key, value in exception.headers.items()]
 
 

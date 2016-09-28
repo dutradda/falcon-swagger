@@ -22,30 +22,21 @@
 
 
 from falcon import API, HTTP_INTERNAL_SERVER_ERROR, HTTP_BAD_REQUEST, HTTPError
-from myreco.base.middlewares import FalconSQLAlchemyRedisMiddleware
+from myreco.base.middlewares import SessionMiddleware
 from myreco.exceptions import JSONError, ModelBaseError, UnauthorizedError
 from sqlalchemy.exc import IntegrityError
 from jsonschema import ValidationError
-
 import logging
+import json
 
 
 class HttpAPI(API):
 
     def __init__(self, models, sqlalchemy_bind=None, redis_bind=None):
-        routes = set()
-        for model in models:
-            for route in model.__routes__:
-                routes.add(route)
-
-        sqlalchemy_redis_mid = FalconSQLAlchemyRedisMiddleware(
-            sqlalchemy_bind, redis_bind, routes)
-
-        API.__init__(self, middleware=sqlalchemy_redis_mid)
+        API.__init__(self, middleware=SessionMiddleware(sqlalchemy_bind, redis_bind))
 
         for model in models:
-            for route in model.__routes__:
-                route.register(self, model)
+            self._register_model(model)
 
         self.add_error_handler(Exception, self._handle_generic_error)
         self.add_error_handler(HTTPError, self._handle_http_error)
@@ -56,12 +47,16 @@ class HttpAPI(API):
         self.add_error_handler(ModelBaseError)
         self.add_error_handler(UnauthorizedError)
 
+    def _register_model(self, model):
+        for uri_template in model.__routes__:
+            self.add_route(uri_template, model)
+
     def _handle_http_error(self, exception, req, resp, params):
         self._compose_error_response(req, resp, exception)
 
     def _handle_integrity_error(self, exception, req, resp, params):
         resp.status = HTTP_BAD_REQUEST
-        resp.body = {
+        resp.body = json.dumps({
             'error': {
                 'params': exception.params,
                 'database message': {
@@ -70,19 +65,19 @@ class HttpAPI(API):
                 },
                 'details': exception.detail
             }
-        }
+        })
 
     def _handle_json_validation_error(self, exception, req, resp, params):
         resp.status = HTTP_BAD_REQUEST
-        resp.body = {
+        resp.body = json.dumps({
             'error': {
                 'message': exception.message,
                 'schema': exception.schema,
                 'input': exception.instance
             }
-        }
+        })
 
     def _handle_generic_error(self, exception, req, resp, params):
         resp.status = HTTP_INTERNAL_SERVER_ERROR
-        resp.body = {'error': {'message': 'Something unexpected happened'}}
+        resp.body = json.dumps({'error': {'message': 'Something unexpected happened'}})
         logging.exception(exception)

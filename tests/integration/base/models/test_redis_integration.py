@@ -31,7 +31,7 @@ import json
 
 @pytest.fixture
 def app():
-    schema = {
+    obj_schema = {
         'type': 'object',
         'required': ['id', 'field1', 'field2'],
         'properties': {
@@ -44,44 +44,99 @@ def app():
             }
         }
     }
-    routes = [{
-        'uri_template': '/test',
-        'method': {'name': 'POST'},
-        'input_schema': schema,
-        'output_schema': schema
-    },{
-        'uri_template': '/test/{id}',
-        'method': {'name': 'POST'}
-    },{
-        'uri_template': '/test',
-        'method': {'name': 'PUT'},
-        'input_schema': schema,
-        'output_schema': schema
-    },{
-        'uri_template': '/test/{id}',
-        'method': {'name': 'PUT'},
-        'input_schema': schema,
-        'output_schema': schema
-    },{
-        'uri_template': '/test',
-        'method': {'name': 'PATCH'}
-    },{
-        'uri_template': '/test/{id}',
-        'method': {'name': 'PATCH'}
-    },{
-        'uri_template': '/test',
-        'method': {'name': 'DELETE'}
-    },{
-        'uri_template': '/test/{id}',
-        'method': {'name': 'DELETE'}
-    },{
-        'uri_template': '/test',
-        'method': {'name': 'GET'}
-    },{
-        'uri_template': '/test/{id}',
-        'method': {'name': 'GET'}
-    }]
-    models = [{'name': 'test', 'id_names': ['id'], 'routes': routes}]
+    schema = {
+        '/test': {
+            'post': {
+                'operationId': 'post_by_body',
+                'responses': {'201': {'description': 'Created', 'schema': obj_schema}},
+                'parameters': [{
+                    'name': 'body',
+                    'in': 'body',
+                    'schema': obj_schema
+                }]
+            },
+            'put': {
+                'operationId': 'put_by_body',
+                'responses': {'200': {'description': 'Updated', 'schema': obj_schema}},
+                'parameters': [{
+                    'name': 'body',
+                    'in': 'body',
+                    'schema': obj_schema
+                }]
+            },
+            'delete': {
+                'operationId': 'delete_by_body',
+                'responses': {'204': {'description': 'Deleted'}},
+                'parameters': [{
+                    'name': 'body',
+                    'in': 'body',
+                    'schema': {}
+                }]
+            },
+            'get': {
+                'operationId': 'get_by_body',
+                'responses': {'200': {'description': 'Getted'}},
+                'parameters': [{
+                    'name': 'body',
+                    'in': 'body',
+                    'schema': {}
+                }]
+            },
+        },
+        '/test/{id}': {
+            'post': {
+                'operationId': 'post_by_uri_template',
+                'responses': {'201': {'description': 'Created'}},
+                'parameters': [{
+                    'name': 'id',
+                    'in': 'path',
+                    'required': True,
+                    'type': 'integer'
+                }]
+            },
+            'put': {
+                'operationId': 'put_by_uri_template',
+                'responses': {'200': {'description': 'Updated', 'schema': obj_schema}},
+                'parameters': [{
+                    'name': 'id',
+                    'in': 'path',
+                    'required': True,
+                    'type': 'integer'
+                }]
+            },
+            'patch': {
+                'operationId': 'patch_by_uri_template',
+                'responses': {'200': {'description': 'Updated'}},
+                'parameters': [{
+                    'name': 'id',
+                    'in': 'path',
+                    'required': True,
+                    'type': 'integer'
+                }]
+            },
+            'delete': {
+                'operationId': 'delete_by_uri_template',
+                'responses': {'200': {'description': 'Deleted'}},
+                'parameters': [{
+                    'name': 'id',
+                    'in': 'path',
+                    'required': True,
+                    'type': 'integer'
+                }]
+            },
+            'get': {
+                'operationId': 'get_by_uri_template',
+                'responses': {'200': {'description': 'Getted'}},
+                'parameters': [{
+                    'name': 'id',
+                    'in': 'path',
+                    'required': True,
+                    'type': 'integer'
+                }]
+            },
+        }
+    }
+    models = [{'name': 'test', 'id_names': ['id'], 'schema': schema}]
     return HttpAPI(RedisModelsBuilder(models), redis_bind=FakeStrictRedis())
 
 
@@ -94,7 +149,7 @@ class TestRedisModelPost(object):
                 'fid': '1'
             }
         }
-        resp = client.post('/test', body=json.dumps(body))
+        resp = client.post('/test', body=json.dumps(body), headers={'Content-Type': 'application/json'})
         assert json.loads(resp.body) == body
 
     def test_post_with_ids(self, client):

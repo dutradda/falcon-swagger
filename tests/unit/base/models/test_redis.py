@@ -21,102 +21,36 @@
 # SOFTWARE.
 
 
-from myreco.base.models.redis import RedisRoutesBuilder, RedisModelMeta, RedisModelsBuilder
-from myreco.base.actions import DefaultPostActions
+from myreco.base.models.redis import RedisModelMeta, RedisModelsBuilder
 from myreco.exceptions import ModelBaseError
 from unittest import mock
 import pytest
 import msgpack
 
 
-class TestRedisRoutesBuilder(object):
-    def test_with_empty_routes(self):
-        model = mock.MagicMock()
-        assert RedisRoutesBuilder(model) == set()
-
-    def test_with_input_schema(self):
-        model = mock.MagicMock(__api_prefix__='/')
-        routes = [{'uri_template': '/test', 'method': {'name': 'POST'}, 'input_schema': {'test': 'test'}}]
-        routes = list(RedisRoutesBuilder(model, routes=routes))
-        assert len(routes) == 1
-        assert routes[0].uri_template == '/test'
-        assert routes[0].method == 'POST'
-        assert routes[0].action == DefaultPostActions.base_action
-        assert routes[0].validator.schema == {'test': 'test'}
-        assert routes[0].output_schema == None
-
-
 class TestRedisModelsBuilder(object):
     def test_without_models_types(self):
         assert RedisModelsBuilder([]) == set()
 
-    def test_without_prefix_and_without_routes(self):
-        models_types = [{
-            'name': 'test',
-            'id_names': ['id']
-        }]
-        model = list(RedisModelsBuilder(models_types))
-        assert len(model) == 1
-        assert model[0].__name__ == 'TestModel'
-        assert model[0].__routes__ == set()
-        assert model[0].__key__ == 'test'
-        assert model[0].__ids_names__ == ('id',)
-
-    def test_without_prefix_and_with_routes(self):
+    def test_build(self):
         models_types = [{
             'name': 'test',
             'id_names': ['id'],
-            'routes': [{'uri_template': '/test', 'method': {'name': 'POST'}, 'input_schema': {'test': 'test'}}]
+            'schema': {}
         }]
         model = list(RedisModelsBuilder(models_types))
         assert len(model) == 1
         assert model[0].__name__ == 'TestModel'
         assert model[0].__key__ == 'test'
-        assert model[0].__ids_names__ == ('id',)
-        routes = list(model[0].__routes__)
-        assert len(routes) == 1
-        assert routes[0].uri_template == '/test'
-        assert routes[0].method == 'POST'
-        assert routes[0].action == DefaultPostActions.base_action
-        assert routes[0].validator.schema == {'test': 'test'}
-        assert routes[0].output_schema == None
-
-    def test_with_prefix_and_without_routes(self):
-        models_types = [{
-            'name': 'test',
-            'id_names': ['id']
-        }]
-        model = list(RedisModelsBuilder(models_types, api_prefix='/api'))
-        assert len(model) == 1
-        assert model[0].__name__ == 'TestModel'
-        assert model[0].__key__ == 'test'
-        assert model[0].__ids_names__ == ('id',)
-
-    def test_with_prefix_and_with_routes(self):
-        models_types = [{
-            'name': 'test',
-            'id_names': ['id'],
-            'routes': [{'uri_template': '/test', 'method': {'name': 'POST'}, 'input_schema': {'test': 'test'}}]
-        }]
-        model = list(RedisModelsBuilder(models_types, api_prefix='/api'))
-        assert len(model) == 1
-        assert model[0].__name__ == 'TestModel'
-        assert model[0].__key__ == 'test'
-        assert model[0].__ids_names__ == ('id',)
-        routes = list(model[0].__routes__)
-        assert len(routes) == 1
-        assert routes[0].uri_template == '/api/test'
-        assert routes[0].method == 'POST'
-        assert routes[0].action == DefaultPostActions.base_action
-        assert routes[0].validator.schema == {'test': 'test'}
-        assert routes[0].output_schema == None
+        assert model[0].__schema__ == {}
 
 
 @pytest.fixture
 def model():
     models_types = [{
         'name': 'test',
-        'id_names': ['id']
+        'id_names': ['id'],
+        'schema': {}
     }]
     return list(RedisModelsBuilder(models_types))[0]
 

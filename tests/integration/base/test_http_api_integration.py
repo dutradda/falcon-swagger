@@ -1,5 +1,4 @@
 from myreco.base.http_api import HttpAPI
-from myreco.base.routes import Route
 from unittest import mock
 from jsonschema import Draft4Validator
 from pytest_falcon.plugin import Client
@@ -21,7 +20,33 @@ def model1(model_base):
         id = sa.Column(sa.Integer, primary_key=True)
         m2_id = sa.Column(sa.ForeignKey('model2.id'))
         model2_ = sa.orm.relationship('model2')
-        __build_generic_routes__ = True
+
+        __schema__ = {
+            '/model1/': {
+                'post': {
+                    'operationId': 'post_by_body',
+                    'responses': {'200': {'description': 'test'}},
+                    'parameters': [{
+                        'name': 'body',
+                        'in': 'body',
+                        'schema': {'type': 'array'}
+                    }]
+                },
+                'put': {
+                    'operationId': 'put_by_body',
+                    'responses': {'200': {'description': 'test'}},
+                    'parameters': [{
+                        'name': 'body',
+                        'in': 'body',
+                        'schema': {'type': 'array'}
+                    }]
+                }
+            }
+        }
+
+        @classmethod
+        def get_test(cls, req, resp, **kwargs):
+            pass
 
     return model1
 
@@ -46,8 +71,23 @@ def model1_with_schema(session, model_base):
         m2_id = sa.Column(sa.ForeignKey('model2.id'))
         model2_ = sa.orm.relationship('model2')
 
-        __routes__ = {Route('/model1/', 'POST', lambda x, y: None,
-                      Draft4Validator({'type': 'object'}))}
+        __schema__ = {
+            '/model1/': {
+                'post': {
+                    'operationId': 'get_test',
+                    'responses': {'200': {'description': 'test'}},
+                    'parameters': [{
+                        'name': 'body',
+                        'in': 'body',
+                        'schema': {'type': 'array'}
+                    }]
+                }
+            }
+        }
+
+        @classmethod
+        def get_test(cls, req, resp, **kwargs):
+            pass
 
     return model1
 
@@ -104,9 +144,9 @@ class TestHttpAPIErrorHandlingPOST(object):
         assert json.loads(resp.body) == {
             'error': {
                 'input': 'test',
-                'message': "'test' is not of type 'object'",
+                'message': "'test' is not of type 'array'",
                 'schema': {
-                    'type': 'object'
+                    'type': 'array'
                 }
             }
         }
@@ -123,7 +163,7 @@ class TestHttpAPIErrorHandlingPOST(object):
         }
 
     def test_model_base_error_handling_with_post_and_with_nested_delete(self, client, model1):
-        data = {'model2_': {'id': 1, '_delete': True}}
+        data = [{'model2_': {'id': 1, '_delete': True}}]
         resp = client.post('/model1/', data=json.dumps(data))
 
         assert resp.status_code == 400
@@ -135,7 +175,7 @@ class TestHttpAPIErrorHandlingPOST(object):
         }
 
     def test_model_base_error_handling_with_post_and_with_nested_remove(self, client, model1):
-        data = {'model2_': {'id': 1, '_remove': True}}
+        data = [{'model2_': {'id': 1, '_remove': True}}]
         resp = client.post('/model1/', data=json.dumps(data))
 
         assert resp.status_code == 400
@@ -147,7 +187,7 @@ class TestHttpAPIErrorHandlingPOST(object):
         }
 
     def test_model_base_error_handling_with_post_and_with_nested_update(self, client, model1):
-        data = {'model2_': {'id': 1, '_update': True}}
+        data = [{'model2_': {'id': 1, '_update': True}}]
         resp = client.post('/model1/', data=json.dumps(data))
 
         assert resp.status_code == 400
@@ -159,8 +199,9 @@ class TestHttpAPIErrorHandlingPOST(object):
         }
 
     def test_model_base_error_handling_with_put_and_with_nested_delete(self, client, model1):
-        resp = client.post('/model1/', data='{}')
-        data = {'id': 1, 'model2_': {'id': 1, '_delete': True}}
+        resp = client.post('/model1/', data='[{}]')
+        assert resp.status_code == 201
+        data = [{'id': 1, 'model2_': {'id': 1, '_delete': True}}]
         resp = client.put('/model1/', body=json.dumps(data))
 
         assert resp.status_code == 400
@@ -172,7 +213,7 @@ class TestHttpAPIErrorHandlingPOST(object):
         }
 
     def test_model_base_error_handling_with_put_and_with_nested_remove(self, client, model1):
-        data = {'model2_': {'id': 1, '_remove': True}}
+        data = [{'model2_': {'id': 1, '_remove': True}}]
         resp = client.post('/model1/', data=json.dumps(data))
 
         assert resp.status_code == 400
@@ -184,7 +225,7 @@ class TestHttpAPIErrorHandlingPOST(object):
         }
 
     def test_model_base_error_handling_with_put_and_with_nested_update(self, client, model1):
-        data = {'model2_': {'id': 1, '_update': True}}
+        data = [{'model2_': {'id': 1, '_update': True}}]
         resp = client.post('/model1/', data=json.dumps(data))
 
         assert resp.status_code == 400
@@ -197,7 +238,7 @@ class TestHttpAPIErrorHandlingPOST(object):
 
     def test_generic_error_handling(self, client, model1):
         model1.insert = mock.MagicMock(side_effect=Exception)
-        resp = client.post('/model1/', data='"test"')
+        resp = client.post('/model1/', data='[{}]')
 
         assert resp.status_code == 500
         assert json.loads(resp.body) == {

@@ -21,8 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.base.routes import Route, RoutesBuilderBase
-from myreco.base.models.base import ModelBaseMeta, ModelBase, ModelBuilderBaseMeta
+from myreco.base.models.base import ModelBaseMeta, ModelBase
 from myreco.exceptions import ModelBaseError
 from jsonschema import Draft4Validator
 from collections import defaultdict, OrderedDict
@@ -30,37 +29,6 @@ from copy import deepcopy
 from types import MethodType
 import json
 import msgpack
-
-
-class RedisRoutesBuilder(RoutesBuilderBase):
-
-    @classmethod
-    def _build_default_routes(cls, model, routes, auth_hook):
-        new_routes = set()
-        if routes is None:
-            return new_routes
-
-        for route in routes:
-            new_routes.add(cls._build_route(model, route, auth_hook))
-
-        return new_routes
-
-    @classmethod
-    def _build_route(cls, model, route, auth_hook):
-        validator = None
-        input_schema = route.get('input_schema')
-        output_schema = route.get('output_schema')
-        method = route['method']['name']
-        uri_template = model.__api_prefix__ + route['uri_template'].strip('/')
-        validator = None
-        hooks = {auth_hook} if auth_hook else None
-
-        if input_schema:
-            Draft4Validator.check_schema(input_schema)
-            validator = Draft4Validator(input_schema)
-
-        action = cls._get_action(uri_template, method)
-        return Route(uri_template, method, action, validator, output_schema, hooks=hooks)
 
 
 class RedisModelMeta(ModelBaseMeta):
@@ -162,43 +130,36 @@ class RedisModelMeta(ModelBaseMeta):
 
 
 class _RedisModel(dict, ModelBase):
-    __routes_builder__ = RedisRoutesBuilder
 
     def get_ids_values(self, keys=None):
         if keys is None:
-            keys = type(self).__ids_names__
+            keys = type(self).__id_names__
 
         return tuple([self.get_(key) for key in sorted(keys)])
 
     def get_ids_map(self, keys=None):
         if keys is None:
-            keys = type(self).__ids_names__
+            keys = type(self).__id_names__
 
         keys = sorted(keys)
         return {key: self[key] for key in keys}
 
 
-class RedisModelsBuilder(metaclass=ModelBuilderBaseMeta):
+class RedisModelsBuilder(object):
 
-    def __new__(cls, models_types, api_prefix=None):
-        return cls._build_models(models_types, api_prefix)
-
-    @classmethod
-    def _build_models(cls, models_types, api_prefix):
+    def __new__(cls, models_types):
         models = set()
         for model_type in models_types:
-            models.add(cls._build_model(model_type, api_prefix))
+            models.add(cls._build_model(model_type))
         return models
 
     @classmethod
-    def _build_model(cls, model_type, api_prefix):
-        cls._set_api_prefix(api_prefix)
-
+    def _build_model(cls, model_type):
         name = model_type['name'].capitalize() + 'Model'
         attributes = {
             '__key__': model_type['name'],
-            '__routes__': model_type.get('routes', []),
-            '__ids_names__': tuple(model_type['id_names'])
+            '__id_names__': tuple(model_type['id_names']),
+            '__schema__': model_type['schema']
         }
         model = RedisModelMeta(name, (_RedisModel,), attributes)
         model.update = MethodType(RedisModelMeta.update, model)

@@ -21,126 +21,11 @@
 # SOFTWARE.
 
 
-from myreco.base.middlewares import FalconRoutesMiddleware, FalconSQLAlchemyRedisMiddleware
-from myreco.base.routes import Route
+from myreco.base.middlewares import SessionMiddleware
 from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
-from myreco.exceptions import JSONError
 from unittest import mock
-from falcon import HTTPMethodNotAllowed, HTTPNotFound
 
 import pytest
-
-
-@pytest.fixture
-def route():
-    return Route('/test', 'POST', mock.MagicMock())
-
-
-@pytest.fixture
-def routes_middleware(route):
-    return FalconRoutesMiddleware(set([route]))
-
-
-class TestFalconRoutesMiddlewareProcessResource(object):
-
-    def test_process_resource_without_methods(self):
-        middleware = FalconRoutesMiddleware(set())
-        req = mock.MagicMock()
-        resp, resource, params = mock.MagicMock(), mock.MagicMock(), mock.MagicMock()
-        with pytest.raises(HTTPMethodNotAllowed):
-            middleware.process_resource(req, resp, resource, params)
-
-    def test_process_resource_with_invalid_json(self, routes_middleware):
-        req = mock.MagicMock(method='POST', uri_template='/test')
-        req.stream.read().decode.return_value = 'test'
-        resp = mock.MagicMock()
-        resource = mock.MagicMock()
-        params = mock.MagicMock()
-
-        with pytest.raises(JSONError):
-            routes_middleware.process_resource(
-                req, resp, resource, params)
-
-    def test_process_resource_with_valid_json(self, routes_middleware, route):
-        req = mock.MagicMock(
-            method='POST', uri_template='/test', context=dict())
-        req.stream.read().decode.return_value = '"test"'
-        resp = mock.MagicMock()
-        resource = mock.MagicMock()
-        params = mock.MagicMock()
-
-        routes_middleware.process_resource(req, resp, resource, params)
-        assert req.context['body'] == 'test'
-
-    def test_process_resource_with_validator(self):
-        validator = mock.MagicMock()
-        route = Route('/test', 'POST', mock.MagicMock(), validator)
-        middleware = FalconRoutesMiddleware(set([route]))
-        req = mock.MagicMock(
-            method='POST', uri_template='/test', context=dict())
-        req.stream.read().decode.return_value = '"test"'
-        resp = mock.MagicMock()
-        resource = mock.MagicMock()
-        params = mock.MagicMock()
-
-        middleware.process_resource(req, resp, resource, params)
-        assert validator.validate.call_args_list == [mock.call('test')]
-
-    def test_if_process_resource_adds_schema_link(self):
-        validator = mock.MagicMock()
-        route = Route('/test', 'POST', mock.MagicMock(), validator)
-        middleware = FalconRoutesMiddleware(set([route]))
-        req = mock.MagicMock(
-            method='POST', uri_template='/test', context=dict())
-        req.stream.read().decode.return_value = '"test"'
-        resp = mock.MagicMock()
-        resource = mock.MagicMock()
-        params = mock.MagicMock()
-
-        middleware.process_resource(req, resp, resource, params)
-        assert resp.add_link.call_args_list == [
-            mock.call('/test/schemas/', 'schemas')]
-
-    def test_process_resource_with_empty_body(self, routes_middleware):
-        req = mock.MagicMock(
-            method='POST', uri_template='/test', context=dict())
-        req.stream.read().decode.return_value = ''
-        resp = mock.MagicMock()
-        resource = mock.MagicMock()
-        params = mock.MagicMock()
-
-        routes_middleware.process_resource(req, resp, resource, params)
-        assert req.context['body'] == {}
-
-    def test_if_raises_not_found(self, routes_middleware):
-        req = mock.MagicMock(
-            method='POST', uri_template='/', context=dict())
-        req.stream.read().decode.return_value = ''
-        resp = mock.MagicMock()
-        resource = mock.MagicMock()
-        params = mock.MagicMock()
-
-        with pytest.raises(HTTPNotFound):
-            routes_middleware.process_resource(req, resp, resource, params)
-
-
-class TestFalconRoutesMiddlewareProcessResponse(object):
-
-    def test_process_response(self, routes_middleware):
-        req = mock.MagicMock()
-        resp = mock.MagicMock(body='test')
-        resource = mock.MagicMock()
-
-        routes_middleware.process_response(req, resp, resource)
-        assert resp.body == '"test"'
-
-    def test_process_response_with_empty_body(self, routes_middleware):
-        req = mock.MagicMock()
-        resp = mock.MagicMock(body='')
-        resource = mock.MagicMock()
-
-        routes_middleware.process_response(req, resp, resource)
-        assert resp.body == ''
 
 
 @pytest.fixture
@@ -154,15 +39,11 @@ def redis_bind():
 
 
 @pytest.fixture
-def sqlalchemy_middleware(bind, redis_bind, route):
-    return FalconSQLAlchemyRedisMiddleware(bind, redis_bind, set([route]))
+def sqlalchemy_middleware(bind, redis_bind):
+    return SessionMiddleware(bind, redis_bind)
 
 
-@mock.patch('myreco.base.middlewares.json', new=mock.MagicMock())
 class TestFalconSQLAlchemyRedisMiddleware(object):
-    def test_init_without_routes(self):
-        assert FalconSQLAlchemyRedisMiddleware(None)._routes == dict()
-
     @mock.patch('myreco.base.middlewares.Session')
     def test_process_resource(self, session, sqlalchemy_middleware, bind, redis_bind):
         req = mock.MagicMock(

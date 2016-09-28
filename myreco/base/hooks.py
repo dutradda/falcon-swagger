@@ -51,10 +51,22 @@ class AuthorizationHook(object):
                 'Please refresh your authorization', self.realm, HTTP_FORBIDDEN)
 
 
-def before_action(func):
-    def _before_action(func_):
+def before_operation(func):
+    def _wrap_class_method(cls, method_name):
+        method = getattr(cls, method_name, None)
+        if method:
+            setattr(cls, method_name, _before_operation(method))
+
+    def _before_operation(func_):
         def do_before(req, resp, **params):
             func(req, resp, None, params)
             func_(req, resp, **params)
+
+        if isinstance(func_, type):
+            for method in ('on_post', 'on_put', 'on_patch', 'on_delete', 'on_get', 'on_head', 'on_options'):
+                _wrap_class_method(func_, method)
+            return func_
+
         return do_before
-    return _before_action
+
+    return _before_operation

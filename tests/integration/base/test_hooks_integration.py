@@ -21,9 +21,9 @@
 # SOFTWARE.
 
 
-from myreco.base.hooks import AuthorizationHook, before_action
+from myreco.base.hooks import AuthorizationHook, before_operation
 from myreco.base.http_api import HttpAPI
-from myreco.base.routes import Route
+from falcon import before as falcon_before
 from unittest import mock
 
 
@@ -40,15 +40,22 @@ def model(model_base):
         if auth_token == '2':
             return False
 
-    def action(req, resp):
-        pass
-
+    @before_operation(AuthorizationHook(auth_func, 'test'))
     class model(model_base):
         __tablename__ = 'model'
-        _build_routes_from_schema = False
         id = sa.Column(sa.Integer, primary_key=True)
+        __schema__ = {
+            '/': {
+                'get': {
+                    'operationId': 'get_test',
+                    'responses': {'200': {'description': 'test'}}
+                }
+            }
+        }
 
-        __routes__ = {Route('/', 'GET', action, hooks=[before_action(AuthorizationHook(auth_func, 'test'))])}
+        @classmethod
+        def get_test(cls, req, resp, **kwargs):
+            pass
 
     return model
 
@@ -81,13 +88,13 @@ class TestAuthorizationHook(object):
             {'error': 'Please refresh your authorization'})
 
     def test_with_valid_authorization(self, app, model, client):
-        resp = client.get('/', headers={'Authorization': '1'})
+        resp = client.get('/', headers={'Authorization': '1'}, body='{}')
         assert resp.status_code == 200
         assert resp.headers.get('WWW-Authenticate') == None
         assert resp.body == ''
 
     def test_with_valid_authorization_using_basic(self, app, model, client):
-        resp = client.get('/', headers={'Authorization': 'Basic 1'})
+        resp = client.get('/', headers={'Authorization': 'Basic 1'}, body='{}')
         assert resp.status_code == 200
         assert resp.headers.get('WWW-Authenticate') == None
         assert resp.body == ''

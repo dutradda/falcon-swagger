@@ -21,83 +21,27 @@
 # SOFTWARE.
 
 
-from myreco.exceptions import JSONError
 from myreco.base.session import Session, RedisSession
 from myreco.base.models.sqlalchemy_redis import SQLAlchemyModelMeta
 from myreco.base.models.redis import RedisModelMeta
-from falcon.errors import HTTPNotFound, HTTPMethodNotAllowed
-import json
-import inspect
 
 
-class FalconRoutesMiddleware(object):
-    def __init__(self, routes):
-        self._routes = dict()
-        self._allowed_methods = set()
-        for route in routes:
-            self._routes[(route.uri_template, route.method)] = route
-            self._allowed_methods.add(route.method)
 
-    def process_resource(self, req, resp, model, uri_params):
-        route = self._get_route(req.uri_template, req.method)
+class SessionMiddleware(object):
 
-        body = req.stream.read().decode()
-        if body:
-            try:
-                req.context['body'] = json.loads(body)
-            except ValueError as error:
-                req.context['body'] = body
-                raise JSONError(*error.args, input_=req.context['body'])
-        else:
-            req.context['body'] = {}
-
-        if route.has_schemas:
-            resp.add_link(route.uri_template + '/schemas/', 'schemas')
-
-        if route.validator is not None:
-            route.validator.validate(req.context['body'])
-
-        req.context['route'] = route
-        req.context['model'] = model
-        route.action(req, resp, **uri_params)
-
-    def _get_route(self, uri_template, method):
-        if not method in self._allowed_methods:
-            raise HTTPMethodNotAllowed(self._allowed_methods)
-
-        route = self._routes.get((uri_template, method))
-        if not route:
-            raise HTTPNotFound()
-
-        return route
-
-    def process_response(self, req, resp, model):
-        if resp.body != '' and resp.body is not None:
-            resp.body = json.dumps(resp.body)
-
-
-class FalconSQLAlchemyRedisMiddleware(FalconRoutesMiddleware):
-
-    def __init__(self, bind, redis_bind=None, routes=None):
-        self._bind = bind
-        self._redis_bind = redis_bind
-
-        if routes is None:
-            routes = set()
-
-        FalconRoutesMiddleware.__init__(self, routes)
+    def __init__(self, sqlalchemy_bind=None, redis_bind=None):
+        self.sqlalchemy_bind = sqlalchemy_bind
+        self.redis_bind = redis_bind
 
     def process_resource(self, req, resp, model, uri_params):
         if isinstance(model, SQLAlchemyModelMeta):
             req.context['session'] = Session(
-                bind=self._bind, redis_bind=self._redis_bind)
+                bind=self.sqlalchemy_bind, redis_bind=self.redis_bind)
+
         elif isinstance(model, RedisModelMeta):
-            req.context['session'] = RedisSession(self._redis_bind)
-        FalconRoutesMiddleware.process_resource(
-            self, req, resp, model, uri_params)
+            req.context['session'] = RedisSession(self.redis_bind)
 
     def process_response(self, req, resp, model):
-        FalconRoutesMiddleware.process_response(self, req, resp, model)
         session = req.context.pop('session', None)
         if session is not None and isinstance(model, SQLAlchemyModelMeta):
             session.close()
