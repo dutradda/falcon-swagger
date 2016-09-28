@@ -1,0 +1,265 @@
+{
+    "/users/": {
+        "post": {
+            "operationId": "post_by_body",
+            "parameters": [{
+                "name": "body",
+                "in": "body",
+                "required": true,
+                "schema": {"$ref": "#/definitions/schema_with_grants_array"}
+            }],
+            "responses": {
+                "201": {"description": "Created"}
+            }
+        },
+        "put": {
+            "operationId": "put_by_body",
+            "parameters": [{
+                "name": "body",
+                "in": "body",
+                "required": true,
+                "schema": {"$ref": "#/definitions/full_schema_array"}
+            }],
+            "responses": {
+                "201": {"description": "Created"},
+                "200": {"description": "Updated"},
+                "207": {"description": "Created and updated"}
+            }
+        },
+        "patch": {
+            "operationId": "patch_by_body",
+            "parameters": [{
+                "name": "body",
+                "in": "body",
+                "required": true,
+                "schema": {"$ref": "#/definitions/schema_at_least_id_array"}
+            }],
+            "responses": {
+                "201": {"description": "Created"},
+                "200": {"description": "Updated"},
+                "207": {"description": "Created and updated"}
+            }
+        },
+        "delete": {
+            "operationId": "delete_by_body",
+            "parameters": [{
+                "name": "body",
+                "in": "body",
+                "required": true,
+                "schema": {"$ref": "#/definitions/email_schema_array"}
+            }],
+            "responses": {
+                "204": {"description": "Deleted"}
+            }
+        },
+        "get": {
+            "operationId": "get_by_body",
+            "parameters": [{
+                "name": "body",
+                "in": "body",
+                "required": false,
+                "schema": {"$ref": "#/definitions/email_schema_array"}
+            }],
+            "responses": {
+                "200": {"description": "Getted"}
+            }
+        }
+    },
+    "/users/{email}": {
+        "parameters": [{
+            "name": "email",
+            "in": "path",
+            "type": "string",
+            "required": true
+        }],
+        "put": {
+            "operationId": "put_by_uri_template",
+            "parameters": [{
+                "name": "body",
+                "in": "body",
+                "required": true,
+                "schema": {"$ref": "#/definitions/schema_with_grants"}
+            }],
+            "responses": {
+                "201": {"description": "Created"},
+                "200": {"description": "Updated"}
+            }
+        },
+        "patch": {
+            "operationId": "patch_by_uri_template",
+            "parameters": [{
+                "name": "body",
+                "in": "body",
+                "required": true,
+                "schema": {"$ref": "#/definitions/base_schema"}
+            }],
+            "responses": {
+                "201": {"description": "Created"}
+            }
+        },
+        "delete": {
+            "operationId": "delete_by_uri_template",
+            "responses": {
+                "204": {"description": "Deleted"}
+            }
+        },
+        "get": {
+            "operationId": "get_by_uri_template",
+            "responses": {
+                "200": {"description": "Getted"}
+            }
+        }
+    },
+    "definitions": {
+        "schema_with_grants_common": {
+            "allOf": [{
+                "$ref": "#/definitions/base_schema_common"
+            },{
+                "properties": {
+                    "grants": {
+                        "type": "array",
+                        "uniqueItems": true,
+                        "items": {"$ref": "#/definitions/grants"}
+                    }
+                }
+            }]
+        },
+        "base_schema_common": {
+            "type": "object",
+            "minProperties": 1,
+            "properties": {
+                "name": {"type": "string"},
+                "email": {"type": "string"},
+                "password": {"type": "string"}
+            }
+        },
+        "full_schema_common": {
+            "allOf": [{
+                "$ref": "#/definitions/schema_with_grants_common"
+            },{
+                "properties": {
+                    "id": {"type": "string"}
+                }
+            }]
+        },
+        "base_schema": {
+            "additionalProperties": false,
+            "$ref": "#/definitions/base_schema_common"
+        },
+        "schema_with_grants": {
+            "additionalProperties": false,
+            "required": ["name", "email", "password"],
+            "$ref": "#/definitions/schema_with_grants_common"
+        },
+        "full_schema": {
+            "additionalProperties": false,
+            "required": ["id", "name", "email", "password"],
+            "$ref": "#/definitions/full_schema_common"
+        },
+        "email_schema": {
+            "type": "object",
+            "required": ["email"],
+            "additionalProperties": false,
+            "properties": {
+                "email": {"type": "string"}
+            }
+        },
+        "schema_at_least_id": {
+            "required": ["id"],
+            "$ref": "#/definitions/full_schema"
+        },
+        "schema_with_grants_array": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"$ref": "#/definitions/schema_with_grants"}
+        },
+        "full_schema_array": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"$ref": "#/definitions/full_schema"}
+        },
+        "email_schema_array": {
+            "type": "array",
+            "minItems": 1,
+            "items": {"$ref": "#/definitions/email_schema"}
+        },
+        "schema_at_least_id_array": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "$ref": "#/definitions/schema_at_least_id"
+            }
+        },
+        "grants": {
+            "oneOf": [{
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["uri_id", "method_id"],
+                "properties": {
+                    "uri_id": {"type": "integer"},
+                    "method_id": {"type": "integer"},
+                    "_update": {"enum": [true]}
+                }
+            },{
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["uri_id", "method_id", "_remove"],
+                "properties": {
+                    "uri_id": {"type": "integer"},
+                    "method_id": {"type": "integer"},
+                    "_remove": {"enum": [true]}
+                }
+            },{
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["uri", "method"],
+                "properties": {
+                    "uri": {"$ref": "#/definitions/uri"},
+                    "method": {"$ref": "#/definitions/method"},
+                    "_update": {"enum": [true]}
+                }
+            }]
+        },
+        "uri": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["id"],
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "uri": {"type": "string"},
+                        "_update": {"enum": [true]}
+                    }
+                },{
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["uri"],
+                    "properties": {
+                        "uri": {"type": "string"}
+                    }
+                }
+            ]
+        },
+        "method": {
+            "oneOf": [
+                {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["id"],
+                    "properties": {
+                        "id": {"type": "integer"},
+                        "_update": {"enum": [true]}
+                    }
+                },{
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["method"],
+                    "properties": {
+                        "method": {"type": "string"}
+                    }
+                }
+            ]
+        }
+    }
+}

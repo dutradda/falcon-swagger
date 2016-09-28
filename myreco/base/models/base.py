@@ -23,8 +23,8 @@
 
 from myreco.exceptions import ModelBaseError, JSONError
 from falcon.errors import HTTPNotFound, HTTPMethodNotAllowed
-from falcon import HTTP_CREATED
-from jsonschema import RefResolver, Draft4Validator
+from falcon import HTTP_CREATED, HTTP_NO_CONTENT
+from jsonschema import RefResolver, Draft4Validator, ValidationError
 from collections import defaultdict
 from copy import deepcopy
 from importlib import import_module
@@ -96,10 +96,11 @@ class BaseModelPutMixinMeta(BaseModelPostMixinMeta):
             ambigous_keys = [
                 kwa for kwa in id_ if kwa in req_body and str(req_body[kwa]) != id_[kwa]]
             if ambigous_keys:
+                body_schema = req.context.get('body_schema')
                 raise ValidationError(
                     "Ambiguous value for '{}'".format(
                         "', '".join(ambigous_keys)),
-                    instance={'body': req_body, 'uri': id_}, schema=cls._body_validator.schema)
+                    instance={'body': req_body, 'uri': id_}, schema=body_schema)
 
             req.context['parameters']['body'] = req_body
             cls._insert(req, resp, with_update=True)
@@ -108,6 +109,9 @@ class BaseModelPutMixinMeta(BaseModelPostMixinMeta):
 
 
 class BaseModelPatchMixinMeta(BaseModelPutMixinMeta):
+
+    def patch_by_body(cls, req, resp):
+        cls._update(req, resp)
 
     def patch_by_uri_template(cls, req, resp):
         session, req_body, id_, kwargs = cls._get_context_values(req.context)
@@ -178,7 +182,7 @@ def _get_dir_path(filename):
     return os.path.dirname(os.path.abspath(filename))
 
 
-def _get_model_schema(filename):
+def get_model_schema(filename):
     return json.load(open(os.path.join(_get_dir_path(filename), 'schema.json')))
 
 
@@ -271,6 +275,8 @@ class Operation(object):
             'headers': headers_params,
             'body': body_params
         }
+        if self._body_validator:
+            req.context['body_schema'] = self._body_validator.schema
         self._action(req, resp)
 
     def _build_body_params(self, req):

@@ -34,3 +34,8 @@ from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBuilder
 @pytest.fixture
 def model_base():
     return SQLAlchemyRedisModelBuilder()
+
+
+@pytest.fixture
+def root_path():
+    return ROOT_PATH

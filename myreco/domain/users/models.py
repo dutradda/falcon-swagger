@@ -22,8 +22,8 @@
 
 
 from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
-from myreco.base.hooks import AuthorizationHook, before_action
-from myreco.base.routes import Route
+from myreco.base.models.base import get_model_schema
+from myreco.base.hooks import AuthorizationHook, before_operation
 from myreco.domain.stores.model import StoresModel
 from myreco.domain.constants import AUTH_REALM
 from base64 import b64decode
@@ -33,7 +33,6 @@ import sqlalchemy as sa
 class GrantsModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'grants'
     __table_args__ = {'mysql_engine':'innodb'}
-    __build_default_routes__ = False
 
     uri_id = sa.Column(sa.ForeignKey('uris.id'), primary_key=True)
     method_id = sa.Column(sa.ForeignKey('methods.id'), primary_key=True)
@@ -45,7 +44,6 @@ class GrantsModel(SQLAlchemyRedisModelBase):
 class URIsModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'uris'
     __table_args__ = {'mysql_engine':'innodb'}
-    __build_default_routes__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     uri = sa.Column(sa.String(255), unique=True, nullable=False)
@@ -54,7 +52,6 @@ class URIsModel(SQLAlchemyRedisModelBase):
 class MethodsModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'methods'
     __table_args__ = {'mysql_engine':'innodb'}
-    __build_default_routes__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     method = sa.Column(sa.String(10), unique=True, nullable=False)
@@ -63,6 +60,7 @@ class MethodsModel(SQLAlchemyRedisModelBase):
 class UsersModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'users'
     __table_args__ = {'mysql_engine':'innodb'}
+    __schema__ = get_model_schema(__file__)
 
     id = sa.Column(sa.String(255), primary_key=True)
     name = sa.Column(sa.String(255), unique=True, nullable=False)
@@ -164,8 +162,7 @@ class UsersModel(SQLAlchemyRedisModelBase):
             inst.id = '{}:{}'.format(inst.email, inst.password)
 
 
-for route in UsersModel.__routes__:
-    route.action = before_action(AuthorizationHook(UsersModel.authorize, AUTH_REALM))(route.action)
+UsersModel = before_operation(AuthorizationHook(UsersModel.authorize, AUTH_REALM))(UsersModel)
 
 
 users_grants = sa.Table(

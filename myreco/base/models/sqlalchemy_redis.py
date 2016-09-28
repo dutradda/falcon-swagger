@@ -387,11 +387,6 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
 
         return objs
 
-    def get_schemas_path(cls):
-        module_filename = import_module(cls.__module__).__file__
-        module_path = os.path.dirname(os.path.abspath(module_filename))
-        return os.path.join(module_path, 'schemas')
-
 
 class _SQLAlchemyModel(ModelBase):
 

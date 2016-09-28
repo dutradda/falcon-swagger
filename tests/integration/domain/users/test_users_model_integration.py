@@ -23,9 +23,8 @@
 
 from myreco.domain.users.models import UsersModel
 from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
-from myreco.base.hooks import AuthorizationHook, before_action
+from myreco.base.hooks import AuthorizationHook, before_operation
 from myreco.base.http_api import HttpAPI
-from myreco.base.routes import Route
 from base64 import b64encode
 from unittest import mock
 import pytest
@@ -38,17 +37,35 @@ def model_base():
     return SQLAlchemyRedisModelBase
 
 
+@before_operation(AuthorizationHook(UsersModel.authorize, 'test'))
 class model(SQLAlchemyRedisModelBase):
     __tablename__ = 'test'
     id = sa.Column(sa.Integer, primary_key=True)
 
     @classmethod
-    def action(cls, req, resp, **kwargs):
+    def do_nothing(cls, req, resp, **kwargs):
         pass
 
-action = before_action(AuthorizationHook(UsersModel.authorize, 'test'))(model.action)
-model.__routes__ = {Route('/test', 'POST', action)}
-model.__routes__.add(Route('/test/{id}', 'POST', action))
+    __schema__ = {
+        '/test': {
+            'post': {
+                'operationId': 'do_nothing',
+                'responses': {'201': {'description': 'Created'}}
+            }
+        },
+        '/test/{id}': {
+            'parameters': [{
+                'name': 'id',
+                'in': 'path',
+                'required': True,
+                'type': 'integer'
+            }],
+            'post': {
+                'operationId': 'do_nothing',
+                'responses': {'201': {'description': 'Created'}}
+            }
+        }
+    }
 
 
 @pytest.fixture

@@ -22,8 +22,9 @@
 
 
 from myreco.domain.users.models import UsersModel, GrantsModel, URIsModel, MethodsModel
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase, SQLAlchemyRedisModelRoutesBuilder
+from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.base.http_api import HttpAPI
+from myreco.base.models.base import get_model_schema
 from unittest import mock
 from base64 import b64encode
 from pytest_falcon.plugin import Client
@@ -193,7 +194,7 @@ class TestUsersResourcePost(object):
             'admin': False
         }]
 
-    def test_post_invalid_json(self, client, headers):
+    def test_post_invalid_json(self, client, headers, root_path):
         user = [{
             'name': 'test2',
             'email': 'test2',
@@ -208,8 +209,7 @@ class TestUsersResourcePost(object):
         assert resp.status_code == 400
         result = json.loads(resp.body)
         message = result['error'].pop('message')
-        expected_schema = os.path.join(UsersModel.get_schemas_path(), 'grants.json')
-        expected_schema = json.load(open(expected_schema))
+        expected_schema = get_model_schema(root_path + '/../myreco/domain/users/models.py')
 
         assert message == \
                 "{'method_id': 1, 'test': 1} is not valid under any of the given schemas" \
@@ -218,13 +218,13 @@ class TestUsersResourcePost(object):
         assert result == {
             'error': {
                 'input': {'method_id': 1, 'test': 1},
-                'schema': expected_schema
+                'schema': expected_schema['definitions']['grants']
             }
         }
 
 
 class TestUsersResourcePutInsert(object):
-    def test_put_with_ambiguous_ids(self, client, headers):
+    def test_put_with_ambiguous_ids(self, client, headers, root_path):
         user = {
             'name': 'test2',
             'email': 'test22',
@@ -236,28 +236,16 @@ class TestUsersResourcePutInsert(object):
             }]
         }
         resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
+        expected_schema = get_model_schema(root_path + '/../myreco/domain/users/models.py')
+        expected_schema = {
+            'definitions': expected_schema['definitions'],
+            '$ref': '#/definitions/schema_with_grants'
+        }
 
         assert resp.status_code == 400
         assert json.loads(resp.body) == {
             'error': {
-                'schema': {
-                    '$schema': 'http://json-schema.org/draft-04/schema#',
-                    'type': 'object',
-                    'properties': {
-                        'grants': {
-                            'uniqueItems': True,
-                            'minItems': 1,
-                            'type': 'array',
-                            'items': {'$ref': 'schema:grants.json'}
-                        },
-                        'name': {'type': 'string'},
-                        'email': {'type': 'string'},
-                        'password': {'type': 'string'}
-                    },
-                    'required': ['name', 'password', 'email', 'grants'],
-                    'additionalProperties': False,
-                    'title': 'Recommendations Users'
-                },
+                'schema': expected_schema,
                 'input': {
                     'body': {
                         'grants': [{
@@ -917,54 +905,9 @@ class TestUsersResourceDeleteGet(object):
 
 
 class TestUsersResourceSchemas(object):
-    def test_get_put_schemas(self, client, headers):
-        resp = client.get('/users/{email}/_schemas/put/')
-        assert resp.status_code == 200
-        assert sorted(json.loads(resp.body)) == [
-            'http://falconframework.org/users/{email}/_schemas/put/input',
-            'http://falconframework.org/users/{email}/_schemas/put/output'
-        ]
+    def test_get_put_schemas(self, client, headers, root_path):
+        resp = client.get('/users/_schema/', headers=headers)
+        expected_schema = get_model_schema(root_path + '/../myreco/domain/users/models.py')
 
-    def test_get_put_input_schema(self, client, headers):
-        resp = client.get('/users/{email}/_schemas/put/input/')
         assert resp.status_code == 200
-        assert json.loads(resp.body) == {
-            '$schema': 'http://json-schema.org/draft-04/schema#',
-            'title': 'Recommendations Users',
-            'type': 'object',
-            'additionalProperties': False,
-            'required': ['name', 'password', 'email', 'grants'],
-            'properties': {
-                'name': {'type': 'string'},
-                'email': {'type': 'string'},
-                'password': {'type': 'string'},
-                'grants': {
-                    'type': 'array',
-                    'minItems': 1,
-                    'uniqueItems': True,
-                    'items': {'$ref': 'schema:grants.json'}
-                }
-            }
-        }
-
-    def test_get_put_output_schema(self, client, headers):
-        resp = client.get('/users/{email}/_schemas/put/output/')
-        assert resp.status_code == 200
-        assert json.loads(resp.body) == {
-            '$schema': 'http://json-schema.org/draft-04/schema#',
-            'title': 'Recommendations Users',
-            'type': 'object',
-            'additionalProperties': False,
-            'required': ['name', 'password', 'email', 'grants'],
-            'properties': {
-                'name': {'type': 'string'},
-                'email': {'type': 'string'},
-                'password': {'type': 'string'},
-                'grants': {
-                    'type': 'array',
-                    'minItems': 1,
-                    'uniqueItems': True,
-                    'items': {'$ref': 'schema:grants.json'}
-                }
-            }
-        }
+        assert json.loads(resp.body) == expected_schema
