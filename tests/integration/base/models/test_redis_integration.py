@@ -31,109 +31,82 @@ import json
 
 @pytest.fixture
 def app():
-    obj_schema = {
-        'type': 'object',
-        'required': ['id', 'field1', 'field2'],
-        'properties': {
-            'id': {'type': 'integer'},
-            'field1': {'type': 'string'},
-            'field2': {
-                'type': 'object',
-                'required': ['fid'],
-                'properties': {'fid': {'type': 'string'}}
-            }
-        }
-    }
     schema = {
         '/test': {
+            'parameters': [{
+                'name': 'body',
+                'in': 'body',
+                'schema': {}
+            }],
             'post': {
                 'operationId': 'post_by_body',
-                'responses': {'201': {'description': 'Created', 'schema': obj_schema}},
+                'responses': {'201': {'description': 'Created', 'schema': {'$ref': '#/definitions/obj_schema'}}},
                 'parameters': [{
                     'name': 'body',
                     'in': 'body',
-                    'schema': obj_schema
+                    'schema': {'$ref': '#/definitions/obj_schema'}
                 }]
             },
             'put': {
                 'operationId': 'put_by_body',
-                'responses': {'200': {'description': 'Updated', 'schema': obj_schema}},
+                'responses': {'200': {'description': 'Updated', 'schema': {'$ref': '#/definitions/obj_schema'}}},
                 'parameters': [{
                     'name': 'body',
                     'in': 'body',
-                    'schema': obj_schema
+                    'schema': {'$ref': '#/definitions/obj_schema'}
                 }]
             },
             'delete': {
                 'operationId': 'delete_by_body',
-                'responses': {'204': {'description': 'Deleted'}},
-                'parameters': [{
-                    'name': 'body',
-                    'in': 'body',
-                    'schema': {}
-                }]
+                'responses': {'204': {'description': 'Deleted'}}
             },
             'get': {
                 'operationId': 'get_by_body',
-                'responses': {'200': {'description': 'Getted'}},
-                'parameters': [{
-                    'name': 'body',
-                    'in': 'body',
-                    'schema': {}
-                }]
+                'responses': {'200': {'description': 'Getted'}}
             },
         },
         '/test/{id}': {
+            'parameters': [{
+                'name': 'id',
+                'in': 'path',
+                'required': True,
+                'type': 'integer'
+            }],
             'post': {
                 'operationId': 'post_by_uri_template',
-                'responses': {'201': {'description': 'Created'}},
-                'parameters': [{
-                    'name': 'id',
-                    'in': 'path',
-                    'required': True,
-                    'type': 'integer'
-                }]
+                'responses': {'201': {'description': 'Created'}}
             },
             'put': {
                 'operationId': 'put_by_uri_template',
-                'responses': {'200': {'description': 'Updated', 'schema': obj_schema}},
-                'parameters': [{
-                    'name': 'id',
-                    'in': 'path',
-                    'required': True,
-                    'type': 'integer'
-                }]
+                'responses': {'200': {'description': 'Updated', 'schema': {'$ref': '#/definitions/obj_schema'}}}
             },
             'patch': {
                 'operationId': 'patch_by_uri_template',
-                'responses': {'200': {'description': 'Updated'}},
-                'parameters': [{
-                    'name': 'id',
-                    'in': 'path',
-                    'required': True,
-                    'type': 'integer'
-                }]
+                'responses': {'200': {'description': 'Updated'}}
             },
             'delete': {
                 'operationId': 'delete_by_uri_template',
-                'responses': {'200': {'description': 'Deleted'}},
-                'parameters': [{
-                    'name': 'id',
-                    'in': 'path',
-                    'required': True,
-                    'type': 'integer'
-                }]
+                'responses': {'200': {'description': 'Deleted'}}
             },
             'get': {
                 'operationId': 'get_by_uri_template',
-                'responses': {'200': {'description': 'Getted'}},
-                'parameters': [{
-                    'name': 'id',
-                    'in': 'path',
-                    'required': True,
-                    'type': 'integer'
-                }]
+                'responses': {'200': {'description': 'Getted'}}
             },
+        },
+        'definitions': {
+            'obj_schema': {
+                'type': 'object',
+                'required': ['id', 'field1', 'field2'],
+                'properties': {
+                    'id': {'type': 'integer'},
+                    'field1': {'type': 'string'},
+                    'field2': {
+                        'type': 'object',
+                        'required': ['fid'],
+                        'properties': {'fid': {'type': 'string'}}
+                    }
+                }
+            }
         }
     }
     models = [{'name': 'test', 'id_names': ['id'], 'schema': schema}]

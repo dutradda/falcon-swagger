@@ -178,6 +178,10 @@ def _get_dir_path(filename):
     return os.path.dirname(os.path.abspath(filename))
 
 
+def _get_model_schema(filename):
+    return json.load(open(os.path.join(_get_dir_path(filename), 'schema.json')))
+
+
 PATHS_SCHEMA = {'$ref': 'swagger_schema_extended.json#/definitions/paths'}
 SCHEMAS_HANDLERS = {'': URISchemaHandler(_get_dir_path(__file__))}
 RESOLVER = RefResolver.from_schema(PATHS_SCHEMA, handlers=SCHEMAS_HANDLERS)
@@ -194,7 +198,7 @@ CAST = {
 
 class Operation(object):
 
-    def __init__(self, action, schema, all_methods_parameters, model_dir):
+    def __init__(self, action, schema, all_methods_parameters, definitions, model_dir):
         self._action = action
         self._body_validator = None
         self._uri_template_validator = None
@@ -208,7 +212,13 @@ class Operation(object):
 
         for parameter in all_methods_parameters + schema.get('parameters', []):
             if parameter['in'] == 'body':
-                self._body_validator = self._build_validator(parameter['schema'])
+                if definitions:
+                    body_schema = deepcopy(parameter['schema'])
+                    body_schema.update({'definitions': definitions})
+                else:
+                    body_schema = parameter['schema']
+
+                self._body_validator = self._build_validator(body_schema)
 
             elif parameter['in'] == 'path':
                 self._set_parameter_on_schema(parameter, uri_template_schema)
@@ -333,7 +343,8 @@ class ModelBaseRoutesMixinMeta(type):
                     except AttributeError:
                         raise ModelBaseError("'operationId' '{}' was not found".format(operation_id))
 
-                    operation = Operation(action, method, all_methods_parameters, cls.get_module_path())
+                    definitions = schema.get('definitions')
+                    operation = Operation(action, method, all_methods_parameters, definitions, cls.get_module_path())
                     cls.__routes__[uri_template][method_name] = operation
                     cls.__allowed_methods__.add(method_name.upper())
 
