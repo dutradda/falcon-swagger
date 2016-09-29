@@ -1,0 +1,68 @@
+{
+    "/variables/": {
+        "post": {
+            "operationId": "post_by_body",
+            "parameters": [{
+                "name": "body",
+                "in": "body",
+                "required": true,
+                "schema": {"$ref": "#/definitions/schema_array"}
+            }],
+            "responses": {"201": {"description": "Created"}}
+        },
+        "get": {
+            "operationId": "get_by_body",
+            "responses": {"200": {"description": "Got"}}
+        }
+    },
+    "/variables/{id}/": {
+        "parameters": [{
+            "name": "id",
+            "in": "path",
+            "type": "integer",
+            "required": true
+        }],
+        "patch": {
+            "operationId": "patch_by_uri_template",
+            "parameters": [{
+                "name": "body",
+                "in": "body",
+                "required": true,
+                "schema": {"$ref": "#/definitions/schema_without_required"}
+            }],
+            "responses": {"200": {"description": "Got"}}
+        },
+        "delete": {
+            "operationId": "delete_by_uri_template",
+            "responses": {"204": {"description": "Deleted"}}
+        },
+        "get": {
+            "operationId": "get_by_uri_template",
+            "responses": {"200": {"description": "Got"}}
+        }
+    },
+    "definitions": {
+        "schema_without_required": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": false,
+            "properties": {
+                "name": {"type": "string"},
+                "store_id": {"type": "integer"}
+            }
+        },
+        "schema_array": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["name", "store_id"],
+                "properties": {
+                    "name": {"type": "string"},
+                    "store_id": {"type": "integer"}
+                }
+            }
+        }
+    }
+}
