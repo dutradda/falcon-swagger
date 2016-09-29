@@ -1,5 +1,5 @@
 {
-    "/items_types/": {
+    "/stores/": {
         "post": {
             "operationId": "post_by_body",
             "parameters": [{
@@ -15,7 +15,7 @@
             "responses": {"200": {"description": "Getted"}}
         }
     },
-    "/items_types/{id}/": {
+    "/stores/{id}/": {
         "parameters": [{
             "name": "id",
             "in": "path",
@@ -48,12 +48,7 @@
             "additionalProperties": false,
             "properties": {
                 "name": {"type": "string"},
-                "id_names": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {"type": "string"}
-                },
-                "schema": {"$ref": "http://json-schema.org/draft-04/schema#"}
+                "country": {"type": "string"}
             }
         },
         "schema_array": {
@@ -62,15 +57,10 @@
             "items": {
                 "type": "object",
                 "additionalProperties": false,
-                "required": ["name", "id_names", "schema"],
+                "required": ["name", "country"],
                 "properties": {
                     "name": {"type": "string"},
-                    "id_names": {
-                        "type": "array",
-                        "minItems": 1,
-                        "items": {"type": "string"}
-                    },
-                    "schema": {"$ref": "http://json-schema.org/draft-04/schema#"}
+                    "country": {"type": "string"}
                 }
             }
         }

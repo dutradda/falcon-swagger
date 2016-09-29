@@ -23,7 +23,7 @@
 
 from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.base.http_api import HttpAPI
-from myreco.domain.items_types.models import ItemsTypesModel
+from myreco.domain.stores.model import StoresModel
 from myreco.domain.users.models import UsersModel
 from base64 import b64encode
 from fakeredis import FakeStrictRedis
@@ -46,7 +46,7 @@ def app(session):
     }
     UsersModel.insert(session, user)
 
-    return HttpAPI([ItemsTypesModel], session.bind, FakeStrictRedis())
+    return HttpAPI([StoresModel], session.bind, FakeStrictRedis())
 
 
 @pytest.fixture
@@ -56,15 +56,16 @@ def headers():
     }
 
 
+
 class TestItemsTypesModelPost(object):
 
     def test_post_without_body(self, client, headers):
-        resp = client.post('/items_types/', headers=headers)
+        resp = client.post('/stores/', headers=headers)
         assert resp.status_code == 400
         assert json.loads(resp.body) == {'error': 'Request body is missing'}
 
     def test_post_with_invalid_body(self, client, headers):
-        resp = client.post('/items_types/', headers=headers, body='[{}]')
+        resp = client.post('/stores/', headers=headers, body='[{}]')
         assert resp.status_code == 400
         assert json.loads(resp.body) ==  {
             'error': {
@@ -73,15 +74,10 @@ class TestItemsTypesModelPost(object):
                 'schema': {
                     'type': 'object',
                     'additionalProperties': False,
-                    'required': ['name', 'id_names', 'schema'],
+                    'required': ['name', 'country'],
                     'properties': {
                         'name': {'type': 'string'},
-                        'id_names': {
-                            'type': 'array',
-                            'minItems': 1,
-                            'items': {'type': 'string'}
-                        },
-                        'schema': {'$ref': 'http://json-schema.org/draft-04/schema#'}
+                        'country': {'type': 'string'}
                     }
                 }
             }
@@ -90,10 +86,9 @@ class TestItemsTypesModelPost(object):
     def test_post(self, client, headers):
         body = [{
             'name': 'test',
-            'id_names': ['test'],
-            'schema': {}
+            'country': 'test'
         }]
-        resp = client.post('/items_types/', headers=headers, body=json.dumps(body))
+        resp = client.post('/stores/', headers=headers, body=json.dumps(body))
         body[0]['id'] = 1
 
         assert resp.status_code == 201
@@ -103,24 +98,23 @@ class TestItemsTypesModelPost(object):
 class TestItemsTypesModelGet(object):
 
     def test_get_not_found(self, client, headers):
-        resp = client.get('/items_types/', headers=headers)
+        resp = client.get('/stores/', headers=headers)
         assert resp.status_code == 404
 
     def test_get_invalid_with_body(self, client, headers):
-        resp = client.get('/items_types/', headers=headers, body='{}')
+        resp = client.get('/stores/', headers=headers, body='{}')
         assert resp.status_code == 400
         assert json.loads(resp.body) == {'error': 'Request body is not acceptable'}
 
     def test_get(self, client, headers):
         body = [{
             'name': 'test',
-            'id_names': ['test'],
-            'schema': {}
+            'country': 'test'
         }]
-        client.post('/items_types/', headers=headers, body=json.dumps(body))
+        client.post('/stores/', headers=headers, body=json.dumps(body))
         body[0]['id'] = 1
 
-        resp = client.get('/items_types/', headers=headers)
+        resp = client.get('/stores/', headers=headers)
         assert resp.status_code == 200
         assert json.loads(resp.body) ==  body
 
@@ -128,12 +122,12 @@ class TestItemsTypesModelGet(object):
 class TestItemsTypesModelUriTemplatePatch(object):
 
     def test_patch_without_body(self, client, headers):
-        resp = client.patch('/items_types/1/', headers=headers, body='')
+        resp = client.patch('/stores/1/', headers=headers, body='')
         assert resp.status_code == 400
         assert json.loads(resp.body) == {'error': 'Request body is missing'}
 
     def test_patch_with_invalid_body(self, client, headers):
-        resp = client.patch('/items_types/1/', headers=headers, body='{}')
+        resp = client.patch('/stores/1/', headers=headers, body='{}')
         assert resp.status_code == 400
         assert json.loads(resp.body) ==  {
             'error': {
@@ -145,12 +139,7 @@ class TestItemsTypesModelUriTemplatePatch(object):
                     'minProperties': 1,
                     'properties': {
                         'name': {'type': 'string'},
-                        'id_names': {
-                            'type': 'array',
-                            'minItems': 1,
-                            'items': {'type': 'string'}
-                        },
-                        'schema': {'$ref': 'http://json-schema.org/draft-04/schema#'}
+                        'country': {'type': 'string'}
                     }
                 }
             }
@@ -159,24 +148,22 @@ class TestItemsTypesModelUriTemplatePatch(object):
     def test_patch_not_found(self, client, headers):
         body = {
             'name': 'test',
-            'id_names': ['test'],
-            'schema': {}
+            'country': 'test'
         }
-        resp = client.patch('/items_types/1/', headers=headers, body=json.dumps(body))
+        resp = client.patch('/stores/1/', headers=headers, body=json.dumps(body))
         assert resp.status_code == 404
 
     def test_patch(self, client, headers):
         body = [{
             'name': 'test',
-            'id_names': ['test'],
-            'schema': {}
+            'country': 'test'
         }]
-        obj = json.loads(client.post('/items_types/', headers=headers, body=json.dumps(body)).body)[0]
+        obj = json.loads(client.post('/stores/', headers=headers, body=json.dumps(body)).body)[0]
 
         body = {
             'name': 'test2'
         }
-        resp = client.patch('/items_types/1/', headers=headers, body=json.dumps(body))
+        resp = client.patch('/stores/1/', headers=headers, body=json.dumps(body))
         obj['name'] = 'test2'
 
         assert resp.status_code == 200
@@ -186,48 +173,46 @@ class TestItemsTypesModelUriTemplatePatch(object):
 class TestItemsTypesModelUriTemplateDelete(object):
 
     def test_delete_with_body(self, client, headers):
-        resp = client.delete('/items_types/1/', headers=headers, body='{}')
+        resp = client.delete('/stores/1/', headers=headers, body='{}')
         assert resp.status_code == 400
         assert json.loads(resp.body) == {'error': 'Request body is not acceptable'}
 
     def test_delete(self, client, headers):
         body = [{
             'name': 'test',
-            'id_names': ['test'],
-            'schema': {}
+            'country': 'test'
         }]
-        client.post('/items_types/', headers=headers, body=json.dumps(body))
+        client.post('/stores/', headers=headers, body=json.dumps(body))
 
-        resp = client.get('/items_types/1/', headers=headers)
+        resp = client.get('/stores/1/', headers=headers)
         assert resp.status_code == 200
 
-        resp = client.delete('/items_types/1/', headers=headers)
+        resp = client.delete('/stores/1/', headers=headers)
         assert resp.status_code == 204
 
-        resp = client.get('/items_types/1/', headers=headers)
+        resp = client.get('/stores/1/', headers=headers)
         assert resp.status_code == 404
 
 
 class TestItemsTypesModelUriTemplateGet(object):
 
     def test_get_with_body(self, client, headers):
-        resp = client.get('/items_types/1/', headers=headers, body='{}')
+        resp = client.get('/stores/1/', headers=headers, body='{}')
         assert resp.status_code == 400
         assert json.loads(resp.body) == {'error': 'Request body is not acceptable'}
 
     def test_get_not_found(self, client, headers):
-        resp = client.get('/items_types/1/', headers=headers)
+        resp = client.get('/stores/1/', headers=headers)
         assert resp.status_code == 404
 
     def test_get(self, client, headers):
         body = [{
             'name': 'test',
-            'id_names': ['test'],
-            'schema': {}
+            'country': 'test'
         }]
-        client.post('/items_types/', headers=headers, body=json.dumps(body))
+        client.post('/stores/', headers=headers, body=json.dumps(body))
 
-        resp = client.get('/items_types/1/', headers=headers)
+        resp = client.get('/stores/1/', headers=headers)
         body[0]['id'] = 1
         assert resp.status_code == 200
         assert json.loads(resp.body) == body[0]

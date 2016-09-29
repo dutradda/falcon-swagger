@@ -65,7 +65,7 @@
             }
         }
     },
-    "/users/{email}": {
+    "/users/{email}/": {
         "parameters": [{
             "name": "email",
             "in": "path",

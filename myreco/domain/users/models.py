@@ -24,7 +24,6 @@
 from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.base.models.base import get_model_schema
 from myreco.base.hooks import AuthorizationHook, before_operation
-from myreco.domain.stores.model import StoresModel
 from myreco.domain.constants import AUTH_REALM
 from base64 import b64decode
 import sqlalchemy as sa
@@ -160,6 +159,9 @@ class UsersModel(SQLAlchemyRedisModelBase):
         insts = cls._to_list(insts)
         for inst in insts:
             inst.id = '{}:{}'.format(inst.email, inst.password)
+
+
+from myreco.domain.stores.model import StoresModel
 
 
 UsersModel = before_operation(AuthorizationHook(UsersModel.authorize, AUTH_REALM))(UsersModel)
