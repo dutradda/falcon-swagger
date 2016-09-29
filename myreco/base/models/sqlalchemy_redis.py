@@ -308,7 +308,7 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
         ids = cls._to_list(ids)
         filters = cls.build_filters_by_ids(ids)
 
-        session.query(cls).filter(filters).delete()
+        [session.delete(inst) for inst in session.query(cls).filter(filters).all()]
 
         if commit:
             session.commit()
@@ -376,14 +376,16 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
         if ids_not_cached:
             filters = cls.build_filters_by_ids(ids_not_cached)
             instances = session.query(cls).filter(filters).all()
-            items_to_set = {
-                inst.get_key(): msgpack.dumps(inst.todict()) for inst in instances}
-            session.redis_bind.hmset(model_redis_key, items_to_set)
+            if instances:
+                items_to_set = {
+                    inst.get_key(): msgpack.dumps(inst.todict()) for inst in instances}
+                session.redis_bind.hmset(model_redis_key, items_to_set)
+                ids_keys = ids[0].keys()
 
-            for inst in instances:
-                inst_ids = inst.get_ids_map()
-                index = ids_not_cached.index(inst_ids)
-                objs.insert(index, inst.todict())
+                for inst in instances:
+                    inst_ids = inst.get_ids_map(ids_keys)
+                    index = ids_not_cached.index(inst_ids)
+                    objs.insert(index, inst.todict())
 
         return objs
 

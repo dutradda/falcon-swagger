@@ -25,6 +25,7 @@ from myreco.domain.users.models import UsersModel, GrantsModel, URIsModel, Metho
 from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.base.http_api import HttpAPI
 from myreco.base.models.base import get_model_schema
+from fakeredis import FakeStrictRedis
 from unittest import mock
 from base64 import b64encode
 from pytest_falcon.plugin import Client
@@ -74,7 +75,7 @@ def init_(session):
 
 @pytest.fixture
 def app(session, init_):
-    return HttpAPI([UsersModel], session.bind)
+    return HttpAPI([UsersModel], session.bind, FakeStrictRedis())
 
 
 @pytest.fixture
