@@ -38,61 +38,25 @@ class EnginesModel(SQLAlchemyRedisModelBase):
 
     type = sa.orm.relationship('EnginesTypesModel')
     item_type = sa.orm.relationship('ItemsTypesModel')
-    variables = sa.orm.relationship('EnginesVariablesModel', uselist=True)
-    fallbacks = sa.orm.relationship('EnginesModel',
-                            uselist=True,
-                            secondary='engines_fallbacks',
-                            primaryjoin="and_(EnginesModel.id==engines_fallbacks.c.engine_id, engines_fallbacks.c.engine_type_id==engines_fallbacks.c.fallback_type_id)",
-                            secondaryjoin="and_(EnginesModel.id==engines_fallbacks.c.fallback_id, engines_fallbacks.c.engine_type_id==engines_fallbacks.c.fallback_type_id)")
+    enabled_filters = sa.orm.relationship('FiltersModel', uselist=True)
 
 
 class EnginesTypesModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'engines_types'
     __table_args__ = {'mysql_engine':'innodb'}
-    __build_default_routes__ = False
-
-    id = sa.Column(sa.Integer, primary_key=True)
-    name = sa.Column(sa.Integer, unique=True, nullable=False)
-
-
-class EnginesVariablesModel(SQLAlchemyRedisModelBase):
-    __tablename__ = 'engines_variables'
-    __table_args__ = {'mysql_engine':'innodb'}
-    __build_default_routes__ = False
-
-    variable_id = sa.Column(sa.ForeignKey('variables.id'), primary_key=True)
-    engine_id = sa.Column(sa.ForeignKey('engines.id'), primary_key=True)
-    override = sa.Column(sa.Boolean, default=False)
-    override_value = sa.Column(sa.String(255))
-    score = sa.Column(sa.Float)
-
-    variable = sa.orm.relationship('VariablesModel')
-
-
-class VariablesModel(SQLAlchemyRedisModelBase):
-    __tablename__ = 'slots'
-    __table_args__ = {'mysql_engine':'innodb'}
-    __build_default_routes__ = False
-
-    id = sa.Column(sa.Integer, primary_key=True)
-    name = sa.Column(sa.Integer, unique=True, nullable=False)
-
-
-class EnginesFiltersModel(SQLAlchemyRedisModelBase):
-    __tablename__ = 'engines_filters'
-    __table_args__ = {'mysql_engine':'innodb'}
-    __build_default_routes__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.String(255), unique=True, nullable=False)
-    object_attr = sa.Column(sa.String(255))
-    item_type_id = sa.Column(sa.ForeignKey('items_types.id'), nullable=False)
+
+    def get_variables_names(self):
+        pass
 
 
-engines_fallbacks = sa.Table("engines_fallbacks", SQLAlchemyRedisModelBase.metadata,
-    sa.Column("engine_id", sa.Integer, sa.ForeignKey("engines.id", ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
-    sa.Column("fallback_id", sa.Integer, sa.ForeignKey("engines.id", ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
-    sa.Column("engine_type_id", sa.Integer, sa.ForeignKey("engines.type_id", ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
-    sa.Column("fallback_type_id", sa.Integer, sa.ForeignKey("engines.type_id", ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
-    mysql_engine='innodb'
-)
+class FiltersModel(SQLAlchemyRedisModelBase):
+    __tablename__ = 'filters'
+    __table_args__ = {'mysql_engine':'innodb'}
+
+    name = sa.Column(sa.String(255), nullable=False, primary_key=True)
+    item_type_id = sa.Column(sa.ForeignKey('items_types.id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True)
+    engine_id = sa.Column(sa.ForeignKey('engines.id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True)
+    store_id = sa.Column(sa.ForeignKey('stores.id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)

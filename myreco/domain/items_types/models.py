@@ -21,8 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase, RedisModelMeta
-from myreco.base.routes import Route
+from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.exceptions import ModelBaseError
 from jsonschema import Draft4Validator
 from collections import defaultdict
@@ -33,42 +32,44 @@ import json
 class ItemsTypesModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'items_types'
     __table_args__ = {'mysql_engine': 'innodb'}
-    __build_default_routes__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.Integer, unique=True, nullable=False)
-    id_names_json = sa.Column(sa.String(255), default='["id"]')
+    id_names_json = sa.Column(sa.String(255), nullable=False)
+    schema_json = sa.Column(sa.Text, nullable=False)
+    engine_id = sa.Column(sa.ForeignKey('engines.id'), nullable=False)
 
-    routes = sa.orm.relationships('RoutesModel', uselist=True)
-
+    @classmethod
     def insert(cls, session, objs, commit=True, todict=True):
-        cls._validate_json(objs)
-        type(cls).insert(cls, session, objs, commit, todict)
+        cls._format_input_json(objs)
+        return type(cls).insert(cls, session, objs, commit, todict)
 
-    def _validate_json(cls, objs_):
-        objs = cls._to_list(objs_)
+    @classmethod
+    def _format_input_json(cls, objs):
+        objs = cls._to_list(objs)
         for obj in ojbs:
-            id_names_json = obj.get('id_names_json')
-            if id_names_json:
-                try:
-                    json.loads(id_names_json)
-                except ValueError as error:
-                    raise JSONError(*error.args, input_=objs_)
+            id_names = obj.pop('id_names', None)
+            if id_names:
+                obj['id_names_json'] = json.dumps(id_names)
 
+            schema = obj.pop('schema', None)
+            if schema:
+                obj['schema_json'] = json.dumps(schema)
+
+    @classmethod
     def update(cls, session, objs, commit=True, todict=True):
-        cls._validate_json(objs)
-        type(cls).update(cls, session, objs, commit, todict)
+        cls._format_input_json(objs)
+        return type(cls).update(cls, session, objs, commit, todict)
 
+    @classmethod
+    def get(cls, session, ids=None, limit=None, offset=None, **kwargs):
+        objs = type(cls).get(cls, session, ids, limit, offset, **kwargs)
+        cls._format_output_json(objs)
+        return objs
 
-class RoutesModel(SQLAlchemyRedisModelBase):
-    __tablename__ = 'json_schemas'
-    __table_args__ = {'mysql_engine': 'innodb'}
-    __build_default_routes__ = False
-
-    item_type_id = sa.Column(sa.ForeignKey('items_types.id'), primary_key=True)
-    method_id = sa.Column(sa.ForeignKey('methods.id'), primary_key=True)
-    uri_template = sa.Column(sa.String(255), nullable=False)
-    output_schema = sa.Column(sa.Text)
-    input_schema = sa.Column(sa.Text)
-
-    method = sa.orm.relationship('MethodsModel')
+    @classmethod
+    def _format_output_json(cls, objs):
+        objs = cls._to_list(objs)
+        for obj in ojbs:
+            obj['id_names'] = json.loads(obj.pop('id_names_json'))
+            obj['schema'] = json.loads(obj.pop('schema_json'))

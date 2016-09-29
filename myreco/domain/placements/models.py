@@ -41,27 +41,36 @@ class PlacementsModel(SQLAlchemyRedisModelBase):
 class VariationsModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'variations'
     __table_args__ = {'mysql_engine':'innodb'}
-    __build_default_routes__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.Integer, nullable=False)
     placement_small_hash = sa.Column(sa.ForeignKey('placements.small_hash'), nullable=False)
 
-    engines = sa.orm.relationship('EnginesModel', uselist=True, secondary='variations_engines')
+    engines_managers = sa.orm.relationship('EnginesManagersModel',
+                uselist=True, secondary='variations_engines_managers',
+                primaryjoin='and_('
+                    'VariationsModel.id==variations_engines_managers.c.variation_id,'
+                    'EnginesManagersModel.id==variations_engines_managers.c.engines_managers_id,'
+                    'EnginesModel.id==EnginesManagersModel.engine_id,'
+                    'EnginesModel.type_id==variations_engines_managers.c.engine_type_id)',
+                secondaryjoin='and_('
+                    'VariationsModel.id==variations_engines_managers.c.variation_id,'
+                    'EnginesManagersModel.id==variations_engines_managers.c.engines_managers_id,'
+                    'EnginesModel.id==EnginesManagersModel.engine_id,'
+                    'EnginesModel.type_id==variations_engines_managers.c.engine_type_id)')
 
 
 class ABTestUsersModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'ab_test_users'
     __table_args__ = {'mysql_engine':'innodb'}
-    __build_default_routes__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     variation_id = sa.Column(sa.ForeignKey('variations.id'), nullable=False)
 
 
-variations_engines = sa.Table(
-    'variations_engines', SQLAlchemyRedisModelBase.metadata,
+variations_engines_managers = sa.Table(
+    'variations_engines_managers', SQLAlchemyRedisModelBase.metadata,
     sa.Column('variation_id', sa.Integer, sa.ForeignKey('variations.id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
-    sa.Column('engine_id', sa.Integer, sa.ForeignKey('engines.id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False),
+    sa.Column('engines_managers_id', sa.Integer, sa.ForeignKey('engines_managers.id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False),
     sa.Column('engine_type_id', sa.Integer, sa.ForeignKey('engines.type_id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
     mysql_engine='innodb')
