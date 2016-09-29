@@ -61,7 +61,7 @@
                 "schema": {"$ref": "#/definitions/email_schema_array"}
             }],
             "responses": {
-                "200": {"description": "Getted"}
+                "200": {"description": "Got"}
             }
         }
     },
@@ -106,7 +106,7 @@
         "get": {
             "operationId": "get_by_uri_template",
             "responses": {
-                "200": {"description": "Getted"}
+                "200": {"description": "Got"}
             }
         }
     },

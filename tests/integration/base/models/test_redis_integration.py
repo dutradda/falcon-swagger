@@ -62,7 +62,7 @@ def app():
             },
             'get': {
                 'operationId': 'get_by_body',
-                'responses': {'200': {'description': 'Getted'}}
+                'responses': {'200': {'description': 'Got'}}
             },
         },
         '/test/{id}': {
@@ -100,7 +100,7 @@ def app():
             },
             'get': {
                 'operationId': 'get_by_uri_template',
-                'responses': {'200': {'description': 'Getted'}}
+                'responses': {'200': {'description': 'Got'}}
             },
         },
         'definitions': {

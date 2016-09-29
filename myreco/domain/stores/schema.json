@@ -12,7 +12,7 @@
         },
         "get": {
             "operationId": "get_by_body",
-            "responses": {"200": {"description": "Getted"}}
+            "responses": {"200": {"description": "Got"}}
         }
     },
     "/stores/{id}/": {
@@ -30,7 +30,7 @@
                 "required": true,
                 "schema": {"$ref": "#/definitions/schema_without_required"}
             }],
-            "responses": {"200": {"description": "Getted"}}
+            "responses": {"200": {"description": "Got"}}
         },
         "delete": {
             "operationId": "delete_by_uri_template",
@@ -38,7 +38,7 @@
         },
         "get": {
             "operationId": "get_by_uri_template",
-            "responses": {"200": {"description": "Getted"}}
+            "responses": {"200": {"description": "Got"}}
         }
     },
     "definitions": {
