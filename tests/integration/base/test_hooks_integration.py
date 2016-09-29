@@ -88,13 +88,13 @@ class TestAuthorizationHook(object):
             {'error': 'Please refresh your authorization'})
 
     def test_with_valid_authorization(self, app, model, client):
-        resp = client.get('/', headers={'Authorization': '1'}, body='{}')
+        resp = client.get('/', headers={'Authorization': '1'})
         assert resp.status_code == 200
         assert resp.headers.get('WWW-Authenticate') == None
         assert resp.body == ''
 
     def test_with_valid_authorization_using_basic(self, app, model, client):
-        resp = client.get('/', headers={'Authorization': 'Basic 1'}, body='{}')
+        resp = client.get('/', headers={'Authorization': 'Basic 1'})
         assert resp.status_code == 200
         assert resp.headers.get('WWW-Authenticate') == None
         assert resp.body == ''

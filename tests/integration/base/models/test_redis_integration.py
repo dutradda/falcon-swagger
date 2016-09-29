@@ -74,11 +74,21 @@ def app():
             }],
             'post': {
                 'operationId': 'post_by_uri_template',
-                'responses': {'201': {'description': 'Created'}}
+                'responses': {'201': {'description': 'Created'}},
+                'parameters': [{
+                    'name': 'body',
+                    'in': 'body',
+                    'schema': {'$ref': '#/definitions/obj_schema'}
+                }]
             },
             'put': {
                 'operationId': 'put_by_uri_template',
-                'responses': {'200': {'description': 'Updated', 'schema': {'$ref': '#/definitions/obj_schema'}}}
+                'responses': {'200': {'description': 'Updated', 'schema': {'$ref': '#/definitions/obj_schema'}}},
+                'parameters': [{
+                    'name': 'body',
+                    'in': 'body',
+                    'schema': {'$ref': '#/definitions/obj_schema'}
+                }]
             },
             'patch': {
                 'operationId': 'patch_by_uri_template',

@@ -209,6 +209,8 @@ class Operation(object):
         self._query_string_validator = None
         self._headers_validator = None
         self._model_dir = model_dir
+        self._body_required = False
+        self._has_body_parameter = False
 
         query_string_schema = self._build_default_schema()
         uri_template_schema = self._build_default_schema()
@@ -223,6 +225,8 @@ class Operation(object):
                     body_schema = parameter['schema']
 
                 self._body_validator = self._build_validator(body_schema)
+                self._body_required = parameter.get('required', False)
+                self._has_body_parameter = True
 
             elif parameter['in'] == 'path':
                 self._set_parameter_on_schema(parameter, uri_template_schema)
@@ -281,6 +285,9 @@ class Operation(object):
 
     def _build_body_params(self, req):
         if req.content_length and (req.content_type is None or 'application/json' in req.content_type):
+            if not self._has_body_parameter:
+                raise ModelBaseError('Request body is not acceptable')
+
             body = req.stream.read().decode()
             try:
                 body = json.loads(body)
@@ -291,6 +298,12 @@ class Operation(object):
                 self._body_validator.validate(body)
 
             return body
+
+        elif self._body_required:
+            raise ModelBaseError('Request body is missing')
+
+        else:
+            return None
 
         return req.stream
 
