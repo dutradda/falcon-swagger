@@ -308,7 +308,8 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
         ids = cls._to_list(ids)
         filters = cls.build_filters_by_ids(ids)
 
-        [session.delete(inst) for inst in session.query(cls).filter(filters).all()]
+        instances = session.query(cls).filter(filters).all()
+        [session.delete(inst) for inst in instances]
 
         if commit:
             session.commit()
