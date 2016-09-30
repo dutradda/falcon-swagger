@@ -98,7 +98,11 @@ class TestUsersModelIntegrationWithAuthorizationHook(object):
             'name': 'test',
             'email': 'test@test',
             'password': '123',
-            'grants': [{'uri': {'uri': '/test/{id}'}, 'method': {'method': 'POST'}}]
+            'grants': [{
+                'uri': {'uri': '/test/{id}', '_operation': 'insert'},
+                'method': {'method': 'POST', '_operation': 'insert'},
+                '_operation': 'insert'
+            }]
         }
         UsersModel.insert(session, user)
 
@@ -117,7 +121,11 @@ class TestUsersModelIntegrationWithAuthorizationHook(object):
             'name': 'test',
             'email': 'test@test',
             'password': '123',
-            'grants': [{'uri': {'uri': '/test/{id}'}, 'method': {'method': 'POST'}}]
+            'grants': [{
+                'uri': {'uri': '/test/{id}', '_operation': 'insert'},
+                'method': {'method': 'POST', '_operation': 'insert'},
+                '_operation': 'insert'
+            }]
         }
         UsersModel.insert(session, user)
 
@@ -171,7 +179,11 @@ class TestUsersModel(object):
             'name': 'test',
             'email': 'test@test',
             'password': '123',
-            'grants': [{'uri': {'uri': '/test'}, 'method': {'method': 'POST'}}]
+            'grants': [{
+                'uri': {'uri': '/test', '_operation': 'insert'},
+                'method': {'method': 'POST', '_operation': 'insert'},
+                '_operation': 'insert'
+            }]
         }
         UsersModel.insert(session, user)
         authorization = b64encode('{}:{}'.format(user['email'], user['password']).encode())
@@ -184,7 +196,11 @@ class TestUsersModel(object):
             'name': 'test',
             'email': 'test@test',
             'password': '123',
-            'grants': [{'uri': {'uri': '/test'}, 'method': {'method': 'POST'}}]
+            'grants': [{
+                'uri': {'uri': '/test/{id}', '_operation': 'insert'},
+                'method': {'method': 'POST', '_operation': 'insert'},
+                '_operation': 'insert'
+            }]
         }
         UsersModel.insert(session, user)
         authorization = b64encode('{}:{}'.format(user['email'], user['password']).encode())

@@ -345,12 +345,12 @@ class TestModelBaseInsert(object):
         assert objs == [{'id': 1}, {'id': 2}] or objs == [{'id': 2}, {'id': 1}]
 
     def test_insert_with_two_nested_objects(self, model1, model2, session):
-        objs = model2.insert(session, {'id': 1, 'model1': {'id': 1}})
+        objs = model2.insert(session, {'id': 1, 'model1': {'id': 1, '_operation': 'insert'}})
         assert objs == [{'id': 1, 'model1_id': 1, 'model1': {'id': 1}}]
 
     def test_insert_with_three_nested_objects(self, model1, model2, model3, session):
-        m1 = {'id': 1}
-        m2 = {'id': 1, 'model1': m1}
+        m1 = {'id': 1, '_operation': 'insert'}
+        m2 = {'id': 1, 'model1': m1, '_operation': 'insert'}
         objs = model3.insert(session, {'id': 1, 'model2': m2})
 
         expected = {
@@ -378,6 +378,35 @@ class TestModelBaseInsert(object):
                 'id': 1,
                 '_operation': 'update',
                 'model1_id': 1
+            }
+        }
+        objs = model3.insert(session, m3)
+
+        expected = {
+            'id': 1,
+            'model1_id': None,
+            'model1': None,
+            'model2_id': 1,
+            'model2': {
+                'id': 1,
+                'model1_id': 1,
+                'model1': {
+                    'id': 1
+                }
+            }
+        }
+        assert objs == [expected]
+
+    def test_insert_with_nested_update_and_get(self, model1, model2, model3, session):
+        model1.insert(session, {'id': 1})
+        model2.insert(session, {'id': 1})
+
+        m3 = {
+            'id': 1,
+            'model2': {
+                'id': 1,
+                '_operation': 'update',
+                'model1': {'id': 1, '_operation': 'get'}
             }
         }
         objs = model3.insert(session, m3)
@@ -524,7 +553,7 @@ class TestModelBaseInsert(object):
         assert objs == [expected]
 
     def test_insert_with_mtm_update_and_delete(self, model1, model2_mtm, model3, session):
-        m1 = {'id': 1}
+        m1 = {'id': 1, '_operation': 'insert'}
         m2 = {'id': 1, 'model1': [m1]}
         model2_mtm.insert(session, m2)
         m3_insert = {
@@ -554,7 +583,7 @@ class TestModelBaseInsert(object):
         assert objs == [expected]
 
     def test_insert_with_mtm_update_and_remove(self, model1, model2_mtm, model3, session):
-        m1 = {'id': 1}
+        m1 = {'id': 1, '_operation': 'insert'}
         m2 = {'id': 1, 'model1': [m1]}
         model2_mtm.insert(session, m2)
         m3_insert = {
@@ -585,7 +614,7 @@ class TestModelBaseInsert(object):
 
     def test_insert_with_mto_update_and_remove(
             self, model1_mto, model2_mto, model3, session):
-        m2 = {'id': 1}
+        m2 = {'id': 1, '_operation': 'insert'}
         m1 = {'id': 1, 'model2': [m2]}
         model1_mto.insert(session, m1)
         m3_insert = {
@@ -697,7 +726,8 @@ class TestModelBaseUpdate(object):
         m2_update = {
             'id': 1,
             'model1': {
-                'id': 1
+                'id': 1,
+                '_operation': 'insert'
             }
         }
         model2.update(session, m2_update)
@@ -718,8 +748,10 @@ class TestModelBaseUpdate(object):
             'id': 1,
             'model2': {
                 'id': 1,
+                '_operation': 'insert',
                 'model1': {
-                    'id': 1
+                    'id': 1,
+                    '_operation': 'insert'
                 }
             }
         }
@@ -748,9 +780,10 @@ class TestModelBaseUpdate(object):
             'id': 1,
             'model2': {
                 'id': 1,
+                '_operation': 'insert',
                 'model1': [
-                    {'id': 1},
-                    {'id': 2}
+                    {'id': 1, '_operation': 'insert'},
+                    {'id': 2, '_operation': 'insert'}
                 ]
             }
         }
@@ -779,9 +812,10 @@ class TestModelBaseUpdate(object):
             'id': 1,
             'model1': {
                 'id': 1,
+                '_operation': 'insert',
                 'model2': [
-                    {'id': 1},
-                    {'id': 2}
+                    {'id': 1, '_operation': 'insert'},
+                    {'id': 2, '_operation': 'insert'}
                 ]
             }
         }
@@ -811,12 +845,12 @@ class TestModelBaseUpdate(object):
         assert model1.update(session, [{'id': 1}, {'id': 2}]) == []
 
     def test_update_with_nested_remove_without_uselist(self, model1, model2, session):
-        model2.insert(session, {'model1': {}})
+        model2.insert(session, {'model1': {'_operation': 'insert'}})
         model2.update(session, {'id': 1, 'model1': {'id': 1, '_operation': 'remove'}})
         assert session.query(model2).one().todict() == {'id': 1, 'model1_id': None, 'model1': None}
 
     def test_update_with_nested_remove_with_two_relationships(self, model1, model2_mtm, session):
-        model2_mtm.insert(session, {'model1': [{}, {}]})
+        model2_mtm.insert(session, {'model1': [{'_operation': 'insert'}, {'_operation': 'insert'}]})
         model2_mtm.update(session, {'id': 1, 'model1': [{'id': 2, '_operation': 'remove'}]})
         assert session.query(model2_mtm).one().todict() == {'id': 1, 'model1': [{'id': 1}]}
 

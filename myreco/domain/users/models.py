@@ -117,17 +117,29 @@ class UsersModel(SQLAlchemyRedisModelBase):
                 method = method[0]
                 grant = GrantsModel.get(session, {'uri_id': uri.id, 'method_id': method.id})
                 if grant:
-                    grant = {'uri_id': uri.id, 'method_id': method.id, '_operation': 'update'}
-                else:
                     grant = {'uri_id': uri.id, 'method_id': method.id}
+                else:
+                    grant = {'uri_id': uri.id, 'method_id': method.id, '_operation': 'insert'}
             elif uri:
                 uri = uri[0]
-                grant = {'uri_id': uri.id, 'method': {'method': 'patch'}}
+                grant = {
+                    'uri_id': uri.id,
+                    'method': {'method': 'patch', '_operation': 'insert'},
+                    '_operation': 'insert'
+                }
             elif method:
                 method = method[0]
-                grant = {'method': {'id': method.id, '_operation': 'update'}, 'uri': {'uri': user_uri}}
+                grant = {
+                    'method': {'id': method.id},
+                    'uri': {'uri': user_uri, '_operation': 'insert'},
+                    '_operation': 'insert'
+                }
             else:
-                grant = {'method': {'method': 'patch'}, 'uri': {'uri': user_uri}}
+                grant = {
+                    'method': {'method': 'patch', '_operation': 'insert'},
+                    'uri': {'uri': user_uri, '_operation': 'insert'},
+                    '_operation': 'insert'
+                }
 
             obj['id'] = '{}:{}'.format(obj['email'], obj['password'])
             grants = obj.get('grants', [])

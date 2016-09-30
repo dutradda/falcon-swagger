@@ -198,16 +198,7 @@
                 "properties": {
                     "uri_id": {"type": "integer"},
                     "method_id": {"type": "integer"},
-                    "_operation": {"enum": ["update"]}
-                }
-            },{
-                "type": "object",
-                "additionalProperties": false,
-                "required": ["uri_id", "method_id", "_operation"],
-                "properties": {
-                    "uri_id": {"type": "integer"},
-                    "method_id": {"type": "integer"},
-                    "_operation": {"enum": ["remove"]}
+                    "_operation": {"enum": ["update", "insert", "remove"]}
                 }
             },{
                 "type": "object",
@@ -216,7 +207,7 @@
                 "properties": {
                     "uri": {"$ref": "#/definitions/uri"},
                     "method": {"$ref": "#/definitions/method"},
-                    "_operation": {"enum": ["update"]}
+                    "_operation": {"enum": ["update", "insert"]}
                 }
             }]
         },
@@ -236,7 +227,8 @@
                     "additionalProperties": false,
                     "required": ["uri"],
                     "properties": {
-                        "uri": {"type": "string"}
+                        "uri": {"type": "string"},
+                        "_operation": {"enum": ["insert"]}
                     }
                 }
             ]
@@ -256,7 +248,8 @@
                     "additionalProperties": false,
                     "required": ["method"],
                     "properties": {
-                        "method": {"type": "string"}
+                        "method": {"type": "string"},
+                        "_operation": {"enum": ["insert"]}
                     }
                 }
             ]

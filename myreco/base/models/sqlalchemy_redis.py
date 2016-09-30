@@ -174,15 +174,22 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
                 rel_insts = cls._get_instances_from_values(session, rel_model, rels_values)
 
                 for rel_values, rel_inst in zip(rels_values, rel_insts):
-                    operation = rel_values.pop('_operation', 'insert')
+                    operation = rel_values.pop('_operation', 'get')
+
                     if rel_inst is None and operation != 'insert':
                         raise ModelBaseError(
                             "Can't execute nested '{}' operation".format(operation), input_)
 
-                    if operation == 'update':
-                        cls._exec_update_on_instance(
+                    if operation == 'get':
+                        cls._exec_get_on_instance(
                             session, rel_model, attr_name, relationship,
                             rel_inst, rel_values, instance, input_)
+
+                    if operation == 'update':
+                        cls._exec_get_on_instance(
+                            session, rel_model, attr_name, relationship,
+                            rel_inst, rel_values, instance, input_)
+                        rel_model._update_instance(session, rel_inst, rel_values, input_)
 
                     elif operation == 'delete':
                         rel_model.delete(session, rel_inst.get_ids_map(), commit=False)
@@ -224,24 +231,14 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
             if value is not None else None
         return {id_name: cast(id_name, values.get(id_name)) for id_name in cls.primaries_keys}
 
-    def _raise_ambiguous_operations_error(cls, to_update, to_delete, to_remove, input_):
-        op_count = [op for op in (to_update, to_delete, to_remove) if op is not None]
-        if len(op_count) > 1:
-            raise ModelBaseError(
-                "ambiguous operations 'update'"
-                ", 'delete' or 'remove'", input_)
-
-    def _exec_update_on_instance(
+    def _exec_get_on_instance(
             cls, session, rel_model, attr_name, relationship,
             rel_inst, rel_values, instance, input_):
         if relationship.prop.uselist is True:
-            rel_model._update_instance(session, rel_inst, rel_values, input_)
             if rel_inst not in getattr(instance, attr_name):
                 getattr(instance, attr_name).append(rel_inst)
 
         else:
-            rel_model._update_instance(
-                session, rel_inst, rel_values, input_)
             setattr(instance, attr_name, rel_inst)
 
     def _exec_remove_on_instance(
