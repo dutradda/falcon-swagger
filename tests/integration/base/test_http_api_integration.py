@@ -163,76 +163,76 @@ class TestHttpAPIErrorHandlingPOST(object):
         }
 
     def test_model_base_error_handling_with_post_and_with_nested_delete(self, client, model1):
-        data = [{'model2_': {'id': 1, '_delete': True}}]
+        data = [{'model2_': {'id': 1, '_operation': 'delete'}}]
         resp = client.post('/model1/', data=json.dumps(data))
 
         assert resp.status_code == 400
         assert json.loads(resp.body) == {
             'error': {
                 'input': data,
-                'message': "Can't execute nested '_delete'"
+                'message': "Can't execute nested 'delete' operation"
             }
         }
 
     def test_model_base_error_handling_with_post_and_with_nested_remove(self, client, model1):
-        data = [{'model2_': {'id': 1, '_remove': True}}]
+        data = [{'model2_': {'id': 1, '_operation': 'remove'}}]
         resp = client.post('/model1/', data=json.dumps(data))
 
         assert resp.status_code == 400
         assert json.loads(resp.body) == {
             'error': {
                 'input': data,
-                'message': "Can't execute nested '_remove'"
+                'message': "Can't execute nested 'remove' operation"
             }
         }
 
     def test_model_base_error_handling_with_post_and_with_nested_update(self, client, model1):
-        data = [{'model2_': {'id': 1, '_update': True}}]
+        data = [{'model2_': {'id': 1, '_operation': 'update'}}]
         resp = client.post('/model1/', data=json.dumps(data))
 
         assert resp.status_code == 400
         assert json.loads(resp.body) == {
             'error': {
                 'input': data,
-                'message': "Can't execute nested '_update'"
+                'message': "Can't execute nested 'update' operation"
             }
         }
 
     def test_model_base_error_handling_with_put_and_with_nested_delete(self, client, model1):
         resp = client.post('/model1/', data='[{}]')
         assert resp.status_code == 201
-        data = [{'id': 1, 'model2_': {'id': 1, '_delete': True}}]
+        data = [{'id': 1, 'model2_': {'id': 1, '_operation': 'delete'}}]
         resp = client.put('/model1/', body=json.dumps(data))
 
         assert resp.status_code == 400
         assert json.loads(resp.body) == {
             'error': {
                 'input': data,
-                'message': "Can't execute nested '_delete'"
+                'message': "Can't execute nested 'delete' operation"
             }
         }
 
     def test_model_base_error_handling_with_put_and_with_nested_remove(self, client, model1):
-        data = [{'model2_': {'id': 1, '_remove': True}}]
+        data = [{'model2_': {'id': 1, '_operation': 'remove'}}]
         resp = client.post('/model1/', data=json.dumps(data))
 
         assert resp.status_code == 400
         assert json.loads(resp.body) == {
             'error': {
                 'input': data,
-                'message': "Can't execute nested '_remove'"
+                'message': "Can't execute nested 'remove' operation"
             }
         }
 
     def test_model_base_error_handling_with_put_and_with_nested_update(self, client, model1):
-        data = [{'model2_': {'id': 1, '_update': True}}]
+        data = [{'model2_': {'id': 1, '_operation': 'update'}}]
         resp = client.post('/model1/', data=json.dumps(data))
 
         assert resp.status_code == 400
         assert json.loads(resp.body) == {
             'error': {
                 'input': data,
-                'message': "Can't execute nested '_update'"
+                'message': "Can't execute nested 'update' operation"
             }
         }
 

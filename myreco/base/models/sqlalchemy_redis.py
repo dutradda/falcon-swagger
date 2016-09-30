@@ -174,26 +174,24 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
                 rel_insts = cls._get_instances_from_values(session, rel_model, rels_values)
 
                 for rel_values, rel_inst in zip(rels_values, rel_insts):
-                    to_update = rel_values.pop('_update', None)
-                    to_delete = rel_values.pop('_delete', None)
-                    to_remove = rel_values.pop('_remove', None)
-                    cls._raise_ambiguous_operations_error(to_update, to_delete, to_remove, input_)
-                    if rel_inst is None:
-                        cls._raise_nested_operation_error(to_update, to_delete, to_remove, input_)
+                    operation = rel_values.pop('_operation', 'insert')
+                    if rel_inst is None and operation != 'insert':
+                        raise ModelBaseError(
+                            "Can't execute nested '{}' operation".format(operation), input_)
 
-                    if to_update:
+                    if operation == 'update':
                         cls._exec_update_on_instance(
                             session, rel_model, attr_name, relationship,
                             rel_inst, rel_values, instance, input_)
 
-                    elif to_delete:
+                    elif operation == 'delete':
                         rel_model.delete(session, rel_inst.get_ids_map(), commit=False)
 
-                    elif to_remove:
+                    elif operation == 'remove':
                         cls._exec_remove_on_instance(
                             rel_model, attr_name, relationship, rel_inst, instance, input_)
 
-                    else:
+                    elif operation == 'insert':
                         cls._exec_insert_on_instance(
                             session, rel_model, attr_name, relationship, rel_values, instance)
 
@@ -232,14 +230,6 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
             raise ModelBaseError(
                 "ambiguous operations 'update'"
                 ", 'delete' or 'remove'", input_)
-
-    def _raise_nested_operation_error(cls, to_update, to_delete, to_remove, input_):
-        operation = ('update' if to_update else
-            ('delete' if to_delete else ('remove' if to_remove else None)))
-
-        if operation is not None:
-            no_rel_insts_message = "Can't execute nested '_{}'"
-            raise ModelBaseError(no_rel_insts_message.format(operation), input_)
 
     def _exec_update_on_instance(
             cls, session, rel_model, attr_name, relationship,

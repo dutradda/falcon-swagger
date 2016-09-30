@@ -271,35 +271,11 @@ class TestModelBaseTodict(object):
 
 class TestModelBaseNestedOperations(object):
 
-    def test_raises_model_error_with_update_and_delete(self, model1, model2):
-        with pytest.raises(ModelBaseError) as exc_info:
-            model2.insert(mock.MagicMock(), {'model1': {
-                          '_update': True, '_delete': True}})
-
-        assert exc_info.value.args == \
-            ("ambiguous operations 'update', 'delete' or 'remove'",)
-
-    def test_raises_model_error_with_update_and_remove(self, model1, model2):
-        with pytest.raises(ModelBaseError) as exc_info:
-            model2.insert(mock.MagicMock(), {'model1': {
-                          '_update': True, '_remove': True}})
-
-        assert exc_info.value.args == \
-            ("ambiguous operations 'update', 'delete' or 'remove'",)
-
-    def test_raises_model_error_with_remove_and_delete(self, model1, model2):
-        with pytest.raises(ModelBaseError) as exc_info:
-            model2.insert(mock.MagicMock(), {'model1': {
-                          '_delete': True, '_remove': True}})
-
-        assert exc_info.value.args == \
-            ("ambiguous operations 'update', 'delete' or 'remove'",)
-
     def test_raises_model_error_with_invalid_nested_id(self, model1, model2_mtm):
         session = mock.MagicMock()
         session.query().filter().all().__getitem__.return_value = model1(mock.MagicMock(), id=1)
         with pytest.raises(ModelBaseError) as exc_info:
             model2_mtm.insert(session, {
-                              'model1': [{'id': 1, '_remove': True}]})
+                              'model1': [{'id': 1, '_operation': 'remove'}]})
         assert exc_info.value.args == \
             ("can't remove model 'model1' on column(s) 'id' with value(s) 1",)

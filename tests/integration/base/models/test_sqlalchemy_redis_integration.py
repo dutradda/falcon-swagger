@@ -376,7 +376,7 @@ class TestModelBaseInsert(object):
             'id': 1,
             'model2': {
                 'id': 1,
-                '_update': True,
+                '_operation': 'update',
                 'model1_id': 1
             }
         }
@@ -405,10 +405,10 @@ class TestModelBaseInsert(object):
             'id': 1,
             'model2': {
                 'id': 1,
-                '_update': True,
+                '_operation': 'update',
                 'model1': {
                     'id': 1,
-                    '_update': True,
+                    '_operation': 'update',
                     'test': 'test_updated'
                 }
             }
@@ -440,15 +440,15 @@ class TestModelBaseInsert(object):
             'id': 1,
             'model2': {
                 'id': 1,
-                '_update': True,
+                '_operation': 'update',
                 'model1': [
                     {
                         'id': 1,
-                        '_update': True,
+                        '_operation': 'update',
                         'test': 'test_updated'
                     }, {
                         'id': 2,
-                        '_update': True,
+                        '_operation': 'update',
                         'test': 'test_updated2'
                     }
                 ]
@@ -485,15 +485,15 @@ class TestModelBaseInsert(object):
             'id': 1,
             'model1': {
                 'id': 1,
-                '_update': True,
+                '_operation': 'update',
                 'model2': [
                     {
                         'id': 1,
-                        '_update': True,
+                        '_operation': 'update',
                         'test': 'test_updated'
                     }, {
                         'id': 2,
-                        '_update': True,
+                        '_operation': 'update',
                         'test': 'test_updated2'
                     }
                 ]
@@ -531,10 +531,10 @@ class TestModelBaseInsert(object):
             'id': 1,
             'model2': {
                 'id': 1,
-                '_update': True,
+                '_operation': 'update',
                 'model1': [{
                     'id': 1,
-                    '_delete': True
+                    '_operation': 'delete'
                 }]
             }
         }
@@ -561,10 +561,10 @@ class TestModelBaseInsert(object):
             'id': 1,
             'model2': {
                 'id': 1,
-                '_update': True,
+                '_operation': 'update',
                 'model1': [{
                     'id': 1,
-                    '_remove': True
+                    '_operation': 'remove'
                 }]
             }
         }
@@ -592,10 +592,10 @@ class TestModelBaseInsert(object):
             'id': 1,
             'model1': {
                 'id': 1,
-                '_update': True,
+                '_operation': 'update',
                 'model2': [{
                     'id': 1,
-                    '_remove': True
+                    '_operation': 'remove'
                 }]
             }
         }
@@ -617,17 +617,17 @@ class TestModelBaseInsert(object):
     def test_insert_nested_update_without_relationships(
             self, model1, model2, session, redis):
         with pytest.raises(ModelBaseError):
-            model2.insert(session, {'model1': {'id': 1, '_update': True}})
+            model2.insert(session, {'model1': {'id': 1, '_operation': 'update'}})
 
     def test_insert_nested_remove_without_relationships(
             self, model1, model2, session, redis):
         with pytest.raises(ModelBaseError):
-            model2.insert(session, {'model1': {'id': 1, '_remove': True}})
+            model2.insert(session, {'model1': {'id': 1, '_operation': 'remove'}})
 
     def test_insert_nested_delete_without_relationships(
             self, model1, model2, session, redis):
         with pytest.raises(ModelBaseError):
-            model2.insert(session, {'model1': {'id': 1, '_delete': True}})
+            model2.insert(session, {'model1': {'id': 1, '_operation': 'delete'}})
 
 
 class TestModelBaseUpdate(object):
@@ -647,7 +647,7 @@ class TestModelBaseUpdate(object):
     def test_update_with_two_nested_objects(self, model1_nested, model2, session):
         model1_nested.insert(session, {'id': 1})
         model2.insert(session, {'id': 1})
-        model2.update(session, {'id': 1, 'model1': {'id': 1, '_update': True, 'test': 'test_updated'}})
+        model2.update(session, {'id': 1, 'model1': {'id': 1, '_operation': 'update', 'test': 'test_updated'}})
 
         assert session.query(model2).one().todict() == {
             'id': 1,
@@ -666,10 +666,10 @@ class TestModelBaseUpdate(object):
             'id': 1,
             'model2': {
                 'id': 1,
-                '_update': True,
+                '_operation': 'update',
                 'model1': {
                     'id': 1,
-                    '_update': True,
+                    '_operation': 'update',
                     'test': 'test_updated'
                 }
             }
@@ -812,12 +812,12 @@ class TestModelBaseUpdate(object):
 
     def test_update_with_nested_remove_without_uselist(self, model1, model2, session):
         model2.insert(session, {'model1': {}})
-        model2.update(session, {'id': 1, 'model1': {'id': 1, '_remove': True}})
+        model2.update(session, {'id': 1, 'model1': {'id': 1, '_operation': 'remove'}})
         assert session.query(model2).one().todict() == {'id': 1, 'model1_id': None, 'model1': None}
 
     def test_update_with_nested_remove_with_two_relationships(self, model1, model2_mtm, session):
         model2_mtm.insert(session, {'model1': [{}, {}]})
-        model2_mtm.update(session, {'id': 1, 'model1': [{'id': 2, '_remove': True}]})
+        model2_mtm.update(session, {'id': 1, 'model1': [{'id': 2, '_operation': 'remove'}]})
         assert session.query(model2_mtm).one().todict() == {'id': 1, 'model1': [{'id': 1}]}
 
 

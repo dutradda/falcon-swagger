@@ -128,8 +128,8 @@ class TestUsersResourcePost(object):
             'email': 'test2',
             'password': 'test',
             'grants': [{
-                'uri': {'id': 2, '_update': True},
-                'method': {'id': 1, '_update': True}
+                'uri': {'id': 2, '_operation': 'update'},
+                'method': {'id': 1, '_operation': 'update'}
             }]
         }]
         resp = client.post('/users', data=json.dumps(user), headers=headers)
@@ -233,7 +233,7 @@ class TestUsersResourcePutInsert(object):
             'grants': [{
                 'uri_id': 1,
                 'method_id': 1,
-                '_update': True
+                '_operation': 'update'
             }]
         }
         resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
@@ -252,7 +252,7 @@ class TestUsersResourcePutInsert(object):
                         'grants': [{
                             'method_id': 1,
                             'uri_id': 1,
-                            '_update': True
+                            '_operation': 'update'
                         }],
                     'name': 'test2',
                     'email': 'test22',
@@ -363,7 +363,7 @@ class TestUsersResourcePutUpdateOne(object):
             'grants': [{
                 'uri_id': 3,
                 'method_id': 3,
-                '_update': True
+                '_operation': 'update'
             }]
         }
         resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
@@ -420,7 +420,7 @@ class TestUsersResourcePutUpdateOne(object):
             'grants': [{
                 'uri_id': 1,
                 'method_id': 1,
-                '_remove': True
+                '_operation': 'remove'
             }]
         }
         resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
@@ -467,11 +467,11 @@ class TestUsersResourcePutUpdateOne(object):
             'grants': [{
                 'uri_id': 3,
                 'method_id': 3,
-                '_update': True
+                '_operation': 'update'
             },{
                 'uri_id': 1,
                 'method_id': 1,
-                '_remove': True
+                '_operation': 'remove'
             }]
         }
         resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
@@ -526,7 +526,7 @@ class TestUsersResourcePutUpdateOne(object):
             'grants': [{
                 'uri_id': 1,
                 'method_id': 1,
-                '_update': True
+                '_operation': 'update'
             }]
         }
         session.redis_bind = mock.MagicMock()
@@ -583,7 +583,7 @@ class TestUsersResourcePutUpdateMany(object):
             'grants': [{
                 'uri_id': 3,
                 'method_id': 3,
-                '_update': True
+                '_operation': 'update'
             }]
         }]
         resp = client.put('/users', body=json.dumps(users), headers=headers)
@@ -641,7 +641,7 @@ class TestUsersResourcePutUpdateMany(object):
             'grants': [{
                 'uri_id': 1,
                 'method_id': 1,
-                '_remove': True
+                '_operation': 'remove'
             }]
         }]
         resp = client.put('/users', body=json.dumps(users), headers=headers)
@@ -689,11 +689,11 @@ class TestUsersResourcePutUpdateMany(object):
             'grants': [{
                 'uri_id': 3,
                 'method_id': 3,
-                '_update': True
+                '_operation': 'update'
             },{
                 'uri_id': 1,
                 'method_id': 1,
-                '_remove': True
+                '_operation': 'remove'
             }]
         }]
         resp = client.put('/users', body=json.dumps(users), headers=headers)
