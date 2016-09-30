@@ -29,41 +29,41 @@ class TestModelGetRelatedHard(object):
     def test_get_related_with_all_models_related_each_other(
             self, model1, model2, model3, model4,
             model5, model6, model7, model8, model9, session):
-        m11 = model1(id=1)
-        m12 = model1(id=2)
-        m13 = model1(id=3)
+        m11 = model1(session, id=1)
+        m12 = model1(session, id=2)
+        m13 = model1(session, id=3)
 
-        m21 = model2(id=1)
-        m22 = model2(id=2)
-        m23 = model2(id=3)
+        m21 = model2(session, id=1)
+        m22 = model2(session, id=2)
+        m23 = model2(session, id=3)
 
-        m31 = model3(id=1)
-        m32 = model3(id=2)
-        m33 = model3(id=3)
+        m31 = model3(session, id=1)
+        m32 = model3(session, id=2)
+        m33 = model3(session, id=3)
 
-        m41 = model4(id=1)
-        m42 = model4(id=2)
-        m43 = model4(id=3)
+        m41 = model4(session, id=1)
+        m42 = model4(session, id=2)
+        m43 = model4(session, id=3)
 
-        m51 = model5(id=1)
-        m52 = model5(id=2)
-        m53 = model5(id=3)
+        m51 = model5(session, id=1)
+        m52 = model5(session, id=2)
+        m53 = model5(session, id=3)
 
-        m61 = model6(id=1)
-        m62 = model6(id=2)
-        m63 = model6(id=3)
+        m61 = model6(session, id=1)
+        m62 = model6(session, id=2)
+        m63 = model6(session, id=3)
 
-        m71 = model7(id=1)
-        m72 = model7(id=2)
-        m73 = model7(id=3)
+        m71 = model7(session, id=1)
+        m72 = model7(session, id=2)
+        m73 = model7(session, id=3)
 
-        m81 = model8(id=1)
-        m82 = model8(id=2)
-        m83 = model8(id=3)
+        m81 = model8(session, id=1)
+        m82 = model8(session, id=2)
+        m83 = model8(session, id=3)
 
-        m91 = model9(id=1)
-        m92 = model9(id=2)
-        m93 = model9(id=3)
+        m91 = model9(session, id=1)
+        m92 = model9(session, id=2)
+        m93 = model9(session, id=3)
 
         m11.model2 = m21
         m11.model3 = [m31, m32]

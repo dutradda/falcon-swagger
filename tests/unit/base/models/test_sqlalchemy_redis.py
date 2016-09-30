@@ -189,19 +189,19 @@ class TestModelBaseInit(object):
 class TestModelBaseTodict(object):
 
     def test_todict_without_schema(self, model1, model2):
-        assert model1(id=1).todict() == {'id': 1}
+        assert model1(mock.MagicMock(), id=1).todict() == {'id': 1}
 
     def test_todict_with_schema(self, model1, model2):
         schema = {'id': True}
-        assert model1(id=1).todict(schema) == {'id': 1}
+        assert model1(mock.MagicMock(), id=1).todict(schema) == {'id': 1}
 
     def test_todict_with_schema_remove_id(self, model1, model2):
         schema = {'id': False}
-        assert model1(id=1).todict(schema) == {}
+        assert model1(mock.MagicMock(), id=1).todict(schema) == {}
 
     def test_todict_with_relationship_and_without_schema(self, model1, model2):
-        m1 = model1(id=1)
-        m2 = model2(id=1, model1=m1)
+        m1 = model1(mock.MagicMock(), id=1)
+        m2 = model2(mock.MagicMock(), id=1, model1=m1)
         assert m2.todict() == {
             'id': 1,
             'model1_id': None,
@@ -211,8 +211,8 @@ class TestModelBaseTodict(object):
         }
 
     def test_todict_with_relationship_and_this_relationship_not_in_schema(self, model1, model2):
-        m1 = model1(id=1)
-        m2 = model2(id=1, model1=m1)
+        m1 = model1(mock.MagicMock(), id=1)
+        m2 = model2(mock.MagicMock(), id=1, model1=m1)
         schema = {'model1': False}
         assert m2.todict(schema) == {
             'id': 1,
@@ -220,8 +220,8 @@ class TestModelBaseTodict(object):
         }
 
     def test_todict_with_relationship_and_a_relationship_attr_not_in_schema(self, model1, model2):
-        m1 = model1(id=1)
-        m2 = model2(id=1, model1=m1)
+        m1 = model1(mock.MagicMock(), id=1)
+        m2 = model2(mock.MagicMock(), id=1, model1=m1)
         schema = {'model1': {'id': False}}
         assert m2.todict(schema) == {
             'id': 1,
@@ -230,9 +230,9 @@ class TestModelBaseTodict(object):
         }
 
     def test_todict_with_nested_relationship_without_schema(self, model1, model2, model3):
-        m1 = model1(id=1)
-        m2 = model2(id=1, model1=m1)
-        m3 = model3(id=1, model2=m2)
+        m1 = model1(mock.MagicMock(), id=1)
+        m2 = model2(mock.MagicMock(), id=1, model1=m1)
+        m3 = model3(mock.MagicMock(), id=1, model2=m2)
         assert m3.todict() == {
             'id': 1,
             'model1_id': None,
@@ -246,9 +246,9 @@ class TestModelBaseTodict(object):
         }
 
     def test_todict_with_nested_relationship_with_schema(self, model1, model2, model3):
-        m1 = model1(id=1)
-        m2 = model2(id=1, model1=m1)
-        m3 = model3(id=1, model2=m2)
+        m1 = model1(mock.MagicMock(), id=1)
+        m2 = model2(mock.MagicMock(), id=1, model1=m1)
+        m3 = model3(mock.MagicMock(), id=1, model2=m2)
         schema = {
             'model2': {
                 'model1': {
@@ -297,7 +297,7 @@ class TestModelBaseNestedOperations(object):
 
     def test_raises_model_error_with_invalid_nested_id(self, model1, model2_mtm):
         session = mock.MagicMock()
-        session.query().filter().all().__getitem__.return_value = model1(id=1)
+        session.query().filter().all().__getitem__.return_value = model1(mock.MagicMock(), id=1)
         with pytest.raises(ModelBaseError) as exc_info:
             model2_mtm.insert(session, {
                               'model1': [{'id': 1, '_remove': True}]})

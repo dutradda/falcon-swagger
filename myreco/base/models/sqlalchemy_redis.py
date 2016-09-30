@@ -146,7 +146,7 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
         new_insts = set()
 
         for obj in objs:
-            instance = cls()
+            instance = cls(session)
             cls._update_instance(session, instance, obj, input_)
             new_insts.add(instance)
 
@@ -171,8 +171,7 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
                 if relationship.prop.uselist is not True:
                     rels_values = [rels_values]
 
-                rel_insts = cls._get_instances_from_values(
-                    session, rel_model, attr_name, rels_values, instance)
+                rel_insts = cls._get_instances_from_values(session, rel_model, rels_values)
 
                 for rel_values, rel_inst in zip(rels_values, rel_insts):
                     to_update = rel_values.pop('_update', None)
@@ -198,9 +197,9 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
                         cls._exec_insert_on_instance(
                             session, rel_model, attr_name, relationship, rel_values, instance)
 
-        instance.update_(**values)
+        instance.update_(session, **values)
 
-    def _get_instances_from_values(cls, session, rel_model, attr_name, rels_values, instance):
+    def _get_instances_from_values(cls, session, rel_model, rels_values):
         ids_to_get = cls._get_ids_from_rels_values(rel_model, rels_values)
         if not ids_to_get:
             return []
@@ -393,6 +392,17 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
 
 class _SQLAlchemyModel(ModelBase):
 
+    def __init__(self, session, **kwargs):
+        for key, value in kwargs.items():
+            self._setattr(key, value, session)
+
+    def _setattr(self, attr_name, value, session):
+        cls = type(self)
+        if not hasattr(cls, attr_name):
+            raise TypeError("{} is an invalid keyword argument for {}".format(k, cls.__name__))
+
+        setattr(self, attr_name, value)
+
     def get_ids_values(self):
         ids_names = sorted(type(self).__id_names__)
         return tuple([getattr(self, id_name) for id_name in ids_names])
@@ -458,18 +468,17 @@ class _SQLAlchemyModel(ModelBase):
 
                 dict_inst[rel_name] = relationships
 
-    def update_(self, **kwargs):
-        type(self).__init__(self, **kwargs)
+    def update_(self, session, **kwargs):
+        type(self).__init__(self, session, **kwargs)
 
 
 class SQLAlchemyRedisModelBuilder(object):
 
-    def __new__(cls, bind=None, metadata=None, mapper=None,
-            constructor=_declarative_constructor, class_registry=None):
+    def __new__(cls, bind=None, metadata=None, mapper=None, class_registry=None):
         return declarative_base(
             name=MODEL_BASE_CLASS_NAME, metaclass=SQLAlchemyModelMeta,
             cls=_SQLAlchemyModel, bind=bind, metadata=metadata,
-            mapper=mapper, constructor=constructor)
+            mapper=mapper, constructor=_SQLAlchemyModel.__init__)
 
 
 SQLAlchemyRedisModelBase = SQLAlchemyRedisModelBuilder()

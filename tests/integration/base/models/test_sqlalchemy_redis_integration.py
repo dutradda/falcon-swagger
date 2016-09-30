@@ -189,7 +189,7 @@ def model2_mto_nested(model_base):
 
 class TestModelBaseTodict(object):
     def test_todict_after_get_from_database(self, model1, model2, session):
-        session.add(model2(id=1, model1=model1(id=1)))
+        session.add(model2(session, id=1, model1=model1(session, id=1)))
         session.commit()
         expected = {
             'id': 1,
@@ -199,7 +199,7 @@ class TestModelBaseTodict(object):
         session.query(model2).filter_by(id=1).one().todict() == expected
 
     def test_todict_after_get_from_database_with_mtm(self, model1, model2_mtm, session):
-        session.add(model2_mtm(id=1, model1=[model1(id=1)]))
+        session.add(model2_mtm(session, id=1, model1=[model1(session, id=1)]))
         session.commit()
         expected = {
             'id': 1,
@@ -209,7 +209,7 @@ class TestModelBaseTodict(object):
 
     def test_todict_after_get_from_database_with_mtm_with_two_relations(
             self, model1, model2_mtm, session):
-        session.add(model2_mtm(id=1, model1=[model1(id=1), model1(id=2)]))
+        session.add(model2_mtm(session, id=1, model1=[model1(session, id=1), model1(session, id=2)]))
         session.commit()
         expected = {
             'id': 1,
@@ -220,8 +220,8 @@ class TestModelBaseTodict(object):
 
 class TestModelBaseGetRelated(object):
     def test_get_related_with_one_model(self, model1, model2, session):
-        m11 = model1(id=1)
-        m21 = model2(id=1)
+        m11 = model1(session, id=1)
+        m21 = model2(session, id=1)
         m21.model1 = m11
         session.add_all([m11, m21])
         session.commit()
@@ -229,9 +229,9 @@ class TestModelBaseGetRelated(object):
         assert m11.get_related(session) == {m21}
 
     def test_get_related_with_two_models(self, model1, model2, model3, session):
-        m11 = model1(id=1)
-        m21 = model2(id=1)
-        m31 = model3(id=1)
+        m11 = model1(session, id=1)
+        m21 = model2(session, id=1)
+        m31 = model3(session, id=1)
         m31.model1 = m11
         m31.model2 = m21
         session.add_all([m11, m21, m31])
@@ -241,9 +241,9 @@ class TestModelBaseGetRelated(object):
         assert m21.get_related(session) == {m31}
 
     def test_get_related_with_two_related(self, model1, model2, model3, session):
-        m11 = model1(id=1)
-        m21 = model2(id=1)
-        m31 = model3(id=1)
+        m11 = model1(session, id=1)
+        m21 = model2(session, id=1)
+        m31 = model3(session, id=1)
         m31.model1 = m11
         m21.model1 = m11
         session.add_all([m11, m21, m31])
@@ -252,13 +252,13 @@ class TestModelBaseGetRelated(object):
         assert m11.get_related(session) == {m31, m21}
 
     def test_get_related_with_two_models_and_two_related(self, model1, model2, model3, session):
-        m11 = model1(id=1)
-        m21 = model2(id=1)
-        m31 = model3(id=1)
+        m11 = model1(session, id=1)
+        m21 = model2(session, id=1)
+        m31 = model3(session, id=1)
         m31.model1 = m11
         m21.model1 = m11
-        m22 = model2(id=2)
-        m32 = model3(id=2)
+        m22 = model2(session, id=2)
+        m32 = model3(session, id=2)
         m32.model1 = m11
         m22.model1 = m11
         session.add_all([m11, m21, m31, m22, m32])
@@ -268,14 +268,14 @@ class TestModelBaseGetRelated(object):
 
     def test_get_related_with_mtm(
             self, model1, model2_mtm, model3_mtm, session):
-        m11 = model1(id=1)
-        m12 = model1(id=2)
-        m21 = model2_mtm(id=1)
-        m31 = model3_mtm(id=1)
+        m11 = model1(session, id=1)
+        m12 = model1(session, id=2)
+        m21 = model2_mtm(session, id=1)
+        m31 = model3_mtm(session, id=1)
         m31.model1 = m11
         m21.model1 = [m11, m12]
-        m22 = model2_mtm(id=2)
-        m32 = model3_mtm(id=2)
+        m22 = model2_mtm(session, id=2)
+        m32 = model3_mtm(session, id=2)
         m32.model1 = m11
         m22.model1 = [m11, m12]
         session.add_all([m11, m12, m21, m31, m22, m32])
@@ -286,8 +286,8 @@ class TestModelBaseGetRelated(object):
 
     def test_get_related_with_primary_join(
             self, model1, model2_primary_join, session):
-        m11 = model1(id=5)
-        m21 = model2_primary_join(id=1, id2=5)
+        m11 = model1(session, id=5)
+        m21 = model2_primary_join(session, id=1, id2=5)
         m21.model1 = m11
         session.add_all([m11, m21])
         session.commit()
@@ -297,8 +297,8 @@ class TestModelBaseGetRelated(object):
 
     def test_get_related_with_primary_join_get_no_result(
             self, model1, model2_primary_join, session):
-        m11 = model1(id=1)
-        m21 = model2_primary_join(id=1, id2=5)
+        m11 = model1(session, id=1)
+        m21 = model2_primary_join(session, id=1, id2=5)
         m21.model1 = m11
         session.add_all([m11, m21])
         session.commit()
@@ -309,8 +309,8 @@ class TestModelBaseGetRelated(object):
 
     def test_get_related_with_mto(
             self, model1_mto, model2_mto, session):
-        m11 = model1_mto(id=1)
-        m21 = model2_mto(id=1)
+        m11 = model1_mto(session, id=1)
+        m21 = model2_mto(session, id=1)
         m11.model2 = [m21]
         session.add_all([m11, m21])
         session.commit()
@@ -320,9 +320,9 @@ class TestModelBaseGetRelated(object):
 
     def test_get_related_with_mto_with_two_related(
             self, model1_mto, model2_mto, session):
-        m11 = model1_mto(id=1)
-        m21 = model2_mto(id=1)
-        m22 = model2_mto(id=2)
+        m11 = model1_mto(session, id=1)
+        m21 = model2_mto(session, id=1)
+        m22 = model2_mto(session, id=2)
         m11.model2 = [m21, m22]
         session.add(m11)
         session.commit()
@@ -803,7 +803,7 @@ class TestModelBaseUpdate(object):
         assert session.query(model3).one().todict() == expected
 
     def test_update_with_missing_id(self, model1, session):
-        session.add(model1(id=1))
+        session.add(model1(session, id=1))
         session.commit()
         assert model1.update(session, [{'id': 1}, {'id': 2}]) == [{'id': 1}]
 
@@ -832,21 +832,21 @@ class TestModelBaseGet(object):
 
     def test_if_query_get_builds_redis_left_ids_correctly_with_result_found_on_redis_with_one_id(
             self, model1, session, redis):
-        session.add(model1(id=1))
+        session.add(model1(session, id=1))
         session.commit()
         redis.hmget.return_value = [None]
         assert model1.get(session, {'id': 1}) == [{'id': 1}]
 
     def test_if_query_get_builds_redis_left_ids_correctly_with_no_result_found_on_redis_with_two_ids(
             self, model1, session, redis):
-        session.add_all([model1(id=1), model1(id=2)])
+        session.add_all([model1(session, id=1), model1(session, id=2)])
         session.commit()
         redis.hmget.return_value = [None, None]
         assert model1.get(session, [{'id': 1}, {'id': 2}]) == [{'id': 1}, {'id': 2}]
 
     def test_if_query_get_builds_redis_left_ids_correctly_with_no_result_found_on_redis_with_three_ids(
             self, model1, session, redis):
-        session.add_all([model1(id=1), model1(id=2), model1(id=3)])
+        session.add_all([model1(session, id=1), model1(session, id=2), model1(session, id=3)])
         session.commit()
         redis.hmget.return_value = [None, None, None]
         assert model1.get(session, [{'id': 1}, {'id': 2}, {'id': 3}]) == \
@@ -854,7 +854,7 @@ class TestModelBaseGet(object):
 
     def test_if_query_get_builds_redis_left_ids_correctly_with_no_result_found_on_redis_with_four_ids(
             self, model1, session, redis):
-        session.add_all([model1(id=1), model1(id=2), model1(id=3), model1(id=4)])
+        session.add_all([model1(session, id=1), model1(session, id=2), model1(session, id=3), model1(session, id=4)])
         session.commit()
         redis.hmget.return_value = [None, None, None, None]
         assert model1.get(session, [{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}]) == \
@@ -862,31 +862,31 @@ class TestModelBaseGet(object):
 
     def test_if_query_get_builds_redis_left_ids_correctly_with_one_not_found_on_redis(
             self, model1, session, redis):
-        session.add(model1(id=1))
+        session.add(model1(session, id=1))
         session.commit()
         redis.hmget.return_value = [None, msgpack.dumps({'id': 2})]
         assert model1.get(session, [{'id': 1}, {'id': 2}]) == [{'id': 1}, {'id': 2}]
 
     def test_with_ids_and_limit(self, model1, session, redis):
-        session.add_all([model1(id=1), model1(id=2), model1(id=3)])
+        session.add_all([model1(session, id=1), model1(session, id=2), model1(session, id=3)])
         session.commit()
         model1.get(session, [{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}], limit=2)
         assert redis.hmget.call_args_list == [mock.call('model1', ['(1,)', '(2,)'])]
 
     def test_with_ids_and_offset(self, model1, session, redis):
-        session.add_all([model1(id=1), model1(id=2), model1(id=3)])
+        session.add_all([model1(session, id=1), model1(session, id=2), model1(session, id=3)])
         session.commit()
         model1.get(session, [{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}], offset=2)
         assert redis.hmget.call_args_list == [mock.call('model1', ['(3,)', '(4,)'])]
 
     def test_with_ids_and_limit_and_offset(self, model1, session, redis):
-        session.add_all([model1(id=1), model1(id=2), model1(id=3)])
+        session.add_all([model1(session, id=1), model1(session, id=2), model1(session, id=3)])
         session.commit()
         model1.get(session, [{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}], limit=2, offset=1)
         assert redis.hmget.call_args_list == [mock.call('model1', ['(2,)', '(3,)'])]
 
     def test_with_missing_id(self, model1, session, redis):
-        session.add(model1(id=1))
+        session.add(model1(session, id=1))
         session.commit()
         redis.hmget.return_value = [None, None]
         assert model1.get(session, [{'id': 1}, {'id': 2}]) == [{'id': 1}]

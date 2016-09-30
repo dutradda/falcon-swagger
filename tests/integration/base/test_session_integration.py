@@ -79,14 +79,14 @@ def model2(engine, request, model_base):
 class TestSessionCommitWithoutRedis(object):
     def test_set_without_redis(self, session, model1, redis):
         session.redis_bind = None
-        session.add(model1(id=1))
+        session.add(model1(session, id=1))
         session.commit()
 
         assert redis.hmset.call_args_list == []
 
     def test_delete_without_redis(self, session, model1, redis):
         session.redis_bind = None
-        m1 = model1(id=1)
+        m1 = model1(session, id=1)
         session.add(m1)
         session.commit()
         session.delete(m1)
@@ -97,23 +97,23 @@ class TestSessionCommitWithoutRedis(object):
 
 class TestSessionCommitRedisSet(object):
     def test_if_instance_is_seted_on_redis(self, session, model1, redis):
-        session.add(model1(id=1))
+        session.add(model1(session, id=1))
         session.commit()
 
         assert redis.hmset.call_args_list == [mock.call('test1', {'(1,)': msgpack.dumps({'id': 1})})]
 
     def test_if_two_instance_are_seted_on_redis(self, session, model1, redis):
-        session.add(model1(id=1))
-        session.add(model1(id=2))
+        session.add(model1(session, id=1))
+        session.add(model1(session, id=2))
         session.commit()
 
         assert redis.hmset.call_args_list == [
             mock.call('test1', {'(1,)': msgpack.dumps({'id': 1}), '(2,)': msgpack.dumps({'id': 2})})]
 
     def test_if_two_commits_sets_redis_correctly(self, session, model1, redis):
-        session.add(model1(id=1))
+        session.add(model1(session, id=1))
         session.commit()
-        session.add(model1(id=2))
+        session.add(model1(session, id=2))
         session.commit()
 
         assert redis.hmset.call_args_list == [
@@ -124,17 +124,17 @@ class TestSessionCommitRedisSet(object):
         class ExceptionTest(Exception):
             pass
 
-        session.add(model1(id=1))
+        session.add(model1(session, id=1))
         redis.hmset.side_effect = ExceptionTest
         with pytest.raises(ExceptionTest):
             session.commit()
 
     def test_if_istances_are_seted_on_redis_with_two_models_correctly(
             self, session, model1, model2, redis):
-        session.add(model1(id=1))
-        session.add(model2(id=1))
-        session.add(model1(id=2))
-        session.add(model2(id=2))
+        session.add(model1(session, id=1))
+        session.add(model2(session, id=1))
+        session.add(model1(session, id=2))
+        session.add(model2(session, id=2))
         session.commit()
 
         expected = [
@@ -149,11 +149,11 @@ class TestSessionCommitRedisSet(object):
 
     def test_if_two_commits_sets_redis_with_two_models_correctly(
             self, session, model1, model2, redis):
-        session.add(model1(id=1))
-        session.add(model2(id=1))
+        session.add(model1(session, id=1))
+        session.add(model2(session, id=1))
         session.commit()
-        session.add(model1(id=2))
-        session.add(model2(id=2))
+        session.add(model1(session, id=2))
+        session.add(model2(session, id=2))
         session.commit()
 
         expected = [
@@ -171,7 +171,7 @@ class TestSessionCommitRedisSet(object):
 
 class TestSessionCommitRedisDelete(object):
     def test_if_instance_is_deleted_from_redis(self, session, model1, redis):
-        inst1 = model1(id=1)
+        inst1 = model1(session, id=1)
         session.add(inst1)
         session.commit()
 
@@ -181,8 +181,8 @@ class TestSessionCommitRedisDelete(object):
         assert redis.hdel.call_args_list == [mock.call('test1', '(1,)')]
 
     def test_if_two_instance_are_deleted_from_redis(self, session, model1, redis):
-        inst1 = model1(id=1)
-        inst2 = model1(id=2)
+        inst1 = model1(session, id=1)
+        inst2 = model1(session, id=2)
         session.add_all([inst1, inst2])
         session.commit()
 
@@ -194,8 +194,8 @@ class TestSessionCommitRedisDelete(object):
             redis.hdel.call_args_list == [mock.call('test1', '(2,)', '(1,)')])
 
     def test_if_two_commits_delete_redis_correctly(self, session, model1, redis):
-        inst1 = model1(id=1)
-        inst2 = model1(id=2)
+        inst1 = model1(session, id=1)
+        inst2 = model1(session, id=2)
         session.add_all([inst1, inst2])
         session.commit()
 
@@ -213,7 +213,7 @@ class TestSessionCommitRedisDelete(object):
         class ExceptionTest(Exception):
             pass
 
-        inst1 = model1(id=1)
+        inst1 = model1(session, id=1)
         session.add(inst1)
         session.commit()
         session.delete(inst1)
@@ -223,10 +223,10 @@ class TestSessionCommitRedisDelete(object):
 
     def test_if_istances_are_seted_on_redis_with_two_models_correctly(
             self, session, model1, model2, redis):
-        inst1 = model1(id=1)
-        inst2 = model1(id=2)
-        inst3 = model2(id=1)
-        inst4 = model2(id=2)
+        inst1 = model1(session, id=1)
+        inst2 = model1(session, id=2)
+        inst3 = model2(session, id=1)
+        inst4 = model2(session, id=2)
         session.add_all([inst1, inst2, inst3, inst4])
         session.commit()
 
@@ -247,10 +247,10 @@ class TestSessionCommitRedisDelete(object):
 
     def test_if_two_commits_delete_redis_with_two_models_correctly(
             self, session, model1, model2, redis):
-        inst1 = model1(id=1)
-        inst2 = model1(id=2)
-        inst3 = model2(id=1)
-        inst4 = model2(id=2)
+        inst1 = model1(session, id=1)
+        inst2 = model1(session, id=2)
+        inst3 = model2(session, id=1)
+        inst4 = model2(session, id=2)
         session.add_all([inst1, inst2, inst3, inst4])
         session.commit()
 
