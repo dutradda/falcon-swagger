@@ -313,7 +313,9 @@ class _SQLAlchemyModel(ModelBase):
         if not ids_to_get:
             return []
 
-        rel_model.get(session, ids_to_get, todict=False)
+        # attribution made just to keep the reference on session identity_map
+        instances = rel_model.get(session, ids_to_get, todict=False)
+
         rels_ints = []
         for rel_ids in ids_to_get:
             rel_inst = rel_model.get(session, rel_ids, todict=False)
