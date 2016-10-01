@@ -22,23 +22,42 @@
 
 
 from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
+from myreco.domain.engines.types.base import EngineTypeChooser
+from types import MethodType, FunctionType
 import sqlalchemy as sa
+import json
 
 
 class EnginesModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'engines'
     __table_args__ = {'mysql_engine':'innodb'}
+    __schema__ = get_model_schema(__file__)
 
     id = sa.Column(sa.Integer, primary_key=True)
-    name = sa.Column(sa.Integer, unique=True, nullable=False)
-    configuration = sa.Column(sa.Text, nullable=False)
+    configuration_json = sa.Column(sa.Text, nullable=False)
     store_id = sa.Column(sa.ForeignKey('stores.id'), nullable=False)
     type_id = sa.Column(sa.ForeignKey('engines_types.id'), nullable=False)
     item_type_id = sa.Column(sa.ForeignKey('items_types.id'), nullable=False, primary_key=True)
 
     type = sa.orm.relationship('EnginesTypesModel')
     item_type = sa.orm.relationship('ItemsTypesModel')
-    enabled_filters = sa.orm.relationship('FiltersModel', uselist=True)
+    filters = sa.orm.relationship('FiltersModel', uselist=True)
+
+    def __setattr__(self, attr_name, value):
+        if attr_name == 'type':
+            type_ = EngineTypeChooser(value.name)
+            self._set_type(type_)
+
+        elif attr_name == 'configuration_json':
+            self.configuration = json.loads(value)
+
+        SQLAlchemyRedisModelBase.__setattr__(self, attr_name, value)
+
+    def _set_type(self, type_):
+        self.__class__ = type_
+        for attr_name, attr in type_.__dict__.items():
+            if isinstance(attr, FunctionType) and attr_name != 'type':
+                self.__setattr__(attr_name, MethodType(attr, self))
 
 
 class EnginesTypesModel(SQLAlchemyRedisModelBase):
@@ -47,9 +66,6 @@ class EnginesTypesModel(SQLAlchemyRedisModelBase):
 
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.String(255), unique=True, nullable=False)
-
-    def get_variables_names(self):
-        pass
 
 
 class FiltersModel(SQLAlchemyRedisModelBase):
