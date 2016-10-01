@@ -146,8 +146,7 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
         new_insts = set()
 
         for obj in objs:
-            instance = cls(session)
-            cls._update_instance(session, instance, obj, input_)
+            instance = cls(session, input_, **obj)
             new_insts.add(instance)
 
         session.add_all(new_insts)
@@ -159,50 +158,6 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
 
     def _build_todict_list(cls, insts):
         return [inst.todict() for inst in insts]
-
-    def _update_instance(cls, session, instance, values, input_):
-        for attr_name in set(values.keys()):
-            relationship = cls._get_relationship(attr_name)
-
-            if relationship is not None:
-                rel_model = cls.get_model_from_rel(relationship)
-                rels_values = values.pop(attr_name)
-
-                if relationship.prop.uselist is not True:
-                    rels_values = [rels_values]
-
-                rel_insts = cls._get_instances_from_values(session, rel_model, rels_values)
-
-                for rel_values, rel_inst in zip(rels_values, rel_insts):
-                    operation = rel_values.pop('_operation', 'get')
-
-                    if rel_inst is None and operation != 'insert':
-                        raise ModelBaseError(
-                            "Can't execute nested '{}' operation".format(operation), input_)
-
-                    if operation == 'get':
-                        cls._exec_get_on_instance(
-                            session, rel_model, attr_name, relationship,
-                            rel_inst, rel_values, instance, input_)
-
-                    if operation == 'update':
-                        cls._exec_get_on_instance(
-                            session, rel_model, attr_name, relationship,
-                            rel_inst, rel_values, instance, input_)
-                        rel_model._update_instance(session, rel_inst, rel_values, input_)
-
-                    elif operation == 'delete':
-                        rel_model.delete(session, rel_inst.get_ids_map(), commit=False)
-
-                    elif operation == 'remove':
-                        cls._exec_remove_on_instance(
-                            rel_model, attr_name, relationship, rel_inst, instance, input_)
-
-                    elif operation == 'insert':
-                        cls._exec_insert_on_instance(
-                            session, rel_model, attr_name, relationship, rel_values, instance)
-
-        instance.update_(session, **values)
 
     def _get_instances_from_values(cls, session, rel_model, rels_values):
         ids_to_get = cls._get_ids_from_rels_values(rel_model, rels_values)
@@ -283,7 +238,7 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
         id_insts_zip = [(inst.get_ids_map(ids_keys), inst) for inst in insts]
 
         for id_, inst in id_insts_zip:
-            cls._update_instance(session, inst, objs[ids.index(id_)], input_)
+            inst.__init__(session, input_, **objs[ids.index(id_)])
 
         if commit:
             session.commit()
@@ -379,16 +334,58 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
 
 class _SQLAlchemyModel(ModelBase):
 
-    def __init__(self, session, **kwargs):
-        for key, value in kwargs.items():
-            self._setattr(key, value, session)
+    def __init__(self, session, input_=None, **kwargs):
+        if input_ is None:
+            input_ = deepcopy(kwargs)
 
-    def _setattr(self, attr_name, value, session):
+        for key, value in kwargs.items():
+            self._setattr(key, value, session, input_)
+
+    def _setattr(self, attr_name, value, session, input_):
         cls = type(self)
         if not hasattr(cls, attr_name):
             raise TypeError("{} is an invalid keyword argument for {}".format(k, cls.__name__))
 
-        setattr(self, attr_name, value)
+        relationship = cls._get_relationship(attr_name)
+
+        if relationship is not None:
+            rel_model = cls.get_model_from_rel(relationship)
+            if relationship.prop.uselist is not True:
+                value = [value]
+
+            rel_insts = cls._get_instances_from_values(session, rel_model, value)
+
+            for rel_values, rel_inst in zip(value, rel_insts):
+                operation = rel_values.pop('_operation', 'get')
+
+                if rel_inst is None and operation != 'insert':
+                    raise ModelBaseError(
+                        "Can't execute nested '{}' operation".format(operation), input_)
+
+                if operation == 'get':
+                    cls._exec_get_on_instance(
+                        session, rel_model, attr_name, relationship,
+                        rel_inst, rel_values, self, input_)
+
+                if operation == 'update':
+                    cls._exec_get_on_instance(
+                        session, rel_model, attr_name, relationship,
+                        rel_inst, rel_values, self, input_)
+                    rel_inst.__init__(session, input_, **rel_values)
+
+                elif operation == 'delete':
+                    rel_model.delete(session, rel_inst.get_ids_map(), commit=False)
+
+                elif operation == 'remove':
+                    cls._exec_remove_on_instance(
+                        rel_model, attr_name, relationship, rel_inst, self, input_)
+
+                elif operation == 'insert':
+                    cls._exec_insert_on_instance(
+                        session, rel_model, attr_name, relationship, rel_values, self)
+
+        else:
+            setattr(self, attr_name, value)
 
     def get_ids_values(self):
         ids_names = sorted(type(self).__id_names__)
@@ -454,9 +451,6 @@ class _SQLAlchemyModel(ModelBase):
                     relationships = attr.todict(rel_schema)
 
                 dict_inst[rel_name] = relationships
-
-    def update_(self, session, **kwargs):
-        type(self).__init__(self, session, **kwargs)
 
 
 class SQLAlchemyRedisModelBuilder(object):

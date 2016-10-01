@@ -200,8 +200,7 @@ class TestModelBaseTodict(object):
         assert model1(mock.MagicMock(), id=1).todict(schema) == {}
 
     def test_todict_with_relationship_and_without_schema(self, model1, model2):
-        m1 = model1(mock.MagicMock(), id=1)
-        m2 = model2(mock.MagicMock(), id=1, model1=m1)
+        m2 = model2(mock.MagicMock(), id=1, model1={'id': 1, '_operation': 'insert'})
         assert m2.todict() == {
             'id': 1,
             'model1_id': None,
@@ -211,8 +210,7 @@ class TestModelBaseTodict(object):
         }
 
     def test_todict_with_relationship_and_this_relationship_not_in_schema(self, model1, model2):
-        m1 = model1(mock.MagicMock(), id=1)
-        m2 = model2(mock.MagicMock(), id=1, model1=m1)
+        m2 = model2(mock.MagicMock(), id=1, model1={'id': 1, '_operation': 'insert'})
         schema = {'model1': False}
         assert m2.todict(schema) == {
             'id': 1,
@@ -220,8 +218,7 @@ class TestModelBaseTodict(object):
         }
 
     def test_todict_with_relationship_and_a_relationship_attr_not_in_schema(self, model1, model2):
-        m1 = model1(mock.MagicMock(), id=1)
-        m2 = model2(mock.MagicMock(), id=1, model1=m1)
+        m2 = model2(mock.MagicMock(), id=1, model1={'id': 1, '_operation': 'insert'})
         schema = {'model1': {'id': False}}
         assert m2.todict(schema) == {
             'id': 1,
@@ -230,8 +227,7 @@ class TestModelBaseTodict(object):
         }
 
     def test_todict_with_nested_relationship_without_schema(self, model1, model2, model3):
-        m1 = model1(mock.MagicMock(), id=1)
-        m2 = model2(mock.MagicMock(), id=1, model1=m1)
+        m2 = {'id': 1, 'model1': {'id': 1, '_operation': 'insert'}, '_operation': 'insert'}
         m3 = model3(mock.MagicMock(), id=1, model2=m2)
         assert m3.todict() == {
             'id': 1,
@@ -246,8 +242,7 @@ class TestModelBaseTodict(object):
         }
 
     def test_todict_with_nested_relationship_with_schema(self, model1, model2, model3):
-        m1 = model1(mock.MagicMock(), id=1)
-        m2 = model2(mock.MagicMock(), id=1, model1=m1)
+        m2 = {'id': 1, 'model1': {'id': 1, '_operation': 'insert'}, '_operation': 'insert'}
         m3 = model3(mock.MagicMock(), id=1, model2=m2)
         schema = {
             'model2': {

@@ -189,7 +189,7 @@ def model2_mto_nested(model_base):
 
 class TestModelBaseTodict(object):
     def test_todict_after_get_from_database(self, model1, model2, session):
-        session.add(model2(session, id=1, model1=model1(session, id=1)))
+        session.add(model2(session, id=1, model1={'id': 1, '_operation': 'insert'}))
         session.commit()
         expected = {
             'id': 1,
@@ -199,7 +199,7 @@ class TestModelBaseTodict(object):
         session.query(model2).filter_by(id=1).one().todict() == expected
 
     def test_todict_after_get_from_database_with_mtm(self, model1, model2_mtm, session):
-        session.add(model2_mtm(session, id=1, model1=[model1(session, id=1)]))
+        session.add(model2_mtm(session, id=1, model1=[{'id': 1, '_operation': 'insert'}]))
         session.commit()
         expected = {
             'id': 1,
@@ -209,7 +209,7 @@ class TestModelBaseTodict(object):
 
     def test_todict_after_get_from_database_with_mtm_with_two_relations(
             self, model1, model2_mtm, session):
-        session.add(model2_mtm(session, id=1, model1=[model1(session, id=1), model1(session, id=2)]))
+        session.add(model2_mtm(session, id=1, model1=[{'id': 1, '_operation': 'insert'}, {'id': 2, '_operation': 'insert'}]))
         session.commit()
         expected = {
             'id': 1,
