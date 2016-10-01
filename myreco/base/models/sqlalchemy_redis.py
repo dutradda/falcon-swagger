@@ -159,68 +159,10 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
     def _build_todict_list(cls, insts):
         return [inst.todict() for inst in insts]
 
-    def _get_instances_from_values(cls, session, rel_model, rels_values):
-        ids_to_get = cls._get_ids_from_rels_values(rel_model, rels_values)
-        if not ids_to_get:
-            return []
-
-        rel_model.get(session, ids_to_get, todict=False)
-        rels_ints = []
-        for rel_ids in ids_to_get:
-            rel_inst = rel_model.get(session, rel_ids, todict=False)
-            rel_inst = rel_inst[0] if rel_inst else None
-            rels_ints.append(rel_inst)
-
-        return rels_ints
-
-    def _get_ids_from_rels_values(cls, rel_model, rels_values):
-        ids = []
-        for rel_value in rels_values:
-            ids_values = rel_model.get_ids_from_values(rel_value)
-            ids.append(ids_values)
-
-        return ids
-
     def get_ids_from_values(cls, values):
         cast = lambda id_name, value: getattr(cls, id_name).type.python_type(value) \
             if value is not None else None
         return {id_name: cast(id_name, values.get(id_name)) for id_name in cls.primaries_keys}
-
-    def _exec_get_on_instance(
-            cls, session, rel_model, attr_name, relationship,
-            rel_inst, rel_values, instance, input_):
-        if relationship.prop.uselist is True:
-            if rel_inst not in getattr(instance, attr_name):
-                getattr(instance, attr_name).append(rel_inst)
-
-        else:
-            setattr(instance, attr_name, rel_inst)
-
-    def _exec_remove_on_instance(
-            cls, rel_model, attr_name, relationship,
-            rel_inst, instance, input_):
-        if relationship.prop.uselist is True:
-            if rel_inst in getattr(instance, attr_name):
-                getattr(instance, attr_name).remove(rel_inst)
-            else:
-                columns_str = ', '.join(rel_model.primaries_keys)
-                ids_str = ', '.join([str(id_) for id_ in rel_inst.get_ids_values()])
-                error_message = "can't remove model '{}' on column(s) '{}' with value(s) {}"
-                error_message = error_message.format(rel_model.tablename, columns_str, ids_str)
-                raise ModelBaseError(error_message, input_)
-        else:
-            setattr(instance, attr_name, None)
-
-    def _exec_insert_on_instance(
-            cls, session, rel_model, attr_name,
-            relationship, rel_values, instance):
-        inserted_objs = rel_model.insert(
-            session, rel_values, commit=False, todict=False)
-        if relationship.prop.uselist is not True:
-            setattr(instance, attr_name, inserted_objs[0])
-        else:
-            if inserted_objs[0] not in getattr(instance, attr_name):
-                getattr(instance, attr_name).append(inserted_objs[0])
 
     def update(cls, session, objs, commit=True, todict=True, ids=None, **kwargs):
         input_ = deepcopy(objs)
@@ -349,47 +291,77 @@ class _SQLAlchemyModel(ModelBase):
         relationship = cls._get_relationship(attr_name)
 
         if relationship is not None:
-            rel_model = cls.get_model_from_rel(relationship)
-            if relationship.prop.uselist is not True:
-                value = [value]
-
-            rel_insts = cls._get_instances_from_values(session, rel_model, value)
-
-            for rel_values, rel_inst in zip(value, rel_insts):
-                operation = rel_values.pop('_operation', 'get')
-
-                if rel_inst is None and operation != 'insert':
-                    raise ModelBaseError(
-                        "Can't execute nested '{}' operation".format(operation), input_)
-
-                if operation == 'get':
-                    cls._exec_get_on_instance(
-                        session, rel_model, attr_name, relationship,
-                        rel_inst, rel_values, self, input_)
-
-                if operation == 'update':
-                    cls._exec_get_on_instance(
-                        session, rel_model, attr_name, relationship,
-                        rel_inst, rel_values, self, input_)
-                    rel_inst.__init__(session, input_, **rel_values)
-
-                elif operation == 'delete':
-                    rel_model.delete(session, rel_inst.get_ids_map(), commit=False)
-
-                elif operation == 'remove':
-                    cls._exec_remove_on_instance(
-                        rel_model, attr_name, relationship, rel_inst, self, input_)
-
-                elif operation == 'insert':
-                    cls._exec_insert_on_instance(
-                        session, rel_model, attr_name, relationship, rel_values, self)
-
+            self._set_relationship(relationship, attr_name, value, session, input_)
         else:
             setattr(self, attr_name, value)
 
-    def get_ids_values(self):
-        ids_names = sorted(type(self).__id_names__)
-        return tuple([getattr(self, id_name) for id_name in ids_names])
+    def _set_relationship(self, relationship, attr_name, values_list, session, input_):
+        cls = type(self)        
+        rel_model = cls.get_model_from_rel(relationship)
+
+        if relationship.prop.uselist is not True:
+            values_list = [values_list]
+
+        rel_insts = self._get_instances_from_values(session, rel_model, values_list)
+
+        for rel_values, rel_inst in zip(values_list, rel_insts):
+            self._do_nested_operation(rel_values, rel_inst,
+                                attr_name, relationship, session, input_)
+
+    def _get_instances_from_values(self, session, rel_model, rels_values):
+        ids_to_get = self._get_ids_from_rels_values(rel_model, rels_values)
+        if not ids_to_get:
+            return []
+
+        rel_model.get(session, ids_to_get, todict=False)
+        rels_ints = []
+        for rel_ids in ids_to_get:
+            rel_inst = rel_model.get(session, rel_ids, todict=False)
+            rel_inst = rel_inst[0] if rel_inst else None
+            rels_ints.append(rel_inst)
+
+        return rels_ints
+
+    def _get_ids_from_rels_values(self, rel_model, rels_values):
+        ids = []
+        for rel_value in rels_values:
+            ids_values = rel_model.get_ids_from_values(rel_value)
+            ids.append(ids_values)
+
+        return ids
+
+    def _do_nested_operation(self, rel_values, rel_inst,
+                    attr_name, relationship, session, input_):
+        operation = rel_values.pop('_operation', 'get')
+
+        if rel_inst is None and operation != 'insert':
+            raise ModelBaseError(
+                "Can't execute nested '{}' operation".format(operation), input_)
+
+        if operation == 'get':
+            self._do_get(attr_name, relationship, rel_inst)
+
+        elif operation == 'update':
+            self._do_get(attr_name, relationship, rel_inst)
+            rel_inst.__init__(session, input_, **rel_values)
+
+        elif operation == 'delete':
+            rel_model = type(rel_inst)
+            rel_model.delete(session, rel_inst.get_ids_map(), commit=False)
+
+        elif operation == 'remove':
+            self._do_remove(attr_name, relationship, rel_inst, input_)
+
+        elif operation == 'insert':
+            self._do_insert(session, attr_name, relationship, rel_values)
+
+    def _do_get(self, attr_name, relationship, rel_inst):
+        if relationship.prop.uselist is True:
+            if rel_inst not in getattr(self, attr_name):
+                getattr(self, attr_name).append(rel_inst)
+
+        else:
+            setattr(self, attr_name, rel_inst)
 
     def get_ids_map(self, keys=None):
         if keys is None:
@@ -397,6 +369,34 @@ class _SQLAlchemyModel(ModelBase):
 
         pk_names = sorted(keys)
         return {id_name: getattr(self, id_name) for id_name in pk_names}
+
+    def _do_remove(self, attr_name, relationship, rel_inst, input_):
+        rel_model = type(rel_inst)
+        if relationship.prop.uselist is True:
+            if rel_inst in getattr(self, attr_name):
+                getattr(self, attr_name).remove(rel_inst)
+            else:
+                columns_str = ', '.join(rel_model.primaries_keys)
+                ids_str = ', '.join([str(id_) for id_ in rel_inst.get_ids_values()])
+                error_message = "can't remove model '{}' on column(s) '{}' with value(s) {}"
+                error_message = error_message.format(rel_model.tablename, columns_str, ids_str)
+                raise ModelBaseError(error_message, input_)
+        else:
+            setattr(self, attr_name, None)
+
+    def get_ids_values(self):
+        ids_names = sorted(type(self).__id_names__)
+        return tuple([getattr(self, id_name) for id_name in ids_names])
+
+    def _do_insert(self, session, attr_name, relationship, rel_values):
+        rel_model = type(self).get_model_from_rel(relationship)
+        rel_inst = rel_model(session, **rel_values)
+
+        if relationship.prop.uselist is not True:
+            setattr(self, attr_name, rel_inst)
+        else:
+            if rel_inst not in getattr(self, attr_name):
+                getattr(self, attr_name).append(rel_inst)
 
     def get_related(self, session):
         related = set()
