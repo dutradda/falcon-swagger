@@ -44,43 +44,25 @@ class ItemsTypesModel(SQLAlchemyRedisModelBase):
     id_names_json = sa.Column(sa.String(255), nullable=False)
     schema_json = sa.Column(sa.Text, nullable=False)
 
-    @classmethod
-    def insert(cls, session, objs, commit=True, todict=True, **kwargs):
-        cls._format_input_json(objs)
-        objs = type(cls).insert(cls, session, objs, commit, todict, **kwargs)
-        if todict:
-            cls._format_output_json(objs)
-        return objs
+    def _setattr(self, attr_name, value, session, input_):
+        if attr_name == 'id_names':
+            value = json.dumps(value)
+            attr_name = 'id_names_json'
 
-    @classmethod
-    def _format_input_json(cls, objs):
-        objs = cls._to_list(objs)
-        for obj in objs:
-            id_names = obj.pop('id_names', None)
-            if id_names:
-                obj['id_names_json'] = json.dumps(id_names)
+        elif attr_name == 'schema':
+            value = json.dumps(value)
+            attr_name = 'schema_json'
 
-            if 'schema' in obj:
-                obj['schema_json'] = json.dumps(obj.pop('schema'))
+        SQLAlchemyRedisModelBase._setattr(self, attr_name, value, session, input_)
 
-    @classmethod
-    def update(cls, session, objs, commit=True, todict=True, ids=None, **kwargs):
-        cls._format_input_json(objs)
-        objs = type(cls).update(cls, session, objs, commit, todict, ids, **kwargs)
-        if todict:
-            cls._format_output_json(objs)
-        return objs
+    def _format_output_json(self, dict_inst):
+        if 'id_names_json' in dict_inst:
+            dict_inst['id_names'] = json.loads(dict_inst.pop('id_names_json'))
 
-    @classmethod
-    def get(cls, session, ids=None, limit=None, offset=None, todict=True, **kwargs):
-        objs = type(cls).get(cls, session, ids, limit, offset, todict, **kwargs)
-        if todict:
-            cls._format_output_json(objs)
-        return objs
+        if 'schema_json' in dict_inst:
+            dict_inst['schema'] = json.loads(dict_inst.pop('schema_json'))
 
-    @classmethod
-    def _format_output_json(cls, objs):
-        objs = cls._to_list(objs)
-        for obj in objs:
-            obj['id_names'] = json.loads(obj.pop('id_names_json'))
-            obj['schema'] = json.loads(obj.pop('schema_json'))
+    def todict(self, schema=None):
+        dict_inst = SQLAlchemyRedisModelBase.todict(self, schema)
+        self._format_output_json(dict_inst)
+        return dict_inst
