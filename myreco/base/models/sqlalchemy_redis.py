@@ -164,7 +164,9 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
             if value is not None else None
         return {id_name: cast(id_name, values.get(id_name)) for id_name in cls.primaries_keys}
 
-    def update(cls, session, objs, commit=True, todict=True, ids=None, **kwargs):
+    def update(cls, session, objs, commit=True, todict=True, ids=None, ids_keys=None, **kwargs):
+        cls._raise_ids_keys_error(ids, ids_keys)
+
         input_ = deepcopy(objs)
 
         objs = cls._to_list(objs)
@@ -176,7 +178,6 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
         for inst in insts:
             inst.old_redis_key = inst.get_key()
 
-        ids_keys = ids[0].keys()
         id_insts_zip = [(inst.get_ids_map(ids_keys), inst) for inst in insts]
 
         for id_, inst in id_insts_zip:

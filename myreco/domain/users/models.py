@@ -147,7 +147,7 @@ class UsersModel(SQLAlchemyRedisModelBase):
             obj['grants'] = grants
 
     @classmethod
-    def update(cls, session, objs, commit=True, todict=True, ids=None):
+    def update(cls, session, objs, commit=True, todict=True, ids=None, ids_keys=None):
         if not ids:
             ids = []
             objs = cls._to_list(objs)
@@ -156,10 +156,13 @@ class UsersModel(SQLAlchemyRedisModelBase):
                 email = obj.get('email')
                 if id_ is not None:
                     ids.append({'id': id_})
+                    ids_keys = ('id',)
                 elif email is not None:
                     ids.append({'email': email})
+                    ids_keys = ('email',)
 
-        insts = type(cls).update(cls, session, objs, commit=False, todict=False, ids=ids)
+        insts = type(cls).update(cls, session, objs, commit=False,
+                            todict=False, ids=ids, ids_keys=ids_keys)
         cls._set_insts_ids(insts)
 
         if commit:

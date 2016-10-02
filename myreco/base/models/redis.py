@@ -56,12 +56,14 @@ class RedisModelMeta(ModelBaseMeta):
 
         return objs
 
-    def update(cls, session, objs, ids=None, **kwargs):
+    def update(cls, session, objs, ids=None, ids_keys=None, **kwargs):
+        cls._raise_ids_keys_error(ids, ids_keys)
+
         input_ = deepcopy(objs)
 
         objs = cls._to_list(objs)
         if ids:
-            keys_objs_map = cls._build_keys_objs_map_with_ids(objs, ids)
+            keys_objs_map = cls._build_keys_objs_map_with_ids(objs, ids, ids_keys)
         else:
             keys_objs_map = OrderedDict([(cls(obj).get_key().encode(), obj) for obj in objs])
 
@@ -90,9 +92,8 @@ class RedisModelMeta(ModelBaseMeta):
 
         return list(keys_objs_map.values())
 
-    def _build_keys_objs_map_with_ids(cls, objs, ids):
+    def _build_keys_objs_map_with_ids(cls, objs, ids, ids_keys):
         ids = cls._to_list(ids)
-        ids_keys = ids[0].keys()
         keys_objs_map = OrderedDict()
 
         for obj in objs:
