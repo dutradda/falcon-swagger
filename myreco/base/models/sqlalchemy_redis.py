@@ -69,6 +69,7 @@ class SQLAlchemyModelInitMixinMeta(DeclarativeMeta, ModelBaseMeta):
             cls.relationships = set()
             cls.columns = set(cls.__table__.c)
             cls.__key__ = cls.tablename = str(cls.__table__.name)
+            cls.__join_conditions__ = attributes.get('__join_conditions__')
             cls.todict_schema = {}
             cls.valid_attributes = set()
             base_class.all_models.add(cls)
@@ -195,7 +196,7 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
         ids = cls._to_list(ids)
         filters = cls.build_filters_by_ids(ids)
 
-        instances = session.query(cls).filter(filters).all()
+        instances = cls._build_query(session).filter(filters).all()
         [session.delete(inst) for inst in instances]
 
         if commit:
@@ -228,9 +229,14 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
     def _build_id_attribute_comparison(cls, pk_name, pk_attributes):
         return getattr(cls, pk_name) == pk_attributes[pk_name]
 
-    def get(cls, session, ids=None, limit=None, offset=None, todict=True, **kwargs):
+    def get(cls, session, ids=None, limit=None, offset=None,
+            todict=True, **kwargs):
+        extra_filters = None
+        if kwargs:
+            extra_filters = cls.build_filters_by_ids([kwargs])
+
         if ids is None:
-            query = session.query(cls)
+            query = cls._build_query(session, extra_filters)
 
             if limit is not None:
                 query = query.limit(limit)
@@ -244,12 +250,24 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
             limit += offset
 
         ids = cls._to_list(ids)
-        return cls._get_many(session, ids[offset:limit], todict=todict)
+        return cls._get_many(session, ids[offset:limit], extra_filters, todict)
 
-    def _get_many(cls, session, ids, todict=True):
-        if not todict or session.redis_bind is None:
+    def _build_query(cls, session, extra_filters=None):
+        query = session.query(cls)
+
+        if cls.__join_conditions__:
+            query = query.join(*cls.__join_conditions__)
+
+        if extra_filters:
+            query = query.filter(*extra_filters)
+
+        return query
+
+    def _get_many(cls, session, ids, extra_filters, todict):
+        if not todict or session.redis_bind is None or extra_filters:
             filters = cls.build_filters_by_ids(ids)
-            insts = session.query(cls).filter(filters).all()
+            insts = cls._build_query(session, extra_filters).filter(filters).all()
+
             if todict:
                 return [inst.todict() for inst in insts]
             else:
@@ -263,7 +281,7 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
 
         if ids_not_cached:
             filters = cls.build_filters_by_ids(ids_not_cached)
-            instances = session.query(cls).filter(filters).all()
+            instances = cls._build_query(session).filter(filters).all()
             if instances:
                 items_to_set = {
                     inst.get_key(): msgpack.dumps(inst.todict()) for inst in instances}
@@ -425,7 +443,7 @@ class _SQLAlchemyModel(ModelBase):
         rel_model = cls.get_model_from_rel(relationship, parent=parent)
 
         filters = cls.build_filters_by_ids([self.get_ids_map()])
-        result = set(session.query(rel_model).join(
+        result = set(rel_model._build_query(session).join(
             relationship).filter(filters).all())
         return result
 

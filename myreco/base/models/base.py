@@ -35,10 +35,11 @@ import os.path
 class BaseModelOperationMeta(type):
     def _get_context_values(cls, context):
         session = context['session']
-        req_body = context['parameters']['body']
-        id_ = context['parameters']['uri_template']
-        kwargs = deepcopy(context['parameters']['headers'])
-        kwargs.update(context['parameters']['query_string'])
+        parameters = context['parameters']
+        req_body = parameters['body']
+        id_ = parameters['uri_template']
+        kwargs = deepcopy(parameters['headers'])
+        kwargs.update(parameters['query_string'])
 
         return session, req_body, id_, kwargs
 
