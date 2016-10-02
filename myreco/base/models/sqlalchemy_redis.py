@@ -46,7 +46,7 @@ import os.path
 MODEL_BASE_CLASS_NAME = 'SQLAlchemyRedisModelBase'
 
 
-class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
+class SQLAlchemyModelInitMixinMeta(DeclarativeMeta, ModelBaseMeta):
 
     def __init__(cls, name, bases_classes, attributes):
         DeclarativeMeta.__init__(cls, name, bases_classes, attributes)
@@ -139,6 +139,9 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
             return
 
         return relationship.prop.argument
+
+
+class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
 
     def insert(cls, session, objs, commit=True, todict=True, **kwargs):
         input_ = deepcopy(objs)
@@ -273,6 +276,12 @@ class SQLAlchemyModelMeta(DeclarativeMeta, ModelBaseMeta):
                     objs.insert(index, inst.todict())
 
         return objs
+
+
+class SQLAlchemyModelMeta(
+        SQLAlchemyModelInitMixinMeta,
+        SQLAlchemyModelOperationsMixinMeta):
+    pass
 
 
 class _SQLAlchemyModel(ModelBase):
