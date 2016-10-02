@@ -40,7 +40,6 @@ class BaseModelOperationMeta(type):
         id_ = parameters['uri_template']
         kwargs = deepcopy(parameters['headers'])
         kwargs.update(parameters['query_string'])
-
         return session, req_body, id_, kwargs
 
 
@@ -90,7 +89,7 @@ class BaseModelPutMixinMeta(BaseModelPostMixinMeta):
         req_body_copy = deepcopy(req_body)
 
         cls._update_dict(req_body, id_)
-        objs = cls.update(session, req_body, ids=id_, ids_keys=id_.keys(), **kwargs)
+        objs = cls.update(session, req_body, ids=id_, **kwargs)
 
         if not objs:
             req_body = req_body_copy
@@ -118,7 +117,7 @@ class BaseModelPatchMixinMeta(BaseModelPutMixinMeta):
         session, req_body, id_, kwargs = cls._get_context_values(req.context)
 
         cls._update_dict(req_body, id_)
-        objs = cls.update(session, req_body, ids=id_, ids_keys=id_.keys(), **kwargs)
+        objs = cls.update(session, req_body, ids=id_, **kwargs)
         if objs:
             resp.body = json.dumps(objs[0])
         else:
@@ -482,10 +481,14 @@ class ModelBaseMeta(
     def _to_list(cls, objs):
         return objs if isinstance(objs, list) else [objs]
 
-    def _raise_ids_keys_error(cls, ids, ids_keys):
-        if ids is not None and ids_keys is None:
-            message = "'ids_keys' is required when 'ids' parameter is setted"
-            raise ModelBaseError(message, input_=ids)
+    def get_filters_names_key(cls):
+        return cls.__key__ + '_filters_names'
+
+    def get_key(cls, filters_names=None):
+        if not filters_names or filters_names == cls.__key__:
+            return cls.__key__
+
+        return '{}_{}'.format(cls.__key__, filters_names)
 
 
 class ModelBase(object):

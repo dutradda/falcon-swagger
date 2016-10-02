@@ -540,6 +540,7 @@ class TestUsersResourcePutUpdateOne(object):
             }]
         }
         session.redis_bind = mock.MagicMock()
+        redis.smembers.return_value = {'users'.encode()}
         resp = client.put('/users/test2', body=json.dumps(user), headers=headers)
 
         assert resp.status_code == 200
@@ -568,7 +569,7 @@ class TestUsersResourcePutUpdateOne(object):
                 }
             }]
         }
-        assert redis.hdel.call_args_list == [mock.call('users', "((), ('test2:test',))")]
+        assert redis.hdel.call_args_list == [mock.call('users', "('test2:test',)")]
 
 
 class TestUsersResourcePutUpdateMany(object):

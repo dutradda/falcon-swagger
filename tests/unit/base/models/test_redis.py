@@ -140,7 +140,7 @@ class TestRedisModelMetaUpdateWithIDs(object):
     def test_without_objects_and_with_ids(self, model):
         session = mock.MagicMock()
         session.bind.hkeys.return_value = [str((2,)), str((1,))]
-        assert model.update(session, [], {'id': 1}, ('id',)) == []
+        assert model.update(session, [], {'id': 1}) == []
         assert not session.bind.hmset.called
 
     def test_with_objects_and_with_ids_and_with_one_id_different_than_objects(self, model):
@@ -149,7 +149,7 @@ class TestRedisModelMetaUpdateWithIDs(object):
         expected_map = {
             str((1,)).encode(): msgpack.dumps({'id': 1})
         }
-        assert model.update(session, [{'id': 1}], [{'id': 1}, {'id': 2}], ('id',)) == [{'id': 1}]
+        assert model.update(session, [{'id': 1}], [{'id': 1}, {'id': 2}]) == [{'id': 1}]
         assert session.bind.hmset.call_args_list == [mock.call('test', expected_map)]
 
     def test_with_objects_and_with_ids_and_with_one_obj_different_than_ids(self, model):
@@ -158,19 +158,19 @@ class TestRedisModelMetaUpdateWithIDs(object):
         expected_map = {
             str((1,)).encode(): msgpack.dumps({'id': 1})
         }
-        assert model.update(session, [{'id': 1}, {'id': 2}], [{'id': 1}], ('id',)) == [{'id': 1}]
+        assert model.update(session, [{'id': 1}, {'id': 2}], [{'id': 1}]) == [{'id': 1}]
         assert session.bind.hmset.call_args_list == [mock.call('test', expected_map)]
 
     def test_with_objects_and_with_ids_and_with_ids_different_than_objects(self, model):
         session = mock.MagicMock()
         session.bind.hkeys.return_value = [str((1,)).encode()]
-        assert model.update(session, [{'id': 2}], {'id': 1}, ('id',)) == []
+        assert model.update(session, [{'id': 2}], {'id': 1}) == []
         assert not session.bind.hmset.called
 
     def test_with_objects_and_with_ids_and_with_objs_different_than_ids(self, model):
         session = mock.MagicMock()
         session.bind.hkeys.return_value = [str((2,)).encode()]
-        assert model.update(session, [{'id': 2}], {'id': 1}, ('id',)) == []
+        assert model.update(session, [{'id': 2}], {'id': 1}) == []
         assert not session.bind.hmset.called
 
     def test_hmset_with_objects_and_with_ids(self, model):
@@ -180,14 +180,14 @@ class TestRedisModelMetaUpdateWithIDs(object):
             str((1,)).encode(): msgpack.dumps({'id': 1})
         }
 
-        assert model.update(session, {'id': 1}, {'id': 1}, ('id',)) == [{'id': 1}]
+        assert model.update(session, {'id': 1}, {'id': 1}) == [{'id': 1}]
         assert session.bind.hmset.call_args_list == [mock.call('test', expected_map)]
 
     def test_hmset_with_objects_and_with_ids_and_with_invalid_keys(self, model):
         session = mock.MagicMock()
         session.bind.hkeys.return_value = ['test']
 
-        assert model.update(session, [{'id': 1}], [{'id': 1}], ('id',)) == []
+        assert model.update(session, [{'id': 1}], [{'id': 1}]) == []
         assert session.bind.hmset.call_args_list == []
 
     def test_hmset_with_objects_and_with_ids_and_with_one_invalid_key(self, model):
@@ -197,7 +197,7 @@ class TestRedisModelMetaUpdateWithIDs(object):
             str((1,)).encode(): msgpack.dumps({'id': 1})
         }
 
-        assert model.update(session, [{'id': 1}, {'id': 2}], [{'id': 1}, {'id': 2}], ('id',)) == [{'id': 1}]
+        assert model.update(session, [{'id': 1}, {'id': 2}], [{'id': 1}, {'id': 2}]) == [{'id': 1}]
         assert session.bind.hmset.call_args_list == [mock.call('test', expected_map)]
 
     def test_hmset_with_objects_and_with_ids_len_greater_than_chunks(self, model):
@@ -211,7 +211,7 @@ class TestRedisModelMetaUpdateWithIDs(object):
             str((2,)).encode(): msgpack.dumps({'id': 2})
         }
 
-        assert model.update(session, [{'id': 1}, {'id': 2}], [{'id': 1}, {'id': 2}], ('id',)) == [
+        assert model.update(session, [{'id': 1}, {'id': 2}], [{'id': 1}, {'id': 2}]) == [
             {'id': 1}, {'id': 2}
         ]
         assert session.bind.hmset.call_args_list == [

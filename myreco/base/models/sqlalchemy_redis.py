@@ -167,8 +167,7 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
             if value is not None else None
         return {id_name: cast(id_name, values.get(id_name)) for id_name in cls.primaries_keys}
 
-    def update(cls, session, objs, commit=True, todict=True, ids=None, ids_keys=None, **kwargs):
-        cls._raise_ids_keys_error(ids, ids_keys)
+    def update(cls, session, objs, commit=True, todict=True, ids=None, **kwargs):
 
         input_ = deepcopy(objs)
 
@@ -181,7 +180,7 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
         for inst in insts:
             inst.old_redis_key = inst.get_key()
 
-        id_insts_zip = [(inst.get_ids_map(ids_keys), inst) for inst in insts]
+        id_insts_zip = [(inst.get_ids_map(ids[0].keys()), inst) for inst in insts]
 
         for id_, inst in id_insts_zip:
             inst.__init__(session, input_, **objs[ids.index(id_)])
@@ -229,6 +228,7 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
         return getattr(cls, pk_name) == pk_attributes[pk_name]
 
     def get(cls, session, ids=None, limit=None, offset=None, todict=True, **kwargs):
+
         if ids is None:
             query = cls._build_query(session, kwargs)
 
@@ -275,23 +275,23 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
             else:
                 return insts
 
-        model_redis_key = cls.__key__
+        model_redis_key = type(cls).get_key(cls, '_'.join(kwargs.keys()))
         ids_redis_keys = [cls(session, **id_).get_key(id_.keys()) for id_ in ids]
         objs = session.redis_bind.hmget(model_redis_key, ids_redis_keys)
         ids_not_cached = [id_ for i, (id_, obj) in enumerate(zip(ids, objs)) if obj is None]
         objs = [msgpack.loads(obj, encoding='utf-8') for obj in objs if obj is not None]
 
         if ids_not_cached:
+            session.redis_bind.sadd(cls.get_filters_names_key(), model_redis_key)
             filters = cls.build_filters_by_ids(ids_not_cached)
             instances = cls._build_query(session).filter(filters).all()
             if instances:
                 items_to_set = {
                     inst.get_key(): msgpack.dumps(inst.todict()) for inst in instances}
                 session.redis_bind.hmset(model_redis_key, items_to_set)
-                ids_keys = ids[0].keys()
 
                 for inst in instances:
-                    inst_ids = inst.get_ids_map(ids_keys)
+                    inst_ids = inst.get_ids_map(ids[0].keys())
                     index = ids_not_cached.index(inst_ids)
                     objs.insert(index, inst.todict())
 
@@ -409,22 +409,18 @@ class _SQLAlchemyModel(ModelBase):
                 getattr(self, attr_name).remove(rel_inst)
             else:
                 columns_str = ', '.join(rel_model.primaries_keys)
-                ids_str = ', '.join([str(id_) for id_ in rel_inst.get_ids_values()[1]])
+                ids_str = ', '.join([str(id_) for id_ in rel_inst.get_ids_values()])
                 error_message = "can't remove model '{}' on column(s) '{}' with value(s) {}"
                 error_message = error_message.format(rel_model.__key__, columns_str, ids_str)
                 raise ModelBaseError(error_message, input_)
         else:
             setattr(self, attr_name, None)
 
-    def get_ids_values(self, id_names=None, filters_names=None):
+    def get_ids_values(self, id_names=None):
         if id_names is None:
             id_names = sorted(type(self).__id_names__)
 
-        if filters_names is None:
-            filters_names = tuple()
-
-        filters_ids = tuple(sorted(filters_names))
-        return (filters_ids, tuple([getattr(self, id_name) for id_name in id_names]))
+        return tuple([getattr(self, id_name) for id_name in id_names])
 
     def _do_insert(self, session, attr_name, relationship, rel_values):
         rel_model = type(self).get_model_from_rel(relationship)

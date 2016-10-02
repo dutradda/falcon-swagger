@@ -66,25 +66,36 @@ class _SessionBase(SessionSA):
         models_keys_insts_keys_map = defaultdict(set)
 
         for inst in self._insts_to_hdel:
-            model_redis_key = type(inst).__key__
-            inst_redis_key = inst.get_key()
-            models_keys_insts_keys_map[model_redis_key].add(inst_redis_key)
+            filters_names_set = self._get_filters_names_set(inst)
+            for filters_names in filters_names_set:
+                model = type(inst)
+                model_redis_key = type(model).get_key(model, filters_names.decode())
+                inst_redis_key = inst.get_key()
+                models_keys_insts_keys_map[model_redis_key].add(inst_redis_key)
 
         for model_key, insts_keys in models_keys_insts_keys_map.items():
             self.redis_bind.hdel(model_key, *insts_keys)
+
+    def _get_filters_names_set(self, inst):
+        filters_names_key = type(inst).get_filters_names_key()
+        return self.redis_bind.smembers(filters_names_key)
 
     def _exec_hmset(self, insts):
         models_keys_insts_keys_insts_map = defaultdict(dict)
         models_keys_insts_keys_map = defaultdict(set)
 
         for inst in insts:
-            model_redis_key = type(inst).__key__
-            inst_redis_key = inst.get_key()
-            inst_old_redis_key = getattr(inst, 'old_redis_key', None)
-            if inst_old_redis_key is not None and inst_old_redis_key != inst_redis_key:
-                models_keys_insts_keys_map[model_redis_key].add(inst_old_redis_key)
+            filters_names_set = self._get_filters_names_set(inst)
+            for filters_names in filters_names_set:
+                model = type(inst)
+                model_redis_key = type(model).get_key(model, filters_names.decode())
+                inst_redis_key = inst.get_key()
 
-            models_keys_insts_keys_insts_map[model_redis_key][inst_redis_key] = msgpack.dumps(inst.todict())
+                inst_old_redis_key = getattr(inst, 'old_redis_key', None)
+                if inst_old_redis_key is not None and inst_old_redis_key != inst_redis_key:
+                    models_keys_insts_keys_map[model_redis_key].add(inst_old_redis_key)
+
+                models_keys_insts_keys_insts_map[model_redis_key][inst_redis_key] = msgpack.dumps(inst.todict())
 
         for model_key, insts_keys_insts_map in models_keys_insts_keys_insts_map.items():
             self.redis_bind.hmset(model_key, insts_keys_insts_map)
