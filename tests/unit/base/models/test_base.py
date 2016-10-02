@@ -109,7 +109,7 @@ class TestModelBase(object):
                 }
             }
         }
-        req = mock.MagicMock(uri_template='/test', method='POST')
+        req = mock.MagicMock(uri_template='/test', method='POST', params={})
         resp = mock.MagicMock()
         model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])

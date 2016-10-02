@@ -129,31 +129,31 @@ def model3_string(model_base, model1, model2):
 class TestModelBaseInit(object):
 
     def test_builds_no_relationships(self, model1):
-        assert model1.relationships == set()
+        assert model1.relationships == dict()
 
     def test_builds_no_backrefs(self, model1):
         assert model1.backrefs == set()
 
     def test_if_builds_relationships_correctly_with_one_model(self, model1, model2):
-        assert model2.relationships == {model2.model1}
+        assert model2.relationships == {'model1': model2.model1}
 
     def test_if_builds_relationships_correctly_with_one_model_and_uselist(self, model1, model2_uselist):
-        assert model2_uselist.relationships == {model2_uselist.model1}
+        assert model2_uselist.relationships == {'model1': model2_uselist.model1}
 
     def test_if_builds_relationships_correctly_with_one_model_and_mtm(self, model1, model2_mtm):
-        assert model2_mtm.relationships == {model2_mtm.model1}
+        assert model2_mtm.relationships == {'model1': model2_mtm.model1}
 
     def test_if_builds_relationships_correctly_with_two_models(self, model1, model2, model3):
-        assert model3.relationships == {model3.model1, model3.model2}
+        assert model3.relationships == {'model1': model3.model1, 'model2': model3.model2}
 
     def test_if_builds_relationships_correctly_with_one_model_set_with_string(
             self, model1, model2_string):
-        assert model2_string.relationships == {model2_string.model1}
+        assert model2_string.relationships == {'model1': model2_string.model1}
 
     def test_if_builds_relationships_correctly_with_two_models_set_with_string(
             self, model1, model2, model3_string):
         assert model3_string.relationships == {
-            model3_string.model1, model3_string.model2}
+            'model1': model3_string.model1, 'model2': model3_string.model2}
 
     def test_if_builds_backrefs_correctly_with_one_model(self, model2, model3):
         assert model2.backrefs == {model3.model2}

@@ -59,6 +59,19 @@
                 "in": "body",
                 "required": false,
                 "schema": {"$ref": "#/definitions/email_schema_array"}
+            },{
+                "name": "stores",
+                "in": "query",
+                "required": true,
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "required": ["id"],
+                    "properties": {
+                        "id": {"type": "integer"}
+                    }
+                }
             }],
             "responses": {
                 "200": {"description": "Got"}

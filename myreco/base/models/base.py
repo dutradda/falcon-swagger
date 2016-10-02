@@ -187,18 +187,79 @@ def get_model_schema(filename):
     return json.load(open(os.path.join(_get_dir_path(filename), 'schema.json')))
 
 
+class JsonBuilderMeta(type):
+
+    def _type_builder(cls, type_):
+        return getattr(cls, '_build_' + type_)
+
+    def _build_string(cls, value):
+        return str(value)
+
+    def _build_number(cls, value):
+        return float(value)
+
+    def _build_boolean(cls, value):
+        return bool(value)
+
+    def _build_integer(cls, value):
+        return int(value)
+
+    def _build_array(cls, values, schema, nested_types, input_):
+        if 'array' in nested_types:
+            raise ModelBaseError('nested array was not allowed', input_=input_)
+
+        if isinstance(values, list):
+            new_values = []
+            [new_values.extend(value.split(',')) for value in values]
+            values = new_values
+        else:
+            values = values.split(',')
+
+        items_schema = schema.get('items')
+        if items_schema:
+            nested_types.add('array')
+            values = [cls._build_value(
+                value, items_schema, nested_types, input_) for value in values]
+
+        return values
+
+    def _build_value(cls, value, schema, nested_types, input_):
+        type_ = schema['type']
+        if type_ == 'array' or type_ == 'object':
+            return cls._type_builder(type_)(value, schema, nested_types, input_)
+
+        return cls._type_builder(type_)(value)
+
+    def _build_object(cls, value, schema, nested_types, input_):
+        if 'object' in nested_types:
+            raise ModelBaseError('nested object was not allowed', input_=input_)
+
+        properties = value.split('|')
+        dict_obj = dict()
+        nested_types.add('object')
+        for prop in properties:
+            key, value = prop.split(':')
+            dict_obj[key] = \
+                cls._build_value(value, schema['properties'][key], nested_types, input_)
+
+        nested_types.discard('object')
+        return dict_obj
+
+
+class JsonBuilder(metaclass=JsonBuilderMeta):
+
+    def __new__(cls, json_value, schema):
+        nested_types = set()
+        input_ = deepcopy(json_value)
+        return cls._build_value(json_value, schema, nested_types, input_)
+
+
+
 PATHS_SCHEMA = {'$ref': 'swagger_schema_extended.json#/definitions/paths'}
 SCHEMAS_HANDLERS = {'': URISchemaHandler(_get_dir_path(__file__))}
 RESOLVER = RefResolver.from_schema(PATHS_SCHEMA, handlers=SCHEMAS_HANDLERS)
 SWAGGER_VALIDATOR = Draft4Validator(PATHS_SCHEMA, resolver=RESOLVER)
 HTTP_METHODS = ('post', 'put', 'patch', 'delete', 'get', 'options', 'head')
-CAST = {
-    'string': str,
-    'number': float,
-    'boolean': bool,
-    'integer': int,
-    'array': list
-}
 
 
 class Operation(object):
@@ -259,6 +320,11 @@ class Operation(object):
             if items:
                 property_['items'] = items
 
+        if parameter['type'] == 'object':
+            obj_schema = parameter.get('schema', {})
+            if obj_schema:
+                property_.update(obj_schema)
+
         if parameter.get('required'):
             schema['required'].append(name)
 
@@ -270,9 +336,9 @@ class Operation(object):
 
     def __call__(self, req, resp, **kwargs):
         body_params = self._build_body_params(req)
-        query_string_params = self._build_params_from_schema(self._query_string_validator, req.params)
-        uri_template_params = self._build_params_from_schema(self._uri_template_validator, kwargs)
-        headers_params = self._build_params_from_schema(self._headers_validator, req, 'headers')
+        query_string_params = self._build_non_body_params(self._query_string_validator, req.params)
+        uri_template_params = self._build_non_body_params(self._uri_template_validator, kwargs)
+        headers_params = self._build_non_body_params(self._headers_validator, req, 'headers')
 
         req.context['parameters'] = {
             'query_string': query_string_params,
@@ -308,7 +374,7 @@ class Operation(object):
 
         return req.stream
 
-    def _build_params_from_schema(self, validator, kwargs, type_=None):
+    def _build_non_body_params(self, validator, kwargs, type_=None):
         if validator:
             params = {}
             for param_name, prop in validator.schema['properties'].items():
@@ -318,17 +384,11 @@ class Operation(object):
                     param = kwargs.get(param_name)
 
                 if param:
-                    if prop['type'] == 'array' and not isinstance(param, list):
-                        param = param.split(',')
-
-                    if prop['type'] == 'array' and prop.get('items', {}).get('type'):
-                        array_type = CAST[prop['items']['type']]
-                        params[param_name] = [array_type(param_) for param_ in param]
-                    else:
-                        params[param_name] = CAST[prop['type']](param)
+                    params[param_name] = JsonBuilder(param, prop)
 
             validator.validate(params)
             return params
+
         elif type_ == 'headers':
             return {}
         else:

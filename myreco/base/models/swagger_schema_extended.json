@@ -663,14 +663,18 @@
             "number",
             "boolean",
             "integer",
-            "array"
+            "array",
+            "object"
           ]
         },
         "format": {
           "type": "string"
         },
         "items": {
-          "$ref": "#/definitions/primitivesItems"
+          "$ref": "http://json-schema.org/draft-04/schema#"
+        },
+        "schema": {
+          "$ref": "http://json-schema.org/draft-04/schema#"
         },
         "collectionFormat": {
           "$ref": "#/definitions/collectionFormatWithMulti"

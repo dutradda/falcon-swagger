@@ -66,18 +66,17 @@ class SQLAlchemyModelInitMixinMeta(DeclarativeMeta, ModelBaseMeta):
                         name, MODEL_BASE_CLASS_NAME))
 
             cls.backrefs = set()
-            cls.relationships = set()
+            cls.relationships = dict()
             cls.columns = set(cls.__table__.c)
-            cls.__key__ = cls.tablename = str(cls.__table__.name)
-            cls.__join_conditions__ = attributes.get('__join_conditions__')
+            cls.__key__ = str(cls.__table__.name)
             cls.todict_schema = {}
             cls.valid_attributes = set()
-            base_class.all_models.add(cls)
-            cls._build_backrefs_for_all_models(base_class.all_models)
+            base_class.__all_models__[cls.__key__] = cls
+            cls._build_backrefs_for_all_models(base_class.__all_models__.values())
 
             ModelBaseMeta.__init__(cls, name, bases_classes, attributes)
         else:
-            cls.all_models = set()
+            cls.__all_models__ = dict()
 
     def _build_primary_keys(cls):
         primaries_keys = {}
@@ -101,7 +100,7 @@ class SQLAlchemyModelInitMixinMeta(DeclarativeMeta, ModelBaseMeta):
 
         for model in all_models:
             model._build_relationships()
-            all_relationships.update(model.relationships)
+            all_relationships.update(model.relationships.values())
 
         for model in all_models:
             for relationship in all_relationships:
@@ -116,7 +115,7 @@ class SQLAlchemyModelInitMixinMeta(DeclarativeMeta, ModelBaseMeta):
         for attr_name in cls.__dict__:
             relationship = cls._get_relationship(attr_name)
             if relationship:
-                cls.relationships.add(relationship)
+                cls.relationships[attr_name] = relationship
 
     def _get_relationship(cls, attr_name):
         attr = getattr(cls, attr_name)
@@ -229,14 +228,9 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
     def _build_id_attribute_comparison(cls, pk_name, pk_attributes):
         return getattr(cls, pk_name) == pk_attributes[pk_name]
 
-    def get(cls, session, ids=None, limit=None, offset=None,
-            todict=True, **kwargs):
-        extra_filters = None
-        if kwargs:
-            extra_filters = cls.build_filters_by_ids([kwargs])
-
+    def get(cls, session, ids=None, limit=None, offset=None, todict=True, **kwargs):
         if ids is None:
-            query = cls._build_query(session, extra_filters)
+            query = cls._build_query(session, kwargs)
 
             if limit is not None:
                 query = query.limit(limit)
@@ -250,23 +244,31 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
             limit += offset
 
         ids = cls._to_list(ids)
-        return cls._get_many(session, ids[offset:limit], extra_filters, todict)
+        return cls._get_many(session, ids[offset:limit], todict, kwargs)
 
-    def _build_query(cls, session, extra_filters=None):
+    def _build_query(cls, session, kwargs=None):
         query = session.query(cls)
 
-        if cls.__join_conditions__:
-            query = query.join(*cls.__join_conditions__)
+        if kwargs:
+            for model_name, ids in kwargs.items():
+                relationship = cls.relationships.get(model_name)
+                if not relationship:
+                    raise ModelBaseError("invalid model '{}'".format(model_name), input_=kwargs)
 
-        if extra_filters:
-            query = query.filter(*extra_filters)
+                secondary = relationship.prop.secondary
+                model  = cls.get_model_from_rel(relationship)
+                join = secondary if secondary is not None else model
+
+                ids = cls._to_list(ids)
+                filters = model.build_filters_by_ids(ids)
+                query = query.join(join).filter(filters)
 
         return query
 
-    def _get_many(cls, session, ids, extra_filters, todict):
-        if not todict or session.redis_bind is None or extra_filters:
+    def _get_many(cls, session, ids, todict, kwargs):
+        if not todict or session.redis_bind is None or kwargs:
             filters = cls.build_filters_by_ids(ids)
-            insts = cls._build_query(session, extra_filters).filter(filters).all()
+            insts = cls._build_query(session, kwargs).filter(filters).all()
 
             if todict:
                 return [inst.todict() for inst in insts]
@@ -409,7 +411,7 @@ class _SQLAlchemyModel(ModelBase):
                 columns_str = ', '.join(rel_model.primaries_keys)
                 ids_str = ', '.join([str(id_) for id_ in rel_inst.get_ids_values()])
                 error_message = "can't remove model '{}' on column(s) '{}' with value(s) {}"
-                error_message = error_message.format(rel_model.tablename, columns_str, ids_str)
+                error_message = error_message.format(rel_model.__key__, columns_str, ids_str)
                 raise ModelBaseError(error_message, input_)
         else:
             setattr(self, attr_name, None)
@@ -467,7 +469,7 @@ class _SQLAlchemyModel(ModelBase):
         return (attr_name in schema and schema[attr_name]) or (not attr_name in schema)
 
     def _todict_relationships(self, dict_inst, schema):
-        for rel in type(self).relationships:
+        for rel in type(self).relationships.values():
             rel_name = rel.key
             if self._attribute_in_schema(rel_name, schema):
                 rel_schema = schema.get(rel_name)

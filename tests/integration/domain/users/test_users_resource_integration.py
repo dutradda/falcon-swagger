@@ -22,6 +22,7 @@
 
 
 from myreco.domain.users.models import UsersModel, GrantsModel, URIsModel, MethodsModel
+from myreco.domain.stores.model import StoresModel
 from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.base.http_api import HttpAPI
 from myreco.base.models.base import get_model_schema
@@ -75,7 +76,7 @@ def init_(session):
 
 @pytest.fixture
 def app(session, init_):
-    return HttpAPI([UsersModel], session.bind, FakeStrictRedis())
+    return HttpAPI([UsersModel, StoresModel], session.bind, FakeStrictRedis())
 
 
 @pytest.fixture
@@ -899,21 +900,29 @@ class TestUsersResourceDeleteGet(object):
         assert resp.status_code == 404
 
     def test_delete_many(self, client, headers):
+        store = [{
+            'name': 'test',
+            'country': 'test'
+        }]
+        resp = client.post('/stores', body=json.dumps(store), headers=headers)
+        assert resp.status_code == 201
+
         user = [{
             'name': 'test2',
             'email': 'test2',
-            'password': 'test'
+            'password': 'test',
+            'stores': [{'id':1}]
         }]
         resp = client.post('/users', body=json.dumps(user), headers=headers)
         assert resp.status_code == 201
 
-        resp = client.get('/users', body=json.dumps([{'email': 'test2'}]), headers=headers)
+        resp = client.get('/users?stores=id:1', body=json.dumps([{'email': 'test2'}]), headers=headers)
         assert resp.status_code == 200
 
         resp = client.delete('/users', body=json.dumps([{'email': 'test2'}]), headers=headers)
         assert resp.status_code == 204
 
-        resp = client.get('/users', body=json.dumps([{'email': 'test2'}]), headers=headers)
+        resp = client.get('/users?stores=id:1', body=json.dumps([{'email': 'test2'}]), headers=headers)
         assert resp.status_code == 404
 
 
