@@ -276,7 +276,7 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
                 return insts
 
         model_redis_key = cls.__key__
-        ids_redis_keys = [str(tuple(sorted(id_.values()))) for id_ in ids]
+        ids_redis_keys = [cls(session, **id_).get_key(id_.keys()) for id_ in ids]
         objs = session.redis_bind.hmget(model_redis_key, ids_redis_keys)
         ids_not_cached = [id_ for i, (id_, obj) in enumerate(zip(ids, objs)) if obj is None]
         objs = [msgpack.loads(obj, encoding='utf-8') for obj in objs if obj is not None]
@@ -409,16 +409,22 @@ class _SQLAlchemyModel(ModelBase):
                 getattr(self, attr_name).remove(rel_inst)
             else:
                 columns_str = ', '.join(rel_model.primaries_keys)
-                ids_str = ', '.join([str(id_) for id_ in rel_inst.get_ids_values()])
+                ids_str = ', '.join([str(id_) for id_ in rel_inst.get_ids_values()[1]])
                 error_message = "can't remove model '{}' on column(s) '{}' with value(s) {}"
                 error_message = error_message.format(rel_model.__key__, columns_str, ids_str)
                 raise ModelBaseError(error_message, input_)
         else:
             setattr(self, attr_name, None)
 
-    def get_ids_values(self):
-        ids_names = sorted(type(self).__id_names__)
-        return tuple([getattr(self, id_name) for id_name in ids_names])
+    def get_ids_values(self, id_names=None, filters_names=None):
+        if id_names is None:
+            id_names = sorted(type(self).__id_names__)
+
+        if filters_names is None:
+            filters_names = tuple()
+
+        filters_ids = tuple(sorted(filters_names))
+        return (filters_ids, tuple([getattr(self, id_name) for id_name in id_names]))
 
     def _do_insert(self, session, attr_name, relationship, rel_values):
         rel_model = type(self).get_model_from_rel(relationship)

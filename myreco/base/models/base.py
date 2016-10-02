@@ -489,5 +489,5 @@ class ModelBaseMeta(
 
 
 class ModelBase(object):
-    def get_key(self):
-        return str(self.get_ids_values())
+    def get_key(self, id_names=None):
+        return str(self.get_ids_values(id_names))
