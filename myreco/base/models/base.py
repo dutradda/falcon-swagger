@@ -33,6 +33,7 @@ import os.path
 
 
 class BaseModelOperationMeta(type):
+
     def _get_context_values(cls, context):
         session = context['session']
         parameters = context['parameters']
@@ -178,12 +179,12 @@ class URISchemaHandler(object):
             return json.load(json_schema_file)
 
 
-def _get_dir_path(filename):
+def get_dir_path(filename):
     return os.path.dirname(os.path.abspath(filename))
 
 
 def get_model_schema(filename):
-    return json.load(open(os.path.join(_get_dir_path(filename), 'schema.json')))
+    return json.load(open(os.path.join(get_dir_path(filename), 'schema.json')))
 
 
 class JsonBuilderMeta(type):
@@ -255,7 +256,7 @@ class JsonBuilder(metaclass=JsonBuilderMeta):
 
 
 PATHS_SCHEMA = {'$ref': 'swagger_schema_extended.json#/definitions/paths'}
-SCHEMAS_HANDLERS = {'': URISchemaHandler(_get_dir_path(__file__))}
+SCHEMAS_HANDLERS = {'': URISchemaHandler(get_dir_path(__file__))}
 RESOLVER = RefResolver.from_schema(PATHS_SCHEMA, handlers=SCHEMAS_HANDLERS)
 SWAGGER_VALIDATOR = Draft4Validator(PATHS_SCHEMA, resolver=RESOLVER)
 HTTP_METHODS = ('post', 'put', 'patch', 'delete', 'get', 'options', 'head')
@@ -408,7 +409,7 @@ class ModelBaseRoutesMixinMeta(type):
 
     def get_module_path(cls):
         module_filename = import_module(cls.__module__).__file__
-        return _get_dir_path(module_filename)
+        return get_dir_path(module_filename)
 
     def _build_routes_from_schema(cls, schema):
         for uri_template in schema:
