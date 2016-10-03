@@ -69,7 +69,7 @@ class SQLAlchemyModelInitMixinMeta(DeclarativeMeta, ModelBaseMeta):
             cls.relationships = dict()
             cls.columns = set(cls.__table__.c)
             cls.__key__ = str(cls.__table__.name)
-            cls.todict_schema = {}
+            cls.__todict_schema__ = {}
             cls.valid_attributes = set()
             base_class.__all_models__[cls.__key__] = cls
             cls._build_backrefs_for_all_models(base_class.__all_models__.values())
@@ -453,7 +453,7 @@ class _SQLAlchemyModel(ModelBase):
     def todict(self, schema=None):
         dict_inst = dict()
         if schema is None:
-            schema = type(self).todict_schema
+            schema = type(self).__todict_schema__
 
         self._todict_columns(dict_inst, schema)
         self._todict_relationships(dict_inst, schema)

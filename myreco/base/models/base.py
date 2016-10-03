@@ -46,6 +46,11 @@ def build_validator(schema, path):
     return Draft4Validator(schema, resolver=resolver)
 
 
+def get_module_path(cls):
+    module_filename = import_module(cls.__module__).__file__
+    return get_dir_path(module_filename)
+
+
 class BaseModelOperationMeta(type):
 
     def _get_context_values(cls, context):
@@ -408,8 +413,7 @@ class ModelBaseRoutesMixinMeta(type):
             cls._build_routes_from_schema(schema)
 
     def get_module_path(cls):
-        module_filename = import_module(cls.__module__).__file__
-        return get_dir_path(module_filename)
+        return get_module_path(cls)
 
     def _build_routes_from_schema(cls, schema):
         for uri_template in schema:
