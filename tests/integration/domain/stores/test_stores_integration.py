@@ -57,7 +57,7 @@ def headers():
 
 
 
-class TestItemsTypesModelPost(object):
+class TestStoresModelPost(object):
 
     def test_post_without_body(self, client, headers):
         resp = client.post('/stores/', headers=headers)
@@ -95,7 +95,7 @@ class TestItemsTypesModelPost(object):
         assert json.loads(resp.body) ==  body
 
 
-class TestItemsTypesModelGet(object):
+class TestStoresModelGet(object):
 
     def test_get_not_found(self, client, headers):
         resp = client.get('/stores/', headers=headers)
@@ -119,7 +119,7 @@ class TestItemsTypesModelGet(object):
         assert json.loads(resp.body) ==  body
 
 
-class TestItemsTypesModelUriTemplatePatch(object):
+class TestStoresModelUriTemplatePatch(object):
 
     def test_patch_without_body(self, client, headers):
         resp = client.patch('/stores/1/', headers=headers, body='')
@@ -170,7 +170,7 @@ class TestItemsTypesModelUriTemplatePatch(object):
         assert json.loads(resp.body) ==  obj
 
 
-class TestItemsTypesModelUriTemplateDelete(object):
+class TestStoresModelUriTemplateDelete(object):
 
     def test_delete_with_body(self, client, headers):
         resp = client.delete('/stores/1/', headers=headers, body='{}')
@@ -194,7 +194,7 @@ class TestItemsTypesModelUriTemplateDelete(object):
         assert resp.status_code == 404
 
 
-class TestItemsTypesModelUriTemplateGet(object):
+class TestStoresModelUriTemplateGet(object):
 
     def test_get_with_body(self, client, headers):
         resp = client.get('/stores/1/', headers=headers, body='{}')

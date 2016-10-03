@@ -63,7 +63,7 @@ def headers():
 
 
 
-class TestItemsTypesModelPost(object):
+class TestVariablesModelPost(object):
 
     def test_post_without_body(self, client, headers):
         resp = client.post('/variables/', headers=headers)
@@ -101,7 +101,7 @@ class TestItemsTypesModelPost(object):
         assert json.loads(resp.body) ==  body
 
 
-class TestItemsTypesModelGet(object):
+class TestVariablesModelGet(object):
 
     def test_get_not_found(self, client, headers):
         resp = client.get('/variables/', headers=headers)
@@ -125,7 +125,7 @@ class TestItemsTypesModelGet(object):
         assert json.loads(resp.body) ==  body
 
 
-class TestItemsTypesModelUriTemplatePatch(object):
+class TestVariablesModelUriTemplatePatch(object):
 
     def test_patch_without_body(self, client, headers):
         resp = client.patch('/variables/1/', headers=headers, body='')
@@ -176,7 +176,7 @@ class TestItemsTypesModelUriTemplatePatch(object):
         assert json.loads(resp.body) ==  obj
 
 
-class TestItemsTypesModelUriTemplateDelete(object):
+class TestVariablesModelUriTemplateDelete(object):
 
     def test_delete_with_body(self, client, headers):
         resp = client.delete('/variables/1/', headers=headers, body='{}')
@@ -200,7 +200,7 @@ class TestItemsTypesModelUriTemplateDelete(object):
         assert resp.status_code == 404
 
 
-class TestItemsTypesModelUriTemplateGet(object):
+class TestVariablesModelUriTemplateGet(object):
 
     def test_get_with_body(self, client, headers):
         resp = client.get('/variables/1/', headers=headers, body='{}')
