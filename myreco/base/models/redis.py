@@ -22,12 +22,9 @@
 
 
 from myreco.base.models.base import ModelBaseMeta, ModelBase
-from myreco.exceptions import ModelBaseError
-from jsonschema import Draft4Validator
-from collections import defaultdict, OrderedDict
+from collections import OrderedDict
 from copy import deepcopy
 from types import MethodType
-import json
 import msgpack
 
 

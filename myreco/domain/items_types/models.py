@@ -26,9 +26,6 @@ from myreco.base.models.base import get_model_schema
 from myreco.base.hooks import before_operation, AuthorizationHook
 from myreco.domain.users.models import UsersModel
 from myreco.domain.constants import AUTH_REALM
-from myreco.exceptions import ModelBaseError
-from jsonschema import Draft4Validator
-from collections import defaultdict
 import sqlalchemy as sa
 import json
 

@@ -32,6 +32,20 @@ import json
 import os.path
 
 
+def get_dir_path(filename):
+    return os.path.dirname(os.path.abspath(filename))
+
+
+def get_model_schema(filename):
+    return json.load(open(os.path.join(get_dir_path(filename), 'schema.json')))
+
+
+def build_validator(schema, path):
+    handlers = {'': URISchemaHandler(path)}
+    resolver = RefResolver.from_schema(schema, handlers=handlers)
+    return Draft4Validator(schema, resolver=resolver)
+
+
 class BaseModelOperationMeta(type):
 
     def _get_context_values(cls, context):
@@ -179,14 +193,6 @@ class URISchemaHandler(object):
             return json.load(json_schema_file)
 
 
-def get_dir_path(filename):
-    return os.path.dirname(os.path.abspath(filename))
-
-
-def get_model_schema(filename):
-    return json.load(open(os.path.join(get_dir_path(filename), 'schema.json')))
-
-
 class JsonBuilderMeta(type):
 
     def _type_builder(cls, type_):
@@ -254,11 +260,9 @@ class JsonBuilder(metaclass=JsonBuilderMeta):
         return cls._build_value(json_value, schema, nested_types, input_)
 
 
-
-PATHS_SCHEMA = {'$ref': 'swagger_schema_extended.json#/definitions/paths'}
-SCHEMAS_HANDLERS = {'': URISchemaHandler(get_dir_path(__file__))}
-RESOLVER = RefResolver.from_schema(PATHS_SCHEMA, handlers=SCHEMAS_HANDLERS)
-SWAGGER_VALIDATOR = Draft4Validator(PATHS_SCHEMA, resolver=RESOLVER)
+SWAGGER_VALIDATOR = build_validator(
+    {'$ref': 'swagger_schema_extended.json#/definitions/paths'},
+    get_dir_path(__file__))
 HTTP_METHODS = ('post', 'put', 'patch', 'delete', 'get', 'options', 'head')
 
 
@@ -286,7 +290,7 @@ class Operation(object):
                 else:
                     body_schema = parameter['schema']
 
-                self._body_validator = self._build_validator(body_schema)
+                self._body_validator = build_validator(body_schema, self._model_dir)
                 self._body_required = parameter.get('required', False)
                 self._has_body_parameter = True
 
@@ -300,13 +304,13 @@ class Operation(object):
                 self._set_parameter_on_schema(parameter, headers_schema)
 
         if uri_template_schema['properties']:
-            self._uri_template_validator = self._build_validator(uri_template_schema)
+            self._uri_template_validator = build_validator(uri_template_schema, self._model_dir)
 
         if query_string_schema['properties']:
-            self._query_string_validator = self._build_validator(query_string_schema)
+            self._query_string_validator = build_validator(query_string_schema, self._model_dir)
 
         if headers_schema['properties']:
-            self._headers_validator = self._build_validator(headers_schema)
+            self._headers_validator = build_validator(headers_schema, self._model_dir)
 
     def _build_default_schema(self):
         return {'type': 'object', 'required': [], 'properties': {}}
@@ -329,10 +333,6 @@ class Operation(object):
             schema['required'].append(name)
 
         schema['properties'][name] = property_
-
-    def _build_validator(self, schema):
-        resolver = RefResolver.from_schema(schema, handlers={'': URISchemaHandler(self._model_dir)})
-        return Draft4Validator(schema, resolver=resolver)
 
     def __call__(self, req, resp, **kwargs):
         body_params = self._build_body_params(req)
