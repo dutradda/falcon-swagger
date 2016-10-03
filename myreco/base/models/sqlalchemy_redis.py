@@ -228,7 +228,6 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
         return getattr(cls, pk_name) == pk_attributes[pk_name]
 
     def get(cls, session, ids=None, limit=None, offset=None, todict=True, **kwargs):
-
         if ids is None:
             query = cls._build_query(session, kwargs)
 
@@ -266,7 +265,7 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
         return query
 
     def _get_many(cls, session, ids, todict, kwargs):
-        if not todict or session.redis_bind is None or kwargs:
+        if not todict or session.redis_bind is None:
             filters = cls.build_filters_by_ids(ids)
             insts = cls._build_query(session, kwargs).filter(filters).all()
 
@@ -316,7 +315,7 @@ class _SQLAlchemyModel(ModelBase):
     def _setattr(self, attr_name, value, session, input_):
         cls = type(self)
         if not hasattr(cls, attr_name):
-            raise TypeError("{} is an invalid keyword argument for {}".format(k, cls.__name__))
+            raise TypeError("{} is an invalid keyword argument for {}".format(attr_name, cls.__name__))
 
         relationship = cls._get_relationship(attr_name)
 
