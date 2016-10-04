@@ -48,9 +48,12 @@ class EngineRecommenderMixin(object):
             if var.kind.name == 'POSITIONAL_OR_KEYWORD':
                 variables.append(var.name)
 
+            elif var.kind.name == 'VAR_POSITIONAL':
+                variables.insert(0, var.name)
+
         return tuple(variables)
 
-    def get_recommendations(self, *args):
+    def get_recommendations(self, *input_list, **filters):
         pass
 
 

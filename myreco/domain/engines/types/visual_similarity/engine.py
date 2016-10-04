@@ -27,3 +27,6 @@ from myreco.domain.engines.types.base import EngineRecommenderMixin, EngineType
 
 class VisualSimilarityEngine(EngineRecommenderMixin, EngineType):
     __configuration_schema__ = get_model_schema(__file__)
+
+    def get_recommendations(self, sku, categories, *input_list, **filters):
+        pass
