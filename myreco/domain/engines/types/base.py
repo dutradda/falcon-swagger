@@ -21,27 +21,25 @@
 # SOFTWARE.
 
 
-from myreco.domain.engines.types.neighborhood.engine import NeighborhoodEngine
-from myreco.domain.engines.types.top_seller.engine import TopSellerEngine
-from myreco.domain.engines.types.visual_similarity.engine import VisualSimilarityEngine
-from collections import defaultdict
+from myreco.base.models.base import build_validator, get_module_path
 import inspect
 
 
-class EngineTypeChooser(object):
+class EngineTypeMeta(type):
 
-    def __new__(cls, name):
-        if name == 'neighborhood':
-            return NeighborhoodEngine
-
-        elif name == 'top_seller':
-            return TopSellerEngine
-
-        elif name == 'visual_similarity':
-            return VisualSimilarityEngine
+    def __init__(cls, name, bases_classes, attributes):
+        cls.__config_validator__ = None
+        schema = attributes.get('__configuration_schema__')
+        if schema:
+            cls.__config_validator__ = build_validator(schema, get_module_path(cls))
 
 
-class EngineRecommenderBaseMixin(object):
+class EngineType(metaclass=EngineTypeMeta):
+    def __init__(self, configuration):
+        self._config = configuration
+
+
+class EngineRecommenderMixin(object):
 
     def get_variables(self):
         signature = inspect.signature(self.get_recommendations)
@@ -56,13 +54,25 @@ class EngineRecommenderBaseMixin(object):
         pass
 
 
-class EngineDataImporterBase(object):
+class EngineDataImporterBigqueryMixin(object):
 
-    def import_data(self, configuration):
+    def import_data(self):
         pass
 
 
-class EngineObjectsExporterBase(object):
+from myreco.domain.engines.types.neighborhood.engine import NeighborhoodEngine
+from myreco.domain.engines.types.top_seller.engine import TopSellerEngine
+from myreco.domain.engines.types.visual_similarity.engine import VisualSimilarityEngine
 
-    def export_objects(self, configuration):
-        pass
+
+class EngineTypeChooser(object):
+
+    def __new__(cls, name):
+        if name == 'neighborhood':
+            return NeighborhoodEngine
+
+        elif name == 'top_seller':
+            return TopSellerEngine
+
+        elif name == 'visual_similarity':
+            return VisualSimilarityEngine

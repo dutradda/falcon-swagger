@@ -29,8 +29,8 @@ from myreco.domain.engines.types.base import (
     EngineType)
 
 
-class TopSellerEngine(
-        EngineType,
+class NeighborhoodEngine(
         EngineRecommenderMixin,
-        EngineDataImporterBigqueryMixin):
+        EngineDataImporterBigqueryMixin,
+        EngineType):
     __configuration_schema__ = get_model_schema(__file__)

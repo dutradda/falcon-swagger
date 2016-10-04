@@ -22,15 +22,8 @@
 
 
 from myreco.base.models.base import get_model_schema
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
-from myreco.domain.engines.types.base import (
-    EngineRecommenderMixin,
-    EngineDataImporterBigqueryMixin,
-    EngineType)
+from myreco.domain.engines.types.base import EngineRecommenderMixin, EngineType
 
 
-class TopSellerEngine(
-        EngineType,
-        EngineRecommenderMixin,
-        EngineDataImporterBigqueryMixin):
+class VisualSimilarityEngine(EngineRecommenderMixin, EngineType):
     __configuration_schema__ = get_model_schema(__file__)
