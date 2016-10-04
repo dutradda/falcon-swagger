@@ -152,7 +152,7 @@ class TestEnginesModelPost(object):
         resp = client.post('/engines/', headers=headers, body=json.dumps(body))
         body[0]['id'] = 1
         body[0]['filters'] = []
-        body[0]['variables'] = []
+        body[0]['variables'] = ['input_list']
         body[0]['store'] = {'id': 1, 'name': 'test', 'country': 'test'}
         body[0]['type_name'] = {'id': 1, 'name': 'top_seller'}
         body[0]['item_type'] = item_type = {
@@ -189,7 +189,7 @@ class TestEnginesModelGet(object):
         client.post('/engines/', headers=headers, body=json.dumps(body))
         body[0]['id'] = 1
         body[0]['filters'] = []
-        body[0]['variables'] = []
+        body[0]['variables'] = ['input_list']
         body[0]['store'] = {'id': 1, 'name': 'test', 'country': 'test'}
         body[0]['type_name'] = {'id': 1, 'name': 'top_seller'}
         body[0]['item_type'] = item_type = {
@@ -355,7 +355,7 @@ class TestEnginesModelUriTemplateGet(object):
         resp = client.get('/engines/1/', headers=headers)
         body[0]['id'] = 1
         body[0]['filters'] = []
-        body[0]['variables'] = []
+        body[0]['variables'] = ['input_list']
         body[0]['store'] = {'id': 1, 'name': 'test', 'country': 'test'}
         body[0]['type_name'] = {'id': 1, 'name': 'top_seller'}
         body[0]['item_type'] = item_type = {

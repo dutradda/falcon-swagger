@@ -25,6 +25,7 @@ from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.base.models.base import get_model_schema
 from myreco.domain.engines.types.base import EngineTypeChooser
 from myreco.domain.items_types.models import ItemsTypesModel
+from myreco.exceptions import ModelBaseError
 from types import MethodType, FunctionType
 from jsonschema import ValidationError
 import sqlalchemy as sa
@@ -54,42 +55,37 @@ class EnginesModel(SQLAlchemyRedisModelBase):
             self._set_type()
         return self._type
 
+    def _set_type(self):
+        self._type = EngineTypeChooser(self.type_name.name)(json.loads(self.configuration_json))
+
     def __init__(self, session, input_=None, **kwargs):
         SQLAlchemyRedisModelBase.__init__(self, session, input_=input_, **kwargs)
 
         self._validate_config(session, input_)
-        self._validate_filters(session)
+        self._validate_filters(session, input_)
 
     def _validate_config(self, session, input_):
-        if self.type_name is None:
-            if self.type_name_id is not None:
-                types_names = EnginesTypesNamesModel.get(
-                    session, {'id': self.type_name_id}, todict=False)
-
-                if not types_names:
-                    raise ValidationError(
-                        "type_name_id '{}' was not found".format(self.type_name_id),
-                        instance=input_, schema={})
-
-                self.type_name = types_names[0]
+        self._set_type_name(session, input_)
 
         if self.type_name is not None:
             validator = self.type_.__config_validator__
             if validator:
                 validator.validate(json.loads(self.configuration_json))
 
-    def _validate_filters(self, session):
-        if self.item_type is None:
-            if self.item_type_id is not None:
-                items_types = ItemsTypesModel.get(
-                    session, {'id': self.item_type_id}, todict=False)
+    def _set_type_name(self, session, input_):
+        if self.type_name is None:
+            if self.type_name_id is not None:
+                types_names = EnginesTypesNamesModel.get(
+                    session, {'id': self.type_name_id}, todict=False)
 
-                if not items_types:
-                    raise ValidationError(
-                        "item_type_id '{}' was not found".format(self.item_type_id),
-                        instance=input_)
+                if not types_names:
+                    raise ModelBaseError(
+                        "type_name_id '{}' was not found".format(self.type_name_id), input_)
 
-                self.item_type = items_types[0]
+                self.type_name = types_names[0]
+
+    def _validate_filters(self, session, input_):
+        self._set_item_type(session, input_)
 
         if self.item_type is not None:
             available_filters = self.item_type.todict()['available_filters']
@@ -101,8 +97,17 @@ class EnginesModel(SQLAlchemyRedisModelBase):
                             'filters_names': [f['name'] for f in self.todict()['filters']]},
                         schema={'available_filters': available_filters})
 
-    def _set_type(self):
-        self._type = EngineTypeChooser(self.type_name.name)(json.loads(self.configuration_json))
+    def _set_item_type(self, session, input_):
+        if self.item_type is None:
+            if self.item_type_id is not None:
+                items_types = ItemsTypesModel.get(
+                    session, {'id': self.item_type_id}, todict=False)
+
+                if not items_types:
+                    raise ModelBaseError(
+                        "item_type_id '{}' was not found".format(self.item_type_id), input_)
+
+                self.item_type = items_types[0]
 
     def _setattr(self, attr_name, value, session, input_):
         if attr_name == 'configuration':
