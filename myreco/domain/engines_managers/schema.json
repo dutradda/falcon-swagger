@@ -1,0 +1,121 @@
+{
+    "/engines_managers/": {
+        "post": {
+            "operationId": "post_by_body",
+            "parameters": [{
+                "name": "body",
+                "in": "body",
+                "required": true,
+                "schema": {"$ref": "#/definitions/schema_array"}
+            }],
+            "responses": {"201": {"description": "Created"}}
+        },
+        "get": {
+            "operationId": "get_by_body",
+            "responses": {"200": {"description": "Got"}}
+        }
+    },
+    "/engines_managers/{id}/": {
+        "parameters": [{
+            "name": "id",
+            "in": "path",
+            "type": "integer",
+            "required": true
+        }],
+        "patch": {
+            "operationId": "patch_by_uri_template",
+            "parameters": [{
+                "name": "body",
+                "in": "body",
+                "required": true,
+                "schema": {"$ref": "#/definitions/schema_without_required"}
+            }],
+            "responses": {"200": {"description": "Got"}}
+        },
+        "delete": {
+            "operationId": "delete_by_uri_template",
+            "responses": {"204": {"description": "Deleted"}}
+        },
+        "get": {
+            "operationId": "get_by_uri_template",
+            "responses": {"200": {"description": "Got"}}
+        }
+    },
+    "definitions": {
+        "schema_without_required": {
+            "type": "object",
+            "minProperties": 1,
+            "additionalProperties": false,
+            "properties": {
+                "store_id": {"type": "integer"},
+                "engine_id": {"type": "integer"},
+                "fallbacks": {"$ref": "#/definitions/fallbacks"},
+                "engine_variables": {"$ref": "#/definitions/engine_variables"}
+            }
+        },
+        "schema_array": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["engine_id", "store_id", "engine_variables"],
+                "properties": {
+                    "store_id": {"type": "integer"},
+                    "engine_id": {"type": "integer"},
+                    "fallbacks": {"$ref": "#/definitions/fallbacks"},
+                    "engine_variables": {"$ref": "#/definitions/engine_variables"}
+                }
+            }
+        },
+        "fallbacks": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["id"],
+                "properties": {
+                    "id": {"type": "integer"}
+                }
+            }
+        },
+        "engine_variables": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "minProperties": 2,
+                "anyOf": [
+                    {"required": ["id", "_operation"]},
+                    {"required": ["variable_id", "inside_engine_name"]},
+                    {"required": ["variable", "inside_engine_name"]}
+                ],
+                "properties": {
+                    "id": {"type": "integer"},
+                    "engine_manager_id": {"type": "integer"},
+                    "variable_id": {"type": "integer"},
+                    "_operation": {"enum": ["remove", "update", "insert", "get"]},
+                    "inside_engine_name": {"type": "string"},
+                    "override": {"type": "boolean"},
+                    "override_value": {"type": "string"},
+                    "variable": {
+                        "type": "object",
+                        "additionalProperties": false,
+                        "oneOf": [
+                            {"required": ["id"]},
+                            {"required": ["name", "engine_id", "_operation"]}
+                        ],
+                        "properties": {
+                            "id": {"type": "integer"},
+                            "engine_id": {"type": "integer"},
+                            "name": {"type": "string"},
+                            "_operation": {"enum": ["remove", "insert", "get"]}
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
