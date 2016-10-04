@@ -91,10 +91,11 @@ class TestItemsTypesModelPost(object):
         body = [{
             'name': 'test',
             'id_names': ['test'],
-            'schema': {}
+            'schema': {'properties': {'id': {'type': 'integer'}}}
         }]
         resp = client.post('/items_types/', headers=headers, body=json.dumps(body))
         body[0]['id'] = 1
+        body[0]['available_filters'] = ['id']
 
         assert resp.status_code == 201
         assert json.loads(resp.body) ==  body
@@ -119,6 +120,7 @@ class TestItemsTypesModelGet(object):
         }]
         client.post('/items_types/', headers=headers, body=json.dumps(body))
         body[0]['id'] = 1
+        body[0]['available_filters'] = []
 
         resp = client.get('/items_types/', headers=headers)
         assert resp.status_code == 200
@@ -178,6 +180,7 @@ class TestItemsTypesModelUriTemplatePatch(object):
         }
         resp = client.patch('/items_types/1/', headers=headers, body=json.dumps(body))
         obj['name'] = 'test2'
+        obj['available_filters'] = []
 
         assert resp.status_code == 200
         assert json.loads(resp.body) ==  obj
@@ -226,8 +229,9 @@ class TestItemsTypesModelUriTemplateGet(object):
             'schema': {}
         }]
         client.post('/items_types/', headers=headers, body=json.dumps(body))
-
         resp = client.get('/items_types/1/', headers=headers)
         body[0]['id'] = 1
+        body[0]['available_filters'] = []
+
         assert resp.status_code == 200
         assert json.loads(resp.body) == body[0]
