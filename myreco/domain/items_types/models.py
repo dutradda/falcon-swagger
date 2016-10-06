@@ -59,9 +59,7 @@ class ItemsTypesModel(SQLAlchemyRedisModelBase):
         if 'schema_json' in dict_inst:
             dict_inst['schema'] = json.loads(dict_inst.pop('schema_json'))
 
-        dict_inst['available_filters'] = list(dict_inst['schema'].get('properties', {}).keys())
-
-    def todict(self, schema=None):
-        dict_inst = SQLAlchemyRedisModelBase.todict(self, schema)
-        self._format_output_json(dict_inst)
-        return dict_inst
+        schema_properties = dict_inst['schema'].get('properties', {})
+        schema_properties_names = sorted(schema_properties.keys())
+        dict_inst['available_filters'] = [{'name': name, 'schema': schema_properties[name]} \
+            for name in schema_properties_names]

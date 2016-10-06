@@ -95,7 +95,7 @@ class TestItemsTypesModelPost(object):
         }]
         resp = client.post('/items_types/', headers=headers, body=json.dumps(body))
         body[0]['id'] = 1
-        body[0]['available_filters'] = ['id']
+        body[0]['available_filters'] = [{'name': 'id', 'schema': {'type': 'integer'}}]
 
         assert resp.status_code == 201
         assert json.loads(resp.body) ==  body
