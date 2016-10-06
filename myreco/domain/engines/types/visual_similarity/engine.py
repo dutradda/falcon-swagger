@@ -23,10 +23,35 @@
 
 from myreco.base.models.base import get_model_schema
 from myreco.domain.engines.types.base import EngineRecommenderMixin, EngineType
+from jsonschema import ValidationError
+import json
 
 
 class VisualSimilarityEngine(EngineRecommenderMixin, EngineType):
     __configuration_schema__ = get_model_schema(__file__)
 
-    def get_recommendations(self, sku, categories, *input_list, **filters):
-        pass
+    def get_variables(self, engine):
+        item_id_name = self.configuration['item_id_name']
+        aggregators_ids_name = self.configuration['aggregators_ids_name']
+        item_type_schema_props = json.loads(engine.item_type.schema_json)['properties']
+        return [{
+            'name': item_id_name,
+            'schema': item_type_schema_props[item_id_name]
+        },{
+            'name': aggregators_ids_name,
+            'schema': item_type_schema_props[aggregators_ids_name]
+        }]
+
+    def validate_config(self, engine):
+        item_id_name = self.configuration['item_id_name']
+        aggregators_ids_name = self.configuration['aggregators_ids_name']
+        item_type_schema_props = json.loads(engine.item_type.schema_json)['properties']
+        message = "Configuration key '{}' not in item_type schema"
+
+        if item_id_name not in item_type_schema_props:
+            raise ValidationError(message.format('item_id_name'),
+                instance=dict_inst, schema=item_type_schema_props)
+
+        elif aggregators_ids_name not in item_type_schema_props:
+            raise ValidationError(message.format('aggregators_ids_name'),
+                instance=dict_inst, schema=item_type_schema_props)

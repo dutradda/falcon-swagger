@@ -36,25 +36,19 @@ class EngineTypeMeta(type):
 
 class EngineType(metaclass=EngineTypeMeta):
     def __init__(self, configuration):
-        self._config = configuration
+        self.configuration = configuration
+
+    def get_variables(self, engine):
+        return []
+
+    def validate_config(self, engine):
+        pass
 
 
 class EngineRecommenderMixin(object):
 
-    def get_variables(self):
-        signature = inspect.signature(self.get_recommendations)
-        variables = list()
-        for var in signature.parameters.values():
-            if var.kind.name == 'POSITIONAL_OR_KEYWORD':
-                variables.append(var.name)
-
-            elif var.kind.name == 'VAR_POSITIONAL':
-                variables.insert(0, var.name)
-
-        return tuple(variables)
-
-    def get_recommendations(self, *input_list, **filters):
-        pass
+    def get_recommendations(self, **variables):
+        return []
 
 
 class EngineDataImporterBigqueryMixin(object):
