@@ -37,6 +37,7 @@ class EnginesManagersVariablesModel(SQLAlchemyRedisModelBase):
     inside_engine_name = sa.Column(sa.String(255), nullable=False)
     variable_id = sa.Column(sa.ForeignKey('variables.id', ondelete='CASCADE', onupdate='CASCADE'))
     engine_manager_id = sa.Column(sa.ForeignKey('engines_managers.id', ondelete='CASCADE', onupdate='CASCADE'))
+    is_filter = sa.Column(sa.Boolean, default=False)
     override = sa.Column(sa.Boolean, default=False)
     override_value_json = sa.Column(sa.Text)
 
@@ -62,7 +63,6 @@ class EnginesManagersModel(SQLAlchemyRedisModelBase):
 
     def __init__(self, session, input_=None, **kwargs):
         SQLAlchemyRedisModelBase.__init__(self, session, input_=input_, **kwargs)
-        self._set_engine(session, input_)
         self._validate_fallbacks(input_)
         self._validate_engine_variables(input_)
 
@@ -77,32 +77,42 @@ class EnginesManagersModel(SQLAlchemyRedisModelBase):
     def _validate_engine_variables(self, input_):
         if self.engine is not None:
             engine = self.engine.todict()
+
             for engine_variable in self.engine_variables:
                 var_name = engine_variable.inside_engine_name
-                if var_name not in engine['variables'] \
-                        and var_name not in engine['item_type']['available_filters']:
-                    message = "Invalid 'inside_engine_name' property value '{}'".format(var_name)
-                    schema = {
-                        'available_variables': engine['variables'],
-                        'available_filters': engine['item_type']['available_filters']
-                    }
-                    raise ValidationError(message, instance=input_, schema=schema)
+                engines_variables_map = {var['name']: var['schema'] for var in engine['variables']}
+                available_filters_map = {fil['name']: fil['schema'] \
+                    for fil in engine['item_type']['available_filters']}
+                key_func = lambda v: v['name']
+                message = 'Invalid {}' + " with 'inside_engine_name' value '{}'".format(var_name)
 
-    def _set_engine(self, session, input_):
-        if self.engine is None:
-            if self.engine_id is not None:
-                engines = EnginesModel.get(session, {'id': self.engine_id}, todict=False)
+                if not engine_variable.is_filter:
+                    if var_name not in engines_variables_map:
+                        message = message.format('engine variable')
+                        schema = {'available_variables': sorted(engine['variables'], key=key_func)}
+                        raise ValidationError(message, instance=input_, schema=schema)
 
-                if not engines:
-                    raise ModelBaseError(
-                        "engine_id '{}' was not found".format(self.engine_id), input_)
+                else:
+                    if var_name not in available_filters_map:
+                        message = message.format('filter')
+                        schema = {
+                            'available_filters': \
+                                sorted(engine['item_type']['available_filters'], key=key_func)
+                        }
+                        raise ValidationError(message, instance=input_, schema=schema)
 
-                self.engine = engines[0]
+    def _setattr(self, attr_name, value, session, input_):
+        if attr_name == 'engine_id':
+            value = {'id': value}
+            attr_name = 'engine'
 
-    def todict(self, schema=None):
-        dict_inst = SQLAlchemyRedisModelBase.todict(self, schema)
-        self._format_output_json(dict_inst)
-        return dict_inst
+        if attr_name == 'engine_variables':
+            for engine_var in value:
+                if 'variable_id' in engine_var:
+                    var = {'id': engine_var.pop('variable_id')}
+                    engine_var['variable'] = var
+
+        SQLAlchemyRedisModelBase._setattr(self, attr_name, value, session, input_)
 
     def _format_output_json(self, dict_inst):
         for fallback in dict_inst.get('fallbacks'):

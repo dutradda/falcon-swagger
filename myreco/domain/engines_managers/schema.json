@@ -98,6 +98,7 @@
                     "variable_id": {"type": "integer"},
                     "_operation": {"enum": ["remove", "update", "insert", "get"]},
                     "inside_engine_name": {"type": "string"},
+                    "is_filter": {"type": "boolean"},
                     "override": {"type": "boolean"},
                     "override_value": {"type": "string"},
                     "variable": {

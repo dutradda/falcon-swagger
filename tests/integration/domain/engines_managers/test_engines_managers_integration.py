@@ -24,8 +24,7 @@
 from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.base.http_api import HttpAPI
 from myreco.domain.engines.models import EnginesModel, EnginesTypesNamesModel
-from myreco.domain.engines_managers.models import (
-    EnginesManagersVariablesModel, EnginesManagersModel)
+from myreco.domain.engines_managers.models import EnginesManagersModel
 from myreco.domain.items_types.models import ItemsTypesModel
 from myreco.domain.stores.model import StoresModel
 from myreco.domain.users.models import UsersModel
@@ -58,23 +57,39 @@ def app(session):
     StoresModel.insert(session, store)
 
     EnginesTypesNamesModel.insert(session, {'name': 'visual_similarity'})
+    EnginesTypesNamesModel.insert(session, {'name': 'top_seller'})
+
+    schema_json = json.dumps({
+        'type': 'object',
+        'properties': {
+            'filter_test': {'type': 'string'},
+            'item_id': {'type': 'integer'}
+        }
+    })
 
     item_type = {
         'name': 'products',
         'id_names_json': '["sku"]',
-        'schema_json': '{"type": "object", "properties": {"filter_test": "string"}}'
+        'schema_json': schema_json
     }
     ItemsTypesModel.insert(session, item_type)
     item_type = {
         'name': 'categories',
         'id_names_json': '["id"]',
-        'schema_json': '{"type": "object", "properties": {"filter_test": "string"}}'
+        'schema_json': schema_json
+    }
+    ItemsTypesModel.insert(session, item_type)
+    item_type = {
+        'name': 'invalid',
+        'id_names_json': '["id"]',
+        'schema_json': '{"type": "object", "properties": {"item_id": {"type": "string"}}}'
     }
     ItemsTypesModel.insert(session, item_type)
 
     engine = {
         'name': 'Visual Similarity',
-        'configuration_json': '{}',
+        'configuration_json': json.dumps(
+            {'item_id_name': 'item_id', 'aggregators_ids_name': 'filter_test'}),
         'store_id': 1,
         'type_name_id': 1,
         'item_type_id': 1
@@ -82,10 +97,19 @@ def app(session):
     EnginesModel.insert(session, engine)
     engine = {
         'name': 'Categories Top Seller',
-        'configuration_json': '{}',
+        'configuration_json': json.dumps(
+            {'item_id_name': 'item_id', 'aggregators_ids_name': 'filter_test'}),
         'store_id': 1,
         'type_name_id': 1,
         'item_type_id': 2
+    }
+    EnginesModel.insert(session, engine)
+    engine = {
+        'name': 'Invalid Top Seller',
+        'configuration_json': '{"days_interval": 7}',
+        'store_id': 1,
+        'type_name_id': 2,
+        'item_type_id': 3
     }
     EnginesModel.insert(session, engine)
 
@@ -131,7 +155,7 @@ class TestEnginesManagersModelPost(object):
             }
         }
 
-    def test_post_with_invalid_inside_engine_name(self, client, headers):
+    def test_post_with_invalid_variable_engine(self, client, headers):
         body = [{
             'store_id': 1,
             'engine_id': 1,
@@ -145,7 +169,7 @@ class TestEnginesManagersModelPost(object):
         assert resp.status_code == 400
         assert json.loads(resp.body) ==  {
             'error': {
-                'message': "Invalid 'inside_engine_name' property value 'test'",
+                'message': "Invalid engine variable with 'inside_engine_name' value 'test'",
                 'input': [{
                     'engine_id': 1,
                     'store_id': 1,
@@ -156,84 +180,56 @@ class TestEnginesManagersModelPost(object):
                     }]
                 }],
                 'schema': {
-                    'available_filters': ['filter_test'],
-                    'available_variables': ['input_list', 'sku', 'categories']
+                    'available_variables': [{
+                        'name': 'filter_test',
+                        'schema': {"type": "string"}
+                    },{
+                        'name': 'item_id',
+                        'schema': {"type": "integer"}
+                    }]
                 }
             }
         }
 
-
-    def test_post_with_insert_engine_variable_engine_var(self, client, headers):
+    def test_post_with_invalid_filter(self, client, headers):
         body = [{
             'store_id': 1,
             'engine_id': 1,
             'engine_variables': [{
                 '_operation': 'insert',
                 'variable_id': 1,
-                'inside_engine_name': 'categories'
+                'inside_engine_name': 'test',
+                'is_filter': True
             }]
         }]
         resp = client.post('/engines_managers/', headers=headers, body=json.dumps(body))
-
-        assert resp.status_code == 201
-        assert json.loads(resp.body) == [{
-            'fallbacks': [],
-            'id': 1,
-            'engine_variables': [
-                {
-                    'variable': {
-                        'id': 1,
-                        'name': 'test',
-                        'store_id': 1
-                    },
-                    'id': 1,
-                    'inside_engine_name': 'categories',
-                    'engine_manager_id': 1,
-                    'override': False,
-                    'override_value_json': None,
-                    'variable_id': 1
+        assert resp.status_code == 400
+        assert json.loads(resp.body) ==  {
+            'error': {
+                'message': "Invalid filter with 'inside_engine_name' value 'test'",
+                'input': [{
+                    'engine_id': 1,
+                    'store_id': 1,
+                    'engine_variables': [{
+                        '_operation': 'insert',
+                        'inside_engine_name': 'test',
+                        'is_filter': True,
+                        'variable_id': 1
+                    }]
+                }],
+                'schema': {
+                    'available_filters': [{
+                        'name': 'filter_test',
+                        'schema': {"type": "string"}
+                    },{
+                        'name': 'item_id',
+                        'schema': {"type": "integer"}
+                    }]
                 }
-            ],
-            'engine': {
-                'item_type': {
-                    'id': 1,
-                    'schema': {
-                        'type': 'object',
-                        'properties': {'filter_test': 'string'},
-                    },
-                    'available_filters': ['filter_test'],
-                    'name': 'products',
-                    'id_names': [
-                        'sku'
-                    ]
-                },
-                'store_id': 1,
-                'name': 'Visual Similarity',
-                'item_type_id': 1,
-                'type_name': {
-                    'id': 1,
-                    'name': 'visual_similarity'
-                },
-                'id': 1,
-                'filters': [],
-                'variables': [
-                    'input_list',
-                    'sku',
-                    'categories'
-                ],
-                'type_name_id': 1,
-                'configuration': {},
-                'store': {
-                    'id': 1,
-                    'country': 'test',
-                    'name': 'test'
-                }
-            },
-            'store_id': 1,
-            'engine_id': 1
-        }]
+            }
+        }
 
-    def test_post_with_insert_engine_variable_engine_filter(self, client, headers):
+    def test_post_with_insert_engine_variable_engine_var(self, client, headers):
         body = [{
             'store_id': 1,
             'engine_id': 1,
@@ -261,7 +257,8 @@ class TestEnginesManagersModelPost(object):
                     'engine_manager_id': 1,
                     'override': False,
                     'override_value_json': None,
-                    'variable_id': 1
+                    'variable_id': 1,
+                    'is_filter': False
                 }
             ],
             'engine': {
@@ -269,9 +266,18 @@ class TestEnginesManagersModelPost(object):
                     'id': 1,
                     'schema': {
                         'type': 'object',
-                        'properties': {'filter_test': 'string'},
+                        'properties': {
+                            'filter_test': {'type': 'string'},
+                            'item_id': {'type': 'integer'}
+                        },
                     },
-                    'available_filters': ['filter_test'],
+                    'available_filters': [{
+                        'name': 'filter_test',
+                        'schema': {'type': 'string'}
+                    },{
+                        'name': 'item_id',
+                        'schema': {'type': 'integer'}
+                    }],
                     'name': 'products',
                     'id_names': [
                         'sku'
@@ -285,14 +291,99 @@ class TestEnginesManagersModelPost(object):
                     'name': 'visual_similarity'
                 },
                 'id': 1,
-                'filters': [],
-                'variables': [
-                    'input_list',
-                    'sku',
-                    'categories'
-                ],
+                'variables': [{
+                    'name': 'item_id', 'schema': {'type': 'integer'}
+                },{
+                    'name': 'filter_test', 'schema': {'type': 'string'}
+                }],
                 'type_name_id': 1,
-                'configuration': {},
+                'configuration': {
+                    'aggregators_ids_name': 'filter_test',
+                    'item_id_name': 'item_id'
+                },
+                'store': {
+                    'id': 1,
+                    'country': 'test',
+                    'name': 'test'
+                }
+            },
+            'store_id': 1,
+            'engine_id': 1
+        }]
+
+    def test_post_with_insert_engine_variable_engine_filter(self, client, headers):
+        body = [{
+            'store_id': 1,
+            'engine_id': 1,
+            'engine_variables': [{
+                '_operation': 'insert',
+                'variable_id': 1,
+                'is_filter': True,
+                'inside_engine_name': 'filter_test'
+            }]
+        }]
+        resp = client.post('/engines_managers/', headers=headers, body=json.dumps(body))
+
+        assert resp.status_code == 201
+        assert json.loads(resp.body) == [{
+            'fallbacks': [],
+            'id': 1,
+            'engine_variables': [
+                {
+                    'variable': {
+                        'id': 1,
+                        'name': 'test',
+                        'store_id': 1
+                    },
+                    'id': 1,
+                    'inside_engine_name': 'filter_test',
+                    'engine_manager_id': 1,
+                    'override': False,
+                    'override_value_json': None,
+                    'variable_id': 1,
+                    'is_filter': True
+                }
+            ],
+            'engine': {
+                'item_type': {
+                    'id': 1,
+                    'schema': {
+                        'type': 'object',
+                        'properties': {
+                            'filter_test': {'type': 'string'},
+                            'item_id': {'type': 'integer'}
+                        },
+                    },
+                    'available_filters': [{
+                        'name': 'filter_test',
+                        'schema': {'type': 'string'}
+                    },{
+                        'name': 'item_id',
+                        'schema': {'type': 'integer'}
+                    }],
+                    'name': 'products',
+                    'id_names': [
+                        'sku'
+                    ]
+                },
+                'store_id': 1,
+                'name': 'Visual Similarity',
+                'item_type_id': 1,
+                'type_name': {
+                    'id': 1,
+                    'name': 'visual_similarity'
+                },
+                'id': 1,
+                'variables': [{
+                    'name': 'item_id', 'schema': {'type': 'integer'}
+                },{
+                    'name': 'filter_test', 'schema': {'type': 'string'}
+                }],
+                'type_name_id': 1,
+                'configuration': {
+                    'aggregators_ids_name': 'filter_test',
+                    'item_id_name': 'item_id'
+                },
                 'store': {
                     'id': 1,
                     'country': 'test',
@@ -310,7 +401,7 @@ class TestEnginesManagersModelPost(object):
             'engine_variables': [{
                 '_operation': 'insert',
                 'variable_id': 1,
-                'inside_engine_name': 'sku'
+                'inside_engine_name': 'item_id'
             }]
         }]
         client.post('/engines_managers/', headers=headers, body=json.dumps(body))
@@ -321,7 +412,7 @@ class TestEnginesManagersModelPost(object):
             'engine_variables': [{
                 '_operation': 'insert',
                 'variable_id': 1,
-                'inside_engine_name': 'sku'
+                'inside_engine_name': 'item_id'
             }],
             'fallbacks': [{'id': 1}]
         }]
@@ -339,11 +430,12 @@ class TestEnginesManagersModelPost(object):
                             'store_id': 1
                         },
                         'id': 1,
-                        'inside_engine_name': 'sku',
+                        'inside_engine_name': 'item_id',
                         'engine_manager_id': 1,
                         'override': False,
                         'override_value_json': None,
-                        'variable_id': 1
+                        'variable_id': 1,
+                        'is_filter': False
                     }
                 ],
                 'engine': {
@@ -351,9 +443,18 @@ class TestEnginesManagersModelPost(object):
                         'id': 1,
                         'schema': {
                             'type': 'object',
-                            'properties': {'filter_test': 'string'},
+                            'properties': {
+                                'filter_test': {'type': 'string'},
+                                'item_id': {'type': 'integer'}
+                            },
                         },
-                        'available_filters': ['filter_test'],
+                        'available_filters': [{
+                            'name': 'filter_test',
+                            'schema': {'type': 'string'}
+                        },{
+                            'name': 'item_id',
+                            'schema': {'type': 'integer'}
+                        }],
                         'name': 'products',
                         'id_names': [
                             'sku'
@@ -367,14 +468,16 @@ class TestEnginesManagersModelPost(object):
                         'name': 'visual_similarity'
                     },
                     'id': 1,
-                    'filters': [],
-                    'variables': [
-                        'input_list',
-                        'sku',
-                        'categories'
-                    ],
+                    'variables': [{
+                        'name': 'item_id', 'schema': {'type': 'integer'}
+                    },{
+                        'name': 'filter_test', 'schema': {'type': 'string'}
+                    }],
                     'type_name_id': 1,
-                    'configuration': {},
+                    'configuration': {
+                        'aggregators_ids_name': 'filter_test',
+                        'item_id_name': 'item_id'
+                    },
                     'store': {
                         'id': 1,
                         'country': 'test',
@@ -393,11 +496,12 @@ class TestEnginesManagersModelPost(object):
                         'store_id': 1
                     },
                     'id': 2,
-                    'inside_engine_name': 'sku',
+                    'inside_engine_name': 'item_id',
                     'engine_manager_id': 2,
                     'override': False,
                     'override_value_json': None,
-                    'variable_id': 1
+                    'variable_id': 1,
+                    'is_filter': False
                 }
             ],
             'engine': {
@@ -405,9 +509,18 @@ class TestEnginesManagersModelPost(object):
                     'id': 1,
                     'schema': {
                         'type': 'object',
-                        'properties': {'filter_test': 'string'},
+                        'properties': {
+                            'filter_test': {'type': 'string'},
+                            'item_id': {'type': 'integer'}
+                        },
                     },
-                    'available_filters': ['filter_test'],
+                    'available_filters': [{
+                        'name': 'filter_test',
+                        'schema': {'type': 'string'}
+                    },{
+                        'name': 'item_id',
+                        'schema': {'type': 'integer'}
+                    }],
                     'name': 'products',
                     'id_names': [
                         'sku'
@@ -421,14 +534,16 @@ class TestEnginesManagersModelPost(object):
                     'name': 'visual_similarity'
                 },
                 'id': 1,
-                'filters': [],
-                'variables': [
-                    'input_list',
-                    'sku',
-                    'categories'
-                ],
+                'variables': [{
+                    'name': 'item_id', 'schema': {'type': 'integer'}
+                },{
+                    'name': 'filter_test', 'schema': {'type': 'string'}
+                }],
                 'type_name_id': 1,
-                'configuration': {},
+                'configuration': {
+                    'aggregators_ids_name': 'filter_test',
+                    'item_id_name': 'item_id'
+                },
                 'store': {
                     'id': 1,
                     'country': 'test',
@@ -458,7 +573,7 @@ class TestEnginesManagersModelGet(object):
             'engine_variables': [{
                 '_operation': 'insert',
                 'variable_id': 1,
-                'inside_engine_name': 'categories'
+                'inside_engine_name': 'filter_test'
             }]
         }]
         client.post('/engines_managers/', headers=headers, body=json.dumps(body))
@@ -476,11 +591,12 @@ class TestEnginesManagersModelGet(object):
                         'store_id': 1
                     },
                     'id': 1,
-                    'inside_engine_name': 'categories',
+                    'inside_engine_name': 'filter_test',
                     'engine_manager_id': 1,
                     'override': False,
                     'override_value_json': None,
-                    'variable_id': 1
+                    'variable_id': 1,
+                    'is_filter': False
                 }
             ],
             'engine': {
@@ -488,9 +604,18 @@ class TestEnginesManagersModelGet(object):
                     'id': 1,
                     'schema': {
                         'type': 'object',
-                        'properties': {'filter_test': 'string'},
+                        'properties': {
+                            'filter_test': {'type': 'string'},
+                            'item_id': {'type': 'integer'}
+                        },
                     },
-                    'available_filters': ['filter_test'],
+                    'available_filters': [{
+                        'name': 'filter_test',
+                        'schema': {'type': 'string'}
+                    },{
+                        'name': 'item_id',
+                        'schema': {'type': 'integer'}
+                    }],
                     'name': 'products',
                     'id_names': [
                         'sku'
@@ -504,14 +629,16 @@ class TestEnginesManagersModelGet(object):
                     'name': 'visual_similarity'
                 },
                 'id': 1,
-                'filters': [],
-                'variables': [
-                    'input_list',
-                    'sku',
-                    'categories'
-                ],
+                'variables': [{
+                    'name': 'item_id', 'schema': {'type': 'integer'}
+                },{
+                    'name': 'filter_test', 'schema': {'type': 'string'}
+                }],
                 'type_name_id': 1,
-                'configuration': {},
+                'configuration': {
+                    'aggregators_ids_name': 'filter_test',
+                    'item_id_name': 'item_id'
+                },
                 'store': {
                     'id': 1,
                     'country': 'test',
@@ -560,14 +687,14 @@ class TestEnginesManagersModelUriTemplatePatch(object):
         }
 
 
-    def test_patch_with_invalid_inside_engine_name(self, client, headers):
+    def test_patch_with_invalid_engine_variable(self, client, headers):
         body = [{
             'store_id': 1,
             'engine_id': 1,
             'engine_variables': [{
                 '_operation': 'insert',
                 'variable_id': 1,
-                'inside_engine_name': 'categories'
+                'inside_engine_name': 'filter_test'
             }]
         }]
         resp = client.post('/engines_managers/', headers=headers, body=json.dumps(body))
@@ -583,26 +710,23 @@ class TestEnginesManagersModelUriTemplatePatch(object):
         assert resp.status_code == 400
         assert json.loads(resp.body) ==  {
             'error': {
-                'message': "Invalid 'inside_engine_name' property value 'invalid'",
-                'schema': {
-                    'available_filters': [
-                        'filter_test'
-                    ],
-                    'available_variables': [
-                        'input_list',
-                        'sku',
-                        'categories'
-                    ]
-                },
+                'message': "Invalid engine variable with 'inside_engine_name' value 'invalid'",
                 'input': {
-                    'engine_variables': [
-                        {
-                            '_operation': 'update',
-                            'id': 1,
-                            'inside_engine_name': 'invalid'
-                        }
-                    ],
-                    'id': 1
+                    'id': 1,
+                    'engine_variables': [{
+                        '_operation': 'update',
+                        'id': 1,
+                        'inside_engine_name': 'invalid'
+                    }],
+                },
+                'schema': {
+                    'available_variables': [{
+                        'name': 'filter_test',
+                        'schema': {"type": "string"}
+                    },{
+                        'name': 'item_id',
+                        'schema': {"type": "integer"}
+                    }]
                 }
             }
         }
@@ -614,7 +738,7 @@ class TestEnginesManagersModelUriTemplatePatch(object):
             'engine_variables': [{
                 '_operation': 'insert',
                 'variable_id': 1,
-                'inside_engine_name': 'categories'
+                'inside_engine_name': 'filter_test'
             }]
         }]
         resp = client.post('/engines_managers/', headers=headers, body=json.dumps(body))
@@ -638,7 +762,7 @@ class TestEnginesManagersModelUriTemplatePatch(object):
             'engine_variables': [{
                 '_operation': 'insert',
                 'variable_id': 1,
-                'inside_engine_name': 'categories'
+                'inside_engine_name': 'filter_test'
             }]
         },{
             'store_id': 1,
@@ -646,7 +770,7 @@ class TestEnginesManagersModelUriTemplatePatch(object):
             'engine_variables': [{
                 '_operation': 'insert',
                 'variable_id': 1,
-                'inside_engine_name': 'input_list'
+                'inside_engine_name': 'item_id'
             }]
         }]
         resp = client.post('/engines_managers/', headers=headers, body=json.dumps(body))
@@ -678,7 +802,7 @@ class TestEnginesManagersModelUriTemplatePatch(object):
             'engine_variables': [{
                 '_operation': 'insert',
                 'variable_id': 1,
-                'inside_engine_name': 'categories'
+                'inside_engine_name': 'item_id'
             }]
         }]
         obj = json.loads(client.post('/engines_managers/', headers=headers, body=json.dumps(body)).body)[0]
@@ -708,7 +832,8 @@ class TestEnginesManagersModelUriTemplatePatch(object):
                     'engine_manager_id': 1,
                     'override': False,
                     'override_value_json': None,
-                    'variable_id': 1
+                    'variable_id': 1,
+                    'is_filter': False
                 }
             ],
             'engine': {
@@ -716,9 +841,18 @@ class TestEnginesManagersModelUriTemplatePatch(object):
                     'id': 1,
                     'schema': {
                         'type': 'object',
-                        'properties': {'filter_test': 'string'},
+                        'properties': {
+                            'filter_test': {'type': 'string'},
+                            'item_id': {'type': 'integer'}
+                        },
                     },
-                    'available_filters': ['filter_test'],
+                    'available_filters': [{
+                        'name': 'filter_test',
+                        'schema': {'type': 'string'}
+                    },{
+                        'name': 'item_id',
+                        'schema': {'type': 'integer'}
+                    }],
                     'name': 'products',
                     'id_names': [
                         'sku'
@@ -732,14 +866,16 @@ class TestEnginesManagersModelUriTemplatePatch(object):
                     'name': 'visual_similarity'
                 },
                 'id': 1,
-                'filters': [],
-                'variables': [
-                    'input_list',
-                    'sku',
-                    'categories'
-                ],
+                'variables': [{
+                    'name': 'item_id', 'schema': {'type': 'integer'}
+                },{
+                    'name': 'filter_test', 'schema': {'type': 'string'}
+                }],
                 'type_name_id': 1,
-                'configuration': {},
+                'configuration': {
+                    'aggregators_ids_name': 'filter_test',
+                    'item_id_name': 'item_id'
+                },
                 'store': {
                     'id': 1,
                     'country': 'test',
@@ -765,7 +901,7 @@ class TestEnginesManagersModelUriTemplateDelete(object):
             'engine_variables': [{
                 '_operation': 'insert',
                 'variable_id': 1,
-                'inside_engine_name': 'categories'
+                'inside_engine_name': 'filter_test'
             }]
         }]
         client.post('/engines_managers/', headers=headers, body=json.dumps(body))
@@ -797,7 +933,7 @@ class TestEnginesManagersModelUriTemplateGet(object):
             'engine_variables': [{
                 '_operation': 'insert',
                 'variable_id': 1,
-                'inside_engine_name': 'categories'
+                'inside_engine_name': 'filter_test'
             }]
         }]
         client.post('/engines_managers/', headers=headers, body=json.dumps(body))
@@ -816,11 +952,12 @@ class TestEnginesManagersModelUriTemplateGet(object):
                         'store_id': 1
                     },
                     'id': 1,
-                    'inside_engine_name': 'categories',
+                    'inside_engine_name': 'filter_test',
                     'engine_manager_id': 1,
                     'override': False,
                     'override_value_json': None,
-                    'variable_id': 1
+                    'variable_id': 1,
+                    'is_filter': False
                 }
             ],
             'engine': {
@@ -828,9 +965,18 @@ class TestEnginesManagersModelUriTemplateGet(object):
                     'id': 1,
                     'schema': {
                         'type': 'object',
-                        'properties': {'filter_test': 'string'},
+                        'properties': {
+                            'filter_test': {'type': 'string'},
+                            'item_id': {'type': 'integer'}
+                        },
                     },
-                    'available_filters': ['filter_test'],
+                    'available_filters': [{
+                        'name': 'filter_test',
+                        'schema': {'type': 'string'}
+                    },{
+                        'name': 'item_id',
+                        'schema': {'type': 'integer'}
+                    }],
                     'name': 'products',
                     'id_names': [
                         'sku'
@@ -844,14 +990,16 @@ class TestEnginesManagersModelUriTemplateGet(object):
                     'name': 'visual_similarity'
                 },
                 'id': 1,
-                'filters': [],
-                'variables': [
-                    'input_list',
-                    'sku',
-                    'categories'
-                ],
+                'variables': [{
+                    'name': 'item_id', 'schema': {'type': 'integer'}
+                },{
+                    'name': 'filter_test', 'schema': {'type': 'string'}
+                }],
                 'type_name_id': 1,
-                'configuration': {},
+                'configuration': {
+                    'aggregators_ids_name': 'filter_test',
+                    'item_id_name': 'item_id'
+                },
                 'store': {
                     'id': 1,
                     'country': 'test',
