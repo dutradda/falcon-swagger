@@ -97,47 +97,9 @@ class TestEnginesModelPost(object):
                         'configuration': {'$ref': 'http://json-schema.org/draft-04/schema#'},
                         'store_id': {'type': 'integer'},
                         'type_name_id': {'type': 'integer'},
-                        'item_type_id': {'type': 'integer'},
-                         'filters': {
-                            'minItems': 1,
-                            'type': 'array',
-                            'items': {
-                                'type': 'object',
-                                'required': ['name'],
-                                'additionalProperties': False,
-                                'properties': {
-                                    '_operation': {'enum': ['insert']},
-                                    'name': {'type': 'string'}
-                                }
-                            }
-                        }
+                        'item_type_id': {'type': 'integer'}
                     }
                 }
-            }
-        }
-
-    def test_post_with_invalid_filter(self, client, headers):
-        body = [{
-            'name': 'Seven Days Top Seller',
-            'configuration': {"days_interval": 7},
-            'store_id': 1,
-            'type_name_id': 1,
-            'item_type_id': 1,
-            'filters': [{'name': 'test', '_operation': 'insert'}]
-        }]
-        resp = client.post('/engines/', headers=headers, body=json.dumps(body))
-        assert resp.status_code == 400
-        assert json.loads(resp.body) ==  {
-            'error': {
-                'input': {
-                    'filters_names': [
-                        'test'
-                    ]
-                },
-                'schema': {
-                    'available_filters': []
-                },
-                'message': "invalid filter 'test'"
             }
         }
 
@@ -151,8 +113,7 @@ class TestEnginesModelPost(object):
         }]
         resp = client.post('/engines/', headers=headers, body=json.dumps(body))
         body[0]['id'] = 1
-        body[0]['filters'] = []
-        body[0]['variables'] = ['input_list']
+        body[0]['variables'] = []
         body[0]['store'] = {'id': 1, 'name': 'test', 'country': 'test'}
         body[0]['type_name'] = {'id': 1, 'name': 'top_seller'}
         body[0]['item_type'] = item_type = {
@@ -188,8 +149,7 @@ class TestEnginesModelGet(object):
         }]
         client.post('/engines/', headers=headers, body=json.dumps(body))
         body[0]['id'] = 1
-        body[0]['filters'] = []
-        body[0]['variables'] = ['input_list']
+        body[0]['variables'] = []
         body[0]['store'] = {'id': 1, 'name': 'test', 'country': 'test'}
         body[0]['type_name'] = {'id': 1, 'name': 'top_seller'}
         body[0]['item_type'] = item_type = {
@@ -228,20 +188,7 @@ class TestEnginesModelUriTemplatePatch(object):
                         'configuration': {'$ref': 'http://json-schema.org/draft-04/schema#'},
                         'store_id': {'type': 'integer'},
                         'type_name_id': {'type': 'integer'},
-                        'item_type_id': {'type': 'integer'},
-                         'filters': {
-                            'minItems': 1,
-                            'type': 'array',
-                            'items': {
-                                'type': 'object',
-                                'required': ['name'],
-                                'additionalProperties': False,
-                                'properties': {
-                                    '_operation': {'enum': ['insert']},
-                                    'name': {'type': 'string'}
-                                }
-                            }
-                        }
+                        'item_type_id': {'type': 'integer'}
                     }
                 }
             }
@@ -354,8 +301,7 @@ class TestEnginesModelUriTemplateGet(object):
 
         resp = client.get('/engines/1/', headers=headers)
         body[0]['id'] = 1
-        body[0]['filters'] = []
-        body[0]['variables'] = ['input_list']
+        body[0]['variables'] = []
         body[0]['store'] = {'id': 1, 'name': 'test', 'country': 'test'}
         body[0]['type_name'] = {'id': 1, 'name': 'top_seller'}
         body[0]['item_type'] = item_type = {

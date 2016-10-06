@@ -51,20 +51,7 @@
                 "configuration": {"$ref": "http://json-schema.org/draft-04/schema#"},
                 "store_id": {"type": "integer"},
                 "type_name_id": {"type": "integer"},
-                "item_type_id": {"type": "integer"},
-                "filters": {
-                    "type": "array",
-                    "minItems": 1,
-                    "items": {
-                        "type": "object",
-                        "additionalProperties": false,
-                        "required": ["name"],
-                        "properties": {
-                            "name": {"type": "string"},
-                            "_operation": {"enum": ["insert"]}
-                        }
-                    }
-                }
+                "item_type_id": {"type": "integer"}
             }
         },
         "schema_array": {
@@ -79,20 +66,7 @@
                     "configuration": {"$ref": "http://json-schema.org/draft-04/schema#"},
                     "store_id": {"type": "integer"},
                     "type_name_id": {"type": "integer"},
-                    "item_type_id": {"type": "integer"},
-                    "filters": {
-                        "type": "array",
-                        "minItems": 1,
-                        "items": {
-                            "type": "object",
-                            "additionalProperties": false,
-                            "required": ["name"],
-                            "properties": {
-                                "name": {"type": "string"},
-                                "_operation": {"enum": ["insert"]}
-                            }
-                        }
-                    }
+                    "item_type_id": {"type": "integer"}
                 }
             }
         }
