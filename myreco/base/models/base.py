@@ -345,6 +345,7 @@ class Operation(object):
         uri_template_params = self._build_non_body_params(self._uri_template_validator, kwargs)
         headers_params = self._build_non_body_params(self._headers_validator, req, 'headers')
 
+        req.context['kwargs'] = kwargs
         req.context['parameters'] = {
             'query_string': query_string_params,
             'uri_template': uri_template_params,

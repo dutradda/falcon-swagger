@@ -193,7 +193,6 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
     def delete(cls, session, ids, commit=True, **kwargs):
         ids = cls._to_list(ids)
         filters = cls.build_filters_by_ids(ids)
-
         instances = cls._build_query(session).filter(filters).all()
         [session.delete(inst) for inst in instances]
 
@@ -451,6 +450,11 @@ class _SQLAlchemyModel(ModelBase):
         return result
 
     def todict(self, schema=None):
+        dict_inst = self._todict(schema)
+        self._format_output_json(dict_inst)
+        return dict_inst
+
+    def _todict(self, schema=None):
         dict_inst = dict()
         if schema is None:
             schema = type(self).__todict_schema__
@@ -459,6 +463,9 @@ class _SQLAlchemyModel(ModelBase):
         self._todict_relationships(dict_inst, schema)
 
         return dict_inst
+
+    def _format_output_json(self, dict_inst):
+        pass
 
     def _todict_columns(self, dict_inst, schema):
         for col in type(self).columns:
