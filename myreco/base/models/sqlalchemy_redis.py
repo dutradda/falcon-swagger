@@ -65,10 +65,11 @@ class SQLAlchemyModelInitMixinMeta(DeclarativeMeta, ModelBaseMeta):
                     "'{}' class must inherit from '{}'".format(
                         name, MODEL_BASE_CLASS_NAME))
 
-            cls.backrefs = set()
-            cls.relationships = dict()
+            cls.__backrefs__ = set()
+            cls.__relationships__ = dict()
             cls.columns = set(cls.__table__.c)
             cls.__key__ = str(cls.__table__.name)
+            cls.__use_redis__ = attributes.get('__use_redis__', True)
             cls.__todict_schema__ = {}
             cls.valid_attributes = set()
             base_class.__all_models__[cls.__key__] = cls
@@ -100,22 +101,22 @@ class SQLAlchemyModelInitMixinMeta(DeclarativeMeta, ModelBaseMeta):
 
         for model in all_models:
             model._build_relationships()
-            all_relationships.update(model.relationships.values())
+            all_relationships.update(model.__relationships__.values())
 
         for model in all_models:
             for relationship in all_relationships:
                 if model != cls.get_model_from_rel(relationship, all_models, parent=True) and \
                         model == cls.get_model_from_rel(relationship, all_models):
-                    model.backrefs.add(relationship)
+                    model.__backrefs__.add(relationship)
 
     def _build_relationships(cls):
-        if cls.relationships:
+        if cls.__relationships__:
             return
 
         for attr_name in cls.__dict__:
             relationship = cls._get_relationship(attr_name)
             if relationship:
-                cls.relationships[attr_name] = relationship
+                cls.__relationships__[attr_name] = relationship
 
     def _get_relationship(cls, attr_name):
         attr = getattr(cls, attr_name)
@@ -249,7 +250,7 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
 
         if kwargs:
             for model_name, ids in kwargs.items():
-                relationship = cls.relationships.get(model_name)
+                relationship = cls.__relationships__.get(model_name)
                 if not relationship:
                     raise ModelBaseError("invalid model '{}'".format(model_name), input_=kwargs)
 
@@ -433,7 +434,7 @@ class _SQLAlchemyModel(ModelBase):
     def get_related(self, session):
         related = set()
         cls = type(self)
-        for relationship in cls.backrefs:
+        for relationship in cls.__backrefs__:
             related_model_insts = self._get_related_model_insts(
                 session, relationship, parent=True)
             related.update(related_model_insts)
@@ -477,7 +478,7 @@ class _SQLAlchemyModel(ModelBase):
         return (attr_name in schema and schema[attr_name]) or (not attr_name in schema)
 
     def _todict_relationships(self, dict_inst, schema):
-        for rel in type(self).relationships.values():
+        for rel in type(self).__relationships__.values():
             rel_name = rel.key
             if self._attribute_in_schema(rel_name, schema):
                 rel_schema = schema.get(rel_name)

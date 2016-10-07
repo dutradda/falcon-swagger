@@ -48,27 +48,40 @@ class _SessionBase(SessionSA):
         self._insts_to_hmset = set()
 
     def commit(self):
-        SessionSA.commit(self)
-        if self.redis_bind is not None:
-            try:
+        try:
+            SessionSA.commit(self)
+            if self.redis_bind is not None:
+                self._exec_hdel(self._insts_to_hdel)
                 self._update_objects_on_redis()
-                self._update_back_references_on_redis()
-            except:
-                raise
-            finally:
-                self._clean_redis_sets()
+        finally:
+            self._clean_redis_sets()
+
+    def delete(self, instance):
+        self._insts_to_hmset.update(instance.get_related(self))
+        return SessionSA.delete(self, instance)
 
     def _update_objects_on_redis(self):
-        self._exec_hdel(self._insts_to_hdel)
-        self._exec_hmset(self._insts_to_hmset)
+        insts_to_hmset = set.union(self._insts_to_hdel, self._insts_to_hmset)
+        insts_to_hmset_count = 0
+
+        while len(insts_to_hmset) != insts_to_hmset_count:
+            insts_to_hmset_count = len(insts_to_hmset)
+            insts_to_hmset_copy = insts_to_hmset.copy()
+            [insts_to_hmset.update(inst.get_related(self)) for inst in insts_to_hmset_copy]
+
+        insts_to_hmset.difference_update(self._insts_to_hdel)
+        self._exec_hmset(insts_to_hmset)
 
     def _exec_hdel(self, insts):
         models_keys_insts_keys_map = defaultdict(set)
 
-        for inst in self._insts_to_hdel:
+        for inst in insts:
+            model = type(inst)
+            if not model.__use_redis__:
+                continue
+
             filters_names_set = self._get_filters_names_set(inst)
             for filters_names in filters_names_set:
-                model = type(inst)
                 model_redis_key = type(model).get_key(model, filters_names.decode())
                 inst_redis_key = inst.get_key()
                 models_keys_insts_keys_map[model_redis_key].add(inst_redis_key)
@@ -85,9 +98,12 @@ class _SessionBase(SessionSA):
         models_keys_insts_keys_map = defaultdict(set)
 
         for inst in insts:
+            model = type(inst)
+            if not model.__use_redis__:
+                continue
+
             filters_names_set = self._get_filters_names_set(inst)
             for filters_names in filters_names_set:
-                model = type(inst)
                 model_redis_key = type(model).get_key(model, filters_names.decode())
                 inst_redis_key = inst.get_key()
 
@@ -102,14 +118,6 @@ class _SessionBase(SessionSA):
 
         for model_key, insts_keys in models_keys_insts_keys_map.items():
             self.redis_bind.hdel(model_key, *insts_keys)
-
-    def _update_back_references_on_redis(self):
-        references = set.union(self._insts_to_hdel, self._insts_to_hmset)
-        back_references = set()
-        [back_references.update(ref.get_related(self)) for ref in references]
-        back_references.difference_update(references)
-
-        self._exec_hmset(back_references)
 
     def mark_for_hdel(self, inst):
         self._insts_to_hdel.add(inst)

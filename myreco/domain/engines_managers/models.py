@@ -32,6 +32,7 @@ import sqlalchemy as sa
 class EnginesManagersVariablesModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'engines_managers_variables'
     __table_args__ = {'mysql_engine':'innodb'}
+    __use_redis__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     inside_engine_name = sa.Column(sa.String(255), nullable=False)

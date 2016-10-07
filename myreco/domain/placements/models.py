@@ -109,6 +109,7 @@ class PlacementsModel(SQLAlchemyRedisModelBase):
 class VariationsModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'variations'
     __table_args__ = {'mysql_engine':'innodb'}
+    __use_redis__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     placement_hash = sa.Column(sa.ForeignKey('placements.hash', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
@@ -121,6 +122,7 @@ class VariationsModel(SQLAlchemyRedisModelBase):
 class ABTestUsersModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'ab_test_users'
     __table_args__ = {'mysql_engine':'innodb'}
+    __use_redis__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     variation_id = sa.Column(sa.ForeignKey('variations.id'), nullable=False)

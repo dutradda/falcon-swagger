@@ -91,6 +91,7 @@ class EnginesModel(SQLAlchemyRedisModelBase):
 class EnginesTypesNamesModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'engines_types_names'
     __table_args__ = {'mysql_engine':'innodb'}
+    __use_redis__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.String(255), unique=True, nullable=False)

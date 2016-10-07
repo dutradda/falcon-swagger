@@ -32,6 +32,7 @@ import sqlalchemy as sa
 class GrantsModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'grants'
     __table_args__ = {'mysql_engine':'innodb'}
+    __use_redis__ = False
 
     uri_id = sa.Column(sa.ForeignKey('uris.id'), primary_key=True)
     method_id = sa.Column(sa.ForeignKey('methods.id'), primary_key=True)
@@ -43,6 +44,7 @@ class GrantsModel(SQLAlchemyRedisModelBase):
 class URIsModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'uris'
     __table_args__ = {'mysql_engine':'innodb'}
+    __use_redis__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     uri = sa.Column(sa.String(255), unique=True, nullable=False)
@@ -51,6 +53,7 @@ class URIsModel(SQLAlchemyRedisModelBase):
 class MethodsModel(SQLAlchemyRedisModelBase):
     __tablename__ = 'methods'
     __table_args__ = {'mysql_engine':'innodb'}
+    __use_redis__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     method = sa.Column(sa.String(10), unique=True, nullable=False)
