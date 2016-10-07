@@ -22,6 +22,7 @@
 
 
 from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
+from myreco.base.models.redis import RedisModelBuilder
 from myreco.base.models.base import get_model_schema
 from myreco.base.hooks import before_operation, AuthorizationHook
 from myreco.domain.users.models import UsersModel
@@ -63,3 +64,14 @@ class ItemsTypesModel(SQLAlchemyRedisModelBase):
         schema_properties_names = sorted(schema_properties.keys())
         dict_inst['available_filters'] = [{'name': name, 'schema': schema_properties[name]} \
             for name in schema_properties_names]
+
+
+class ItemsModelsBuilder(object):
+
+    def __new__(cls, models_types):
+        models = set()
+        for model_type in models_types:
+            model = RedisModelBuilder(
+                model_type['name'], model_type['id_names'], model_type['schema'])
+            models.add(model)
+        return models

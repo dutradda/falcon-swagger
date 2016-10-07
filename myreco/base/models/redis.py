@@ -141,23 +141,20 @@ class _RedisModel(dict, ModelBase):
         return {key: self[key] for key in keys}
 
 
-class RedisModelsBuilder(object):
+class RedisModelBuilder(object):
 
-    def __new__(cls, models_types):
-        models = set()
-        for model_type in models_types:
-            models.add(cls._build_model(model_type))
-        return models
+    def __new__(cls, name, id_names, schema):
+        return cls._build_model(name, id_names, schema)
 
     @classmethod
-    def _build_model(cls, model_type):
-        name = model_type['name'].capitalize() + 'Model'
+    def _build_model(cls, name, id_names, schema):
+        class_name = name.capitalize() + 'Model'
         attributes = {
-            '__key__': model_type['name'],
-            '__id_names__': tuple(model_type['id_names']),
-            '__schema__': model_type['schema']
+            '__key__': name,
+            '__id_names__': tuple(id_names),
+            '__schema__': schema
         }
-        model = RedisModelMeta(name, (_RedisModel,), attributes)
+        model = RedisModelMeta(class_name, (_RedisModel,), attributes)
         model.update = MethodType(RedisModelMeta.update, model)
         model.update_ = MethodType(dict.update, model)
         model.get = MethodType(RedisModelMeta.get, model)

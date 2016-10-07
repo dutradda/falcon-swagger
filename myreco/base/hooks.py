@@ -22,7 +22,7 @@
 
 
 from myreco.exceptions import UnauthorizedError
-from falcon import HTTP_FORBIDDEN
+from falcon import HTTP_FORBIDDEN, HTTP_METHODS
 
 
 class AuthorizationHook(object):
@@ -63,8 +63,17 @@ def before_operation(func):
             func_(req, resp, **params)
 
         if isinstance(func_, type):
-            for method in ('on_post', 'on_put', 'on_patch', 'on_delete', 'on_get', 'on_head', 'on_options'):
+            methods = set()
+            for path in func_.__schema__.values():
+                for method_name, method in path.items():
+                    if method_name.upper() in HTTP_METHODS:
+                        op_name = method.get('operationId')
+                        if op_name:
+                            methods.add(op_name)
+
+            for method in methods:
                 _wrap_class_method(func_, method)
+
             return func_
 
         return do_before

@@ -21,8 +21,9 @@
 # SOFTWARE.
 
 
-from falcon import API, HTTP_INTERNAL_SERVER_ERROR, HTTP_BAD_REQUEST, HTTPError
+from falcon import API, HTTP_INTERNAL_SERVER_ERROR, HTTP_BAD_REQUEST, HTTPError, HTTPNotFound
 from myreco.base.middlewares import SessionMiddleware
+from myreco.base.router import ModelRouter
 from myreco.exceptions import JSONError, ModelBaseError, UnauthorizedError
 from sqlalchemy.exc import IntegrityError
 from jsonschema import ValidationError
@@ -33,10 +34,13 @@ import json
 class HttpAPI(API):
 
     def __init__(self, models, sqlalchemy_bind=None, redis_bind=None):
-        API.__init__(self, middleware=SessionMiddleware(sqlalchemy_bind, redis_bind))
+        API.__init__(self, router=ModelRouter(),
+            middleware=SessionMiddleware(sqlalchemy_bind, redis_bind))
+        self.add_route = None
+        del self.add_route
 
         for model in models:
-            self._register_model(model)
+            self.associate_model(model)
 
         self.add_error_handler(Exception, self._handle_generic_error)
         self.add_error_handler(HTTPError, self._handle_http_error)
@@ -47,9 +51,28 @@ class HttpAPI(API):
         self.add_error_handler(ModelBaseError)
         self.add_error_handler(UnauthorizedError)
 
-    def _register_model(self, model):
-        for uri_template in model.__routes__:
-            self.add_route(uri_template, model)
+    def associate_model(self, model):
+        self._router.add_model(model)
+
+    def disassociate_model(self, model):
+        self._router.remove_model(model)
+
+    def _get_responder(self, req):
+        route, params = self._router.get_route_and_params(req)
+        if route is None:
+            return self._get_sink_responder(req)
+
+        return route, params, route.model, route.uri_template
+
+    def _get_sink_responder(self, path):
+        params = {}
+        for pattern, sink in self._sinks:
+            m = pattern.match(path)
+            if m:
+                params = m.groupdict()
+                return sink, params, None, None
+        else:
+            raise HTTPNotFound()
 
     def _handle_http_error(self, exception, req, resp, params):
         self._compose_error_response(req, resp, exception)

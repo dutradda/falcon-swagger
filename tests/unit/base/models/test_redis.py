@@ -21,41 +21,29 @@
 # SOFTWARE.
 
 
-from myreco.base.models.redis import RedisModelMeta, RedisModelsBuilder
+from myreco.base.models.redis import RedisModelMeta, RedisModelBuilder
 from myreco.exceptions import ModelBaseError
 from unittest import mock
 import pytest
 import msgpack
 
 
-class TestRedisModelsBuilder(object):
-    def test_without_models_types(self):
-        assert RedisModelsBuilder([]) == set()
+class TestRedisModelBuilder(object):
 
     def test_build(self):
-        models_types = [{
-            'name': 'test',
-            'id_names': ['id'],
-            'schema': {}
-        }]
-        model = list(RedisModelsBuilder(models_types))
-        assert len(model) == 1
-        assert model[0].__name__ == 'TestModel'
-        assert model[0].__key__ == 'test'
-        assert model[0].__schema__ == {}
+        model = RedisModelBuilder('test', ['id'], {})
+        assert model.__name__ == 'TestModel'
+        assert model.__key__ == 'test'
+        assert model.__schema__ == {}
 
 
 @pytest.fixture
 def model():
-    models_types = [{
-        'name': 'test',
-        'id_names': ['id'],
-        'schema': {}
-    }]
-    return list(RedisModelsBuilder(models_types))[0]
+    return RedisModelBuilder('test', ['id'], {})
 
 
 class TestRedisModelMetaInsert(object):
+
     def test_without_objects(self, model):
         session = mock.MagicMock()
         assert model.insert(session, []) == []
@@ -86,6 +74,7 @@ class TestRedisModelMetaInsert(object):
 
 
 class TestRedisModelMetaUpdateWithoutIDs(object):
+
     def test_without_objects_and_without_ids(self, model):
         session = mock.MagicMock()
         session.bind.hkeys.return_value = []
@@ -137,6 +126,7 @@ class TestRedisModelMetaUpdateWithoutIDs(object):
 
 
 class TestRedisModelMetaUpdateWithIDs(object):
+
     def test_without_objects_and_with_ids(self, model):
         session = mock.MagicMock()
         session.bind.hkeys.return_value = [str((2,)), str((1,))]
@@ -221,6 +211,7 @@ class TestRedisModelMetaUpdateWithIDs(object):
 
 
 class TestRedisModelMetaDelete(object):
+
     def test_without_ids(self, model):
         session = mock.MagicMock()
         model.delete(session, [])
@@ -233,6 +224,7 @@ class TestRedisModelMetaDelete(object):
 
 
 class TestRedisModelMetaGetAll(object):
+
     def test_get_all(self, model):
         session = mock.MagicMock()
         session.bind.hmget.return_value = [msgpack.dumps({'id': 1})]
@@ -261,6 +253,7 @@ class TestRedisModelMetaGetAll(object):
 
 
 class TestRedisModelMetaGetMany(object):
+
     def test_get_many(self, model):
         session = mock.MagicMock()
         model.get(session, {'id': 1})

@@ -21,7 +21,8 @@
 # SOFTWARE.
 
 
-from myreco.base.models.base import get_model_schema, JsonBuilder
+from myreco.base.models.base import get_model_schema
+from myreco.base.json_builder import JsonBuilder
 from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.domain.engines.types.base import EngineTypeChooser
 from myreco.exceptions import ModelBaseError
@@ -84,7 +85,7 @@ class PlacementsModel(SQLAlchemyRedisModelBase):
 
     @classmethod
     def _get_placement(cls, req, resp):
-        small_hash = req.context['kwargs']['small_hash']
+        small_hash = req.context['parameters']['uri_template']['small_hash']
         session = req.context['session']
         placements = cls.get(session, {'small_hash': small_hash})
 

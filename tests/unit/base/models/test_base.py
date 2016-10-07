@@ -22,6 +22,7 @@
 
 
 from myreco.base.models.base import ModelBaseMeta, ModelBase
+from myreco.base.router import ModelRouter
 from myreco.exceptions import ModelBaseError
 from falcon.errors import HTTPNotFound, HTTPMethodNotAllowed
 from jsonschema import ValidationError
@@ -69,10 +70,6 @@ class TestModelBaseErrors(object):
             ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
         assert exc_info.value.args[0] == "'operationId' 'test' was not found"
 
-    def test_raises_not_found_error(self):
-        with pytest.raises(HTTPNotFound) as exc_info:
-            ModelBaseMeta('TestModel', (ModelBase,), {}).on_post(mock.MagicMock(), mock.MagicMock())
-
     def test_raises_method_not_allowed_error(self):
         schema = {
             '/test': {
@@ -87,10 +84,12 @@ class TestModelBaseErrors(object):
                 }
             }
         }
-        req = mock.MagicMock(uri_template='/test', method='GET')
+        req = mock.MagicMock(path='/test', method='GET')
         model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
+        router = ModelRouter()
+        router.add_model(model)
         with pytest.raises(HTTPMethodNotAllowed) as exc_info:
-            model.on_post(req, mock.MagicMock())
+            route, _ = router.get_route_and_params(req)
         assert exc_info.value.headers == {'Allow': 'POST'}
 
 
@@ -109,12 +108,14 @@ class TestModelBase(object):
                 }
             }
         }
-        req = mock.MagicMock(uri_template='/test', method='POST', params={})
+        req = mock.MagicMock(path='/test', method='POST', params={})
         resp = mock.MagicMock()
         model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
-        model.on_post(req, resp)
-        assert '/test/_schema/' in model.__routes__
+        router = ModelRouter()
+        router.add_model(model)
+        route, _ = router.get_route_and_params(req)
+        route(req, resp)
         assert resp.add_link.call_args_list == [mock.call('/test/_schema/', 'schema')]
 
 
@@ -138,11 +139,14 @@ class TestModelBaseBuildsQueryStringParameters(object):
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
             params={'test': '1,2,3,4'},
-            uri_template='/test',
+            path='/test',
             method='POST')
         req.get_header.return_value = None
         resp = mock.MagicMock()
-        model.on_post(req, resp)
+        router = ModelRouter()
+        router.add_model(model)
+        route, _ = router.get_route_and_params(req)
+        route(req, resp)
         kwargs_expected = {'test': ['1', '2', '3', '4']}
 
         assert model.insert.call_args_list == [
@@ -168,10 +172,13 @@ class TestModelBaseBuildsQueryStringParameters(object):
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
             params={'test': ['1', '2', '3', '4']},
-            uri_template='/test',
+            path='/test',
             method='POST')
         resp = mock.MagicMock()
-        model.on_post(req, resp)
+        router = ModelRouter()
+        router.add_model(model)
+        route, _ = router.get_route_and_params(req)
+        route(req, resp)
         kwargs_expected = {'test': ['1', '2', '3', '4']}
 
         assert model.insert.call_args_list == [
@@ -198,10 +205,13 @@ class TestModelBaseBuildsQueryStringParameters(object):
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
             params={'test': '1,2,3,4'},
-            uri_template='/test',
+            path='/test',
             method='POST')
         resp = mock.MagicMock()
-        model.on_post(req, resp)
+        router = ModelRouter()
+        router.add_model(model)
+        route, _ = router.get_route_and_params(req)
+        route(req, resp)
         kwargs_expected = {'test': ['1', '2', '3', '4']}
 
         assert model.insert.call_args_list == [
@@ -228,10 +238,13 @@ class TestModelBaseBuildsQueryStringParameters(object):
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
             params={'test': ['1', '2', '3', '4']},
-            uri_template='/test',
+            path='/test',
             method='POST')
         resp = mock.MagicMock()
-        model.on_post(req, resp)
+        router = ModelRouter()
+        router.add_model(model)
+        route, _ = router.get_route_and_params(req)
+        route(req, resp)
         kwargs_expected = {'test': [1., 2., 3., 4.]}
 
         assert model.insert.call_args_list == [
@@ -258,10 +271,13 @@ class TestModelBaseBuildsQueryStringParameters(object):
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
             params={'test': '1,2,3,4'},
-            uri_template='/test',
+            path='/test',
             method='POST')
         resp = mock.MagicMock()
-        model.on_post(req, resp)
+        router = ModelRouter()
+        router.add_model(model)
+        route, _ = router.get_route_and_params(req)
+        route(req, resp)
         kwargs_expected = {'test': [1., 2., 3., 4.]}
 
         assert model.insert.call_args_list == [
@@ -289,10 +305,13 @@ class TestModelBaseBuildsUriTemplateParameters(object):
         model.get = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
-            uri_template='/test',
+            path='/test',
             method='GET')
         resp = mock.MagicMock()
-        model.on_post(req, resp, **{'test': '1,2,3,4'})
+        router = ModelRouter()
+        router.add_model(model)
+        route, _ = router.get_route_and_params(req)
+        route(req, resp, **{'test': '1,2,3,4'})
         kwargs_expected = {'test': ['1', '2', '3', '4']}
 
         assert model.get.call_args_list == [
@@ -319,10 +338,13 @@ class TestModelBaseBuildsUriTemplateParameters(object):
         model.get = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
-            uri_template='/test',
+            path='/test',
             method='GET')
         resp = mock.MagicMock()
-        model.on_post(req, resp, **{'test': '1,2,3,4'})
+        router = ModelRouter()
+        router.add_model(model)
+        route, _ = router.get_route_and_params(req)
+        route(req, resp, **{'test': '1,2,3,4'})
         kwargs_expected = {'test': ['1', '2', '3', '4']}
 
         assert model.get.call_args_list == [
@@ -349,10 +371,13 @@ class TestModelBaseBuildsUriTemplateParameters(object):
         model.get = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
-            uri_template='/test',
+            path='/test',
             method='GET')
         resp = mock.MagicMock()
-        model.on_post(req, resp, **{'test': '1,2,3,4'})
+        router = ModelRouter()
+        router.add_model(model)
+        route, _ = router.get_route_and_params(req)
+        route(req, resp, **{'test': '1,2,3,4'})
         kwargs_expected = {'test': [1., 2., 3., 4.]}
 
         assert model.get.call_args_list == [
@@ -379,11 +404,14 @@ class TestModelBaseBuildsHeadersParameters(object):
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
-            uri_template='/test',
+            path='/test',
             method='POST')
         req.get_header.return_value = '1,2,3,4'
         resp = mock.MagicMock()
-        model.on_post(req, resp)
+        router = ModelRouter()
+        router.add_model(model)
+        route, _ = router.get_route_and_params(req)
+        route(req, resp)
         kwargs_expected = {'test': ['1', '2', '3', '4']}
 
         assert req.get_header.call_args_list == [mock.call('test')]
@@ -410,11 +438,14 @@ class TestModelBaseBuildsHeadersParameters(object):
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
-            uri_template='/test',
+            path='/test',
             method='POST')
         req.get_header.return_value = '1,2,3,4'
         resp = mock.MagicMock()
-        model.on_post(req, resp)
+        router = ModelRouter()
+        router.add_model(model)
+        route, _ = router.get_route_and_params(req)
+        route(req, resp)
         kwargs_expected = {'test': ['1', '2', '3', '4']}
 
         assert model.insert.call_args_list == [
@@ -440,11 +471,14 @@ class TestModelBaseBuildsHeadersParameters(object):
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
-            uri_template='/test',
+            path='/test',
             method='POST')
         req.get_header.return_value = '1,2,3,4'
         resp = mock.MagicMock()
-        model.on_post(req, resp)
+        router = ModelRouter()
+        router.add_model(model)
+        route, _ = router.get_route_and_params(req)
+        route(req, resp)
         kwargs_expected = {'test': [1., 2., 3., 4.]}
 
         assert model.insert.call_args_list == [

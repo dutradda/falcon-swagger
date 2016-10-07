@@ -1,0 +1,92 @@
+# MIT License
+
+# Copyright (c) 2016 Diogo Dutra
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
+
+from myreco.exceptions import ModelBaseError
+from copy import deepcopy
+
+
+class JsonBuilderMeta(type):
+
+    def _type_builder(cls, type_):
+        return getattr(cls, '_build_' + type_)
+
+    def _build_string(cls, value):
+        return str(value)
+
+    def _build_number(cls, value):
+        return float(value)
+
+    def _build_boolean(cls, value):
+        return bool(value)
+
+    def _build_integer(cls, value):
+        return int(value)
+
+    def _build_array(cls, values, schema, nested_types, input_):
+        if 'array' in nested_types:
+            raise ModelBaseError('nested array was not allowed', input_=input_)
+
+        if isinstance(values, list):
+            new_values = []
+            [new_values.extend(value.split(',')) for value in values]
+            values = new_values
+        else:
+            values = values.split(',')
+
+        items_schema = schema.get('items')
+        if items_schema:
+            nested_types.add('array')
+            values = [cls._build_value(
+                value, items_schema, nested_types, input_) for value in values]
+
+        return values
+
+    def _build_value(cls, value, schema, nested_types, input_):
+        type_ = schema['type']
+        if type_ == 'array' or type_ == 'object':
+            return cls._type_builder(type_)(value, schema, nested_types, input_)
+
+        return cls._type_builder(type_)(value)
+
+    def _build_object(cls, value, schema, nested_types, input_):
+        if 'object' in nested_types:
+            raise ModelBaseError('nested object was not allowed', input_=input_)
+
+        properties = value.split('|')
+        dict_obj = dict()
+        nested_types.add('object')
+        for prop in properties:
+            key, value = prop.split(':')
+            dict_obj[key] = \
+                cls._build_value(value, schema['properties'][key], nested_types, input_)
+
+        nested_types.discard('object')
+        return dict_obj
+
+
+class JsonBuilder(metaclass=JsonBuilderMeta):
+
+    def __new__(cls, json_value, schema):
+        nested_types = set()
+        input_ = deepcopy(json_value)
+        return cls._build_value(json_value, schema, nested_types, input_)

@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.base.models.redis import RedisModelsBuilder
+from myreco.base.models.redis import RedisModelBuilder
 from myreco.base.http_api import HttpAPI
 from unittest import mock
 from fakeredis import FakeStrictRedis
@@ -119,8 +119,7 @@ def app():
             }
         }
     }
-    models = [{'name': 'test', 'id_names': ['id'], 'schema': schema}]
-    return HttpAPI(RedisModelsBuilder(models), redis_bind=FakeStrictRedis())
+    return HttpAPI([RedisModelBuilder('test', ['id'], schema)], redis_bind=FakeStrictRedis())
 
 
 class TestRedisModelPost(object):
