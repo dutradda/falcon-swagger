@@ -29,7 +29,7 @@ class EngineTypeMeta(type):
 
     def __init__(cls, name, bases_classes, attributes):
         cls.__config_validator__ = None
-        schema = attributes.get('__configuration_schema__')
+        schema = getattr(cls, '__configuration_schema__', None)
         if schema:
             cls.__config_validator__ = build_validator(schema, get_module_path(cls))
 

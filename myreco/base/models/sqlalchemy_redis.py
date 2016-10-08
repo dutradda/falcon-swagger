@@ -69,7 +69,7 @@ class SQLAlchemyModelInitMixinMeta(DeclarativeMeta, ModelBaseMeta):
             cls.__relationships__ = dict()
             cls.columns = set(cls.__table__.c)
             cls.__key__ = str(cls.__table__.name)
-            cls.__use_redis__ = attributes.get('__use_redis__', True)
+            cls.__use_redis__ = getattr(cls, '__use_redis__', True)
             cls.__todict_schema__ = {}
             cls.valid_attributes = set()
             base_class.__all_models__[cls.__key__] = cls

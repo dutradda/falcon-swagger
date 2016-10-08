@@ -194,7 +194,7 @@ class ModelBaseRoutesMixinMeta(type):
     def __init__(cls, name, bases, attributes):
         cls.__routes__ = set()
         cls.__key__ = getattr(cls, '__key__', cls.__name__.replace('Model', '').lower())
-        schema = attributes.get('__schema__')
+        schema = getattr(cls, '__schema__', None)
 
         if schema:
             SWAGGER_VALIDATOR.validate(schema)
