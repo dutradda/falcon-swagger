@@ -161,10 +161,6 @@ class TestModelBaseInit(object):
     def test_if_builds_backrefs_correctly_with_two_models(self, model1, model2, model3):
         assert model1.__backrefs__ == {model2.model1, model3.model1}
 
-    def test_if_builds_valid_attributes_correctly(self, model1, model2, model3):
-        assert model3.valid_attributes == {
-            'id', 'model1_id', 'model2_id', 'model1', 'model2'}
-
     def test_if_builds_primaries_keys_correctly(self, model_base):
         class model(model_base):
                 __tablename__ = 'test'
@@ -176,14 +172,16 @@ class TestModelBaseInit(object):
 
     def test_raises_model_error_with_invalid_base_class(self):
         class model(object):
+            __baseclass_name__ = 'Test'
             id = sa.Column(sa.Integer, primary_key=True)
 
         with pytest.raises(ModelBaseError) as error:
             sa.ext.declarative.declarative_base(
+                name='Invalid',
                 metaclass=SQLAlchemyModelMeta, cls=model)
 
         assert error.value.args == (
-            "'Base' class must inherit from 'SQLAlchemyRedisModelBase'",)
+            "'Invalid' class must inherit from 'Test'",)
 
 
 class TestModelBaseTodict(object):

@@ -21,10 +21,8 @@
 # SOFTWARE.
 
 
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.base.models.base import get_model_schema
 from myreco.domain.engines.types.base import EngineTypeChooser
-from myreco.domain.items_types.models import ItemsTypesModel
 from myreco.exceptions import ModelBaseError
 from types import MethodType, FunctionType
 from jsonschema import ValidationError
@@ -32,21 +30,37 @@ import sqlalchemy as sa
 import json
 
 
-class EnginesModel(SQLAlchemyRedisModelBase):
+class EnginesModelBase(sa.ext.declarative.AbstractConcreteBase):
     __tablename__ = 'engines'
-    __table_args__ = {'mysql_engine':'innodb'}
     __schema__ = get_model_schema(__file__)
 
     id = sa.Column(sa.Integer, primary_key=True, autoincrement=True)
     name = sa.Column(sa.String(255), unique=True, nullable=False)
     configuration_json = sa.Column(sa.Text, nullable=False)
-    store_id = sa.Column(sa.ForeignKey('stores.id'), nullable=False)
-    type_name_id = sa.Column(sa.ForeignKey('engines_types_names.id'), nullable=False)
-    item_type_id = sa.Column(sa.ForeignKey('items_types.id'), nullable=False)
 
-    type_name = sa.orm.relationship('EnginesTypesNamesModel')
-    item_type = sa.orm.relationship('ItemsTypesModel')
-    store = sa.orm.relationship('StoresModel')
+    @sa.ext.declarative.declared_attr
+    def store_id(cls):
+        return sa.Column(sa.ForeignKey('stores.id'), nullable=False)
+
+    @sa.ext.declarative.declared_attr
+    def type_name_id(cls):
+        return sa.Column(sa.ForeignKey('engines_types_names.id'), nullable=False)
+
+    @sa.ext.declarative.declared_attr
+    def item_type_id(cls):
+        return sa.Column(sa.ForeignKey('items_types.id'), nullable=False)
+
+    @sa.ext.declarative.declared_attr
+    def type_name(cls):
+        return sa.orm.relationship('EnginesTypesNamesModel')
+
+    @sa.ext.declarative.declared_attr
+    def item_type(cls):
+        return sa.orm.relationship('ItemsTypesModel')
+
+    @sa.ext.declarative.declared_attr
+    def store(cls):
+        return sa.orm.relationship('StoresModel')
 
     @property
     def type_(self):
@@ -58,7 +72,7 @@ class EnginesModel(SQLAlchemyRedisModelBase):
         self._type = EngineTypeChooser(self.type_name.name)(json.loads(self.configuration_json))
 
     def __init__(self, session, input_=None, **kwargs):
-        SQLAlchemyRedisModelBase.__init__(self, session, input_=input_, **kwargs)
+        super().__init__(session, input_=input_, **kwargs)
         self._validate_config(session, input_)
 
     def _validate_config(self, session, input_):
@@ -81,16 +95,15 @@ class EnginesModel(SQLAlchemyRedisModelBase):
             value = {'id': value}
             attr_name = 'item_type'
 
-        SQLAlchemyRedisModelBase._setattr(self, attr_name, value, session, input_)
+        super()._setattr(attr_name, value, session, input_)
 
     def _format_output_json(self, dict_inst):
         dict_inst['configuration'] = json.loads(dict_inst.pop('configuration_json'))
         dict_inst['variables'] = self.type_.get_variables(self)
 
 
-class EnginesTypesNamesModel(SQLAlchemyRedisModelBase):
+class EnginesTypesNamesModelBase(sa.ext.declarative.AbstractConcreteBase):
     __tablename__ = 'engines_types_names'
-    __table_args__ = {'mysql_engine':'innodb'}
     __use_redis__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)

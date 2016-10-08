@@ -22,10 +22,13 @@
 
 
 from myreco.base.middlewares import SessionMiddleware
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
+from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBuilder
 from unittest import mock
 
 import pytest
+
+
+SQLAlchemyRedisModelBase = SQLAlchemyRedisModelBuilder()
 
 
 @pytest.fixture

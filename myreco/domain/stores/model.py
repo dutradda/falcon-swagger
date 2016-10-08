@@ -21,24 +21,16 @@
 # SOFTWARE.
 
 
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.base.models.base import get_model_schema
 from myreco.base.hooks import before_operation, AuthorizationHook
-from myreco.domain.constants import AUTH_REALM
 import sqlalchemy as sa
 
 
-class StoresModel(SQLAlchemyRedisModelBase):
+@before_operation(AuthorizationHook())
+class StoresModelBase(sa.ext.declarative.AbstractConcreteBase):
     __tablename__ = 'stores'
-    __table_args__ = {'mysql_engine':'innodb'}
     __schema__ = get_model_schema(__file__)
 
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.String(255), unique=True, nullable=False)
     country = sa.Column(sa.String(255), unique=True, nullable=False)
-
-
-from myreco.domain.users.models import UsersModel
-
-
-StoresModel = before_operation(AuthorizationHook(UsersModel.authorize, AUTH_REALM))(StoresModel)

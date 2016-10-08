@@ -21,10 +21,9 @@
 # SOFTWARE.
 
 
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
+from tests.integration.fixtures_models import UsersModel, SQLAlchemyRedisModelBase
 from myreco.base.http_api import HttpAPI
-from myreco.domain.items_types.models import ItemsTypesModel
-from myreco.domain.users.models import UsersModel
+from tests.integration.fixtures_models import ItemsTypesModel
 from base64 import b64encode
 from fakeredis import FakeStrictRedis
 import pytest

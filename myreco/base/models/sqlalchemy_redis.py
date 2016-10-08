@@ -43,40 +43,37 @@ import msgpack
 import os.path
 
 
-MODEL_BASE_CLASS_NAME = 'SQLAlchemyRedisModelBase'
-
-
 class SQLAlchemyModelInitMixinMeta(DeclarativeMeta, ModelBaseMeta):
 
     def __init__(cls, name, bases_classes, attributes):
         DeclarativeMeta.__init__(cls, name, bases_classes, attributes)
 
-        if name != MODEL_BASE_CLASS_NAME:
+        if hasattr(cls, '__baseclass_name__'):
             cls._build_primary_keys()
 
             base_class = None
             for base in bases_classes:
-                if base.__name__ == MODEL_BASE_CLASS_NAME:
+                if base.__name__ == cls.__baseclass_name__:
                     base_class = base
                     break
 
             if base_class is None:
                 raise ModelBaseError(
                     "'{}' class must inherit from '{}'".format(
-                        name, MODEL_BASE_CLASS_NAME))
+                        name, cls.__baseclass_name__))
 
             cls.__backrefs__ = set()
             cls.__relationships__ = dict()
-            cls.columns = set(cls.__table__.c)
+            cls.__columns__ = set(cls.__table__.c)
             cls.__key__ = str(cls.__table__.name)
             cls.__use_redis__ = getattr(cls, '__use_redis__', True)
             cls.__todict_schema__ = {}
-            cls.valid_attributes = set()
             base_class.__all_models__[cls.__key__] = cls
             cls._build_backrefs_for_all_models(base_class.__all_models__.values())
 
             ModelBaseMeta.__init__(cls, name, bases_classes, attributes)
         else:
+            cls.__baseclass_name__= name
             cls.__all_models__ = dict()
 
     def _build_primary_keys(cls):
@@ -121,7 +118,6 @@ class SQLAlchemyModelInitMixinMeta(DeclarativeMeta, ModelBaseMeta):
     def _get_relationship(cls, attr_name):
         attr = getattr(cls, attr_name)
         if isinstance(attr, InstrumentedAttribute):
-            cls.valid_attributes.add(attr_name)
             if isinstance(attr.prop, RelationshipProperty):
                 return attr
 
@@ -140,6 +136,9 @@ class SQLAlchemyModelInitMixinMeta(DeclarativeMeta, ModelBaseMeta):
             return
 
         return relationship.prop.argument
+
+    def get_model(cls, name):
+        return cls.__all_models__[name]
 
 
 class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
@@ -469,7 +468,7 @@ class _SQLAlchemyModel(ModelBase):
         pass
 
     def _todict_columns(self, dict_inst, schema):
-        for col in type(self).columns:
+        for col in type(self).__columns__:
             col_name = str(col.name)
             if self._attribute_in_schema(col_name, schema):
                 dict_inst[col_name] = getattr(self, col_name)
@@ -478,13 +477,12 @@ class _SQLAlchemyModel(ModelBase):
         return (attr_name in schema and schema[attr_name]) or (not attr_name in schema)
 
     def _todict_relationships(self, dict_inst, schema):
-        for rel in type(self).__relationships__.values():
-            rel_name = rel.key
+        for rel_name, rel in type(self).__relationships__.items():
             if self._attribute_in_schema(rel_name, schema):
                 rel_schema = schema.get(rel_name)
                 rel_schema = rel_schema if isinstance(
                     rel_schema, dict) else None
-                attr = getattr(self, rel.prop.key)
+                attr = getattr(self, rel_name)
                 relationships = None
                 if rel.prop.uselist is True:
                     relationships = [rel.todict(rel_schema) for rel in attr]
@@ -496,11 +494,9 @@ class _SQLAlchemyModel(ModelBase):
 
 class SQLAlchemyRedisModelBuilder(object):
 
-    def __new__(cls, bind=None, metadata=None, mapper=None, class_registry=None):
+    def __new__(cls, name='SQLAlchemyRedisModelBase',
+                bind=None, metadata=None, mapper=None, class_registry=None):
         return declarative_base(
-            name=MODEL_BASE_CLASS_NAME, metaclass=SQLAlchemyModelMeta,
+            name=name, metaclass=SQLAlchemyModelMeta,
             cls=_SQLAlchemyModel, bind=bind, metadata=metadata,
             mapper=mapper, constructor=_SQLAlchemyModel.__init__)
-
-
-SQLAlchemyRedisModelBase = SQLAlchemyRedisModelBuilder()

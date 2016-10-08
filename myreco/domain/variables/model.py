@@ -21,20 +21,19 @@
 # SOFTWARE.
 
 
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.base.models.base import get_model_schema
 from myreco.base.hooks import before_operation, AuthorizationHook
-from myreco.domain.users.models import UsersModel
-from myreco.domain.constants import AUTH_REALM
 import sqlalchemy as sa
 
 
-@before_operation(AuthorizationHook(UsersModel.authorize, AUTH_REALM))
-class VariablesModel(SQLAlchemyRedisModelBase):
+@before_operation(AuthorizationHook())
+class VariablesModelBase(sa.ext.declarative.AbstractConcreteBase):
     __tablename__ = 'variables'
-    __table_args__ = {'mysql_engine':'innodb'}
     __schema__ = get_model_schema(__file__)
 
     id = sa.Column(sa.Integer, primary_key=True)
     name = sa.Column(sa.String(255), unique=True, nullable=False)
-    store_id = sa.Column(sa.ForeignKey('stores.id'), nullable=False)
+
+    @sa.ext.declarative.declared_attr
+    def store_id(cls):
+    	return sa.Column(sa.ForeignKey('stores.id'), nullable=False)

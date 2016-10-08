@@ -26,7 +26,7 @@ from myreco.domain.users.models import (GrantsModelBase, URIsModelBase, MethodsM
 from myreco.domain.stores.model import StoresModelBase
 from myreco.domain.variables.model import VariablesModelBase
 from myreco.domain.placements.models import (PlacementsModelBase, VariationsModelBase,
-    ABTestUsersModelBase, build_variations_engines_managers)
+    ABTestUsersModelBase, build_variations_engines_managers_table)
 from myreco.domain.engines_managers.models import (EnginesManagersVariablesModelBase,
     EnginesManagersModelBase, build_engines_managers_fallbacks_table)
 from myreco.domain.engines.models import EnginesModelBase, EnginesTypesNamesModelBase
@@ -34,66 +34,66 @@ from myreco.domain.items_types.models import ItemsTypesModelBase
 from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBuilder
 
 
-model_base = SQLAlchemyRedisModelBuilder()
+SQLAlchemyRedisModelBase = SQLAlchemyRedisModelBuilder()
 
 
-build_users_grants_table(model_base.metadata, mysql_engine='innodb')
-build_users_stores_table(model_base.metadata, mysql_engine='innodb')
-build_variations_engines_managers(model_base.metadata, mysql_engine='innodb')
-build_engines_managers_fallbacks_table(model_base.metadata, mysql_engine='innodb')
+build_users_grants_table(SQLAlchemyRedisModelBase.metadata, mysql_engine='innodb')
+build_users_stores_table(SQLAlchemyRedisModelBase.metadata, mysql_engine='innodb')
+build_variations_engines_managers_table(SQLAlchemyRedisModelBase.metadata, mysql_engine='innodb')
+build_engines_managers_fallbacks_table(SQLAlchemyRedisModelBase.metadata, mysql_engine='innodb')
 
 
-class GrantsModel(model_base, GrantsModelBase):
+class GrantsModel(GrantsModelBase, SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}
 
 
-class URIsModel(model_base, URIsModelBase):
+class URIsModel(URIsModelBase, SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}
 
 
-class MethodsModel(model_base, MethodsModelBase):
+class MethodsModel(MethodsModelBase, SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}
 
 
-class UsersModel(model_base, UsersModelBase):
+class UsersModel(UsersModelBase, SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}
 
 
-class StoresModel(model_base, StoresModelBase):
+class StoresModel(StoresModelBase, SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}
 
 
-class VariablesModel(model_base, VariablesModelBase):
+class VariablesModel(VariablesModelBase, SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}
 
 
-class PlacementsModel(model_base, PlacementsModelBase):
+class PlacementsModel(PlacementsModelBase, SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}
 
 
-class VariationsModel(model_base, VariationsModelBase):
+class VariationsModel(VariationsModelBase, SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}
 
 
-class ABTestUsersModel(model_base, ABTestUsersModelBase):
+class ABTestUsersModel(ABTestUsersModelBase, SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}
 
 
-class EnginesManagersVariablesModel(model_base, EnginesManagersVariablesModelBase):
+class EnginesManagersVariablesModel(EnginesManagersVariablesModelBase, SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}
 
 
-class EnginesManagersModel(model_base, EnginesManagersModelBase):
+class EnginesManagersModel(EnginesManagersModelBase, SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}
 
 
-class EnginesModel(model_base, EnginesModelBase):
+class EnginesModel(EnginesModelBase, SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}
 
 
-class EnginesTypesNamesModel(model_base, EnginesTypesNamesModelBase):
+class EnginesTypesNamesModel(EnginesTypesNamesModelBase, SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}
 
 
-class ItemsTypesModel(model_base, ItemsTypesModelBase):
+class ItemsTypesModel(ItemsTypesModelBase, SQLAlchemyRedisModelBase):
     __table_args__ = {'mysql_engine':'innodb'}

@@ -22,48 +22,69 @@
 
 
 from myreco.base.models.base import get_model_schema
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
-from myreco.domain.engines.models import EnginesModel
 from myreco.exceptions import ModelBaseError
 from jsonschema import ValidationError
 import sqlalchemy as sa
 
 
-class EnginesManagersVariablesModel(SQLAlchemyRedisModelBase):
+class EnginesManagersVariablesModelBase(sa.ext.declarative.AbstractConcreteBase):
     __tablename__ = 'engines_managers_variables'
-    __table_args__ = {'mysql_engine':'innodb'}
     __use_redis__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
-    inside_engine_name = sa.Column(sa.String(255), nullable=False)
-    variable_id = sa.Column(sa.ForeignKey('variables.id', ondelete='CASCADE', onupdate='CASCADE'))
-    engine_manager_id = sa.Column(sa.ForeignKey('engines_managers.id', ondelete='CASCADE', onupdate='CASCADE'))
     is_filter = sa.Column(sa.Boolean, default=False)
     override = sa.Column(sa.Boolean, default=False)
     override_value_json = sa.Column(sa.Text)
 
-    variable = sa.orm.relationship('VariablesModel')
+    @sa.ext.declarative.declared_attr
+    def inside_engine_name(cls):
+        return sa.Column(sa.String(255), nullable=False)
+
+    @sa.ext.declarative.declared_attr
+    def variable_id(cls):
+        return sa.Column(sa.ForeignKey('variables.id', ondelete='CASCADE', onupdate='CASCADE'))
+
+    @sa.ext.declarative.declared_attr
+    def engine_manager_id(cls):
+        return sa.Column(sa.ForeignKey('engines_managers.id', ondelete='CASCADE', onupdate='CASCADE'))
+
+    @sa.ext.declarative.declared_attr
+    def variable(cls):
+        return sa.orm.relationship('VariablesModel')
 
 
-class EnginesManagersModel(SQLAlchemyRedisModelBase):
+class EnginesManagersModelBase(sa.ext.declarative.AbstractConcreteBase):
     __tablename__ = 'engines_managers'
-    __table_args__ = {'mysql_engine':'innodb'}
     __schema__ = get_model_schema(__file__)
 
     id = sa.Column(sa.Integer, primary_key=True)
-    engine_id = sa.Column(sa.ForeignKey('engines.id'), nullable=False)
-    store_id = sa.Column(sa.ForeignKey('stores.id'), nullable=False)
 
-    engine = sa.orm.relationship('EnginesModel')
-    engine_variables = sa.orm.relationship('EnginesManagersVariablesModel', uselist=True)
-    fallbacks = sa.orm.relationship('EnginesManagersModel',
-        uselist=True, remote_side=[id],
+    @sa.ext.declarative.declared_attr
+    def engine_id(cls):
+        return sa.Column(sa.ForeignKey('engines.id'), nullable=False)
+
+    @sa.ext.declarative.declared_attr
+    def store_id(cls):
+        return sa.Column(sa.ForeignKey('stores.id'), nullable=False)
+
+    @sa.ext.declarative.declared_attr
+    def engine(cls):
+        return sa.orm.relationship('EnginesModel')
+
+    @sa.ext.declarative.declared_attr
+    def engine_variables(cls):
+        return sa.orm.relationship('EnginesManagersVariablesModel', uselist=True)
+
+    @sa.ext.declarative.declared_attr
+    def fallbacks(cls):
+        return sa.orm.relationship('EnginesManagersModel',
+        uselist=True, remote_side='EnginesManagersModel.id',
         secondary='engines_managers_fallbacks',
         primaryjoin='engines_managers_fallbacks.c.engines_managers_id == EnginesManagersModel.id',
         secondaryjoin='engines_managers_fallbacks.c.fallback_id == EnginesManagersModel.id')
 
     def __init__(self, session, input_=None, **kwargs):
-        SQLAlchemyRedisModelBase.__init__(self, session, input_=input_, **kwargs)
+        super().__init__(session, input_=input_, **kwargs)
         self._validate_fallbacks(input_)
         self._validate_engine_variables(input_)
 
@@ -113,15 +134,15 @@ class EnginesManagersModel(SQLAlchemyRedisModelBase):
                     var = {'id': engine_var.pop('variable_id')}
                     engine_var['variable'] = var
 
-        SQLAlchemyRedisModelBase._setattr(self, attr_name, value, session, input_)
+        super()._setattr(attr_name, value, session, input_)
 
     def _format_output_json(self, dict_inst):
         for fallback in dict_inst.get('fallbacks'):
             fallback.pop('fallbacks')
 
 
-engines_managers_fallbacks = sa.Table("engines_managers_fallbacks", SQLAlchemyRedisModelBase.metadata,
-    sa.Column("engines_managers_id", sa.Integer, sa.ForeignKey("engines_managers.id", ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
-    sa.Column("fallback_id", sa.Integer, sa.ForeignKey("engines_managers.id", ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
-    mysql_engine='innodb'
-)
+def build_engines_managers_fallbacks_table(metadata, **kwargs):
+    return sa.Table("engines_managers_fallbacks", metadata,
+        sa.Column("engines_managers_id", sa.Integer, sa.ForeignKey("engines_managers.id", ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
+        sa.Column("fallback_id", sa.Integer, sa.ForeignKey("engines_managers.id", ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
+        **kwargs)

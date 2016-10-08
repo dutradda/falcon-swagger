@@ -21,20 +21,16 @@
 # SOFTWARE.
 
 
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.base.models.redis import RedisModelBuilder
 from myreco.base.models.base import get_model_schema
 from myreco.base.hooks import before_operation, AuthorizationHook
-from myreco.domain.users.models import UsersModel
-from myreco.domain.constants import AUTH_REALM
 import sqlalchemy as sa
 import json
 
 
-@before_operation(AuthorizationHook(UsersModel.authorize, AUTH_REALM))
-class ItemsTypesModel(SQLAlchemyRedisModelBase):
+@before_operation(AuthorizationHook())
+class ItemsTypesModelBase(sa.ext.declarative.AbstractConcreteBase):
     __tablename__ = 'items_types'
-    __table_args__ = {'mysql_engine': 'innodb'}
     __schema__ = get_model_schema(__file__)
 
     id = sa.Column(sa.Integer, primary_key=True)
@@ -51,7 +47,7 @@ class ItemsTypesModel(SQLAlchemyRedisModelBase):
             value = json.dumps(value)
             attr_name = 'schema_json'
 
-        SQLAlchemyRedisModelBase._setattr(self, attr_name, value, session, input_)
+        super()._setattr(attr_name, value, session, input_)
 
     def _format_output_json(self, dict_inst):
         if 'id_names_json' in dict_inst:

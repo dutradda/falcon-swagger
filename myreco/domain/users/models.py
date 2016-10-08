@@ -21,48 +21,53 @@
 # SOFTWARE.
 
 
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.base.models.base import get_model_schema
 from myreco.base.hooks import AuthorizationHook, before_operation
-from myreco.domain.constants import AUTH_REALM
 from base64 import b64decode
 import sqlalchemy as sa
 
 
-class GrantsModel(SQLAlchemyRedisModelBase):
+class GrantsModelBase(sa.ext.declarative.AbstractConcreteBase):
     __tablename__ = 'grants'
-    __table_args__ = {'mysql_engine':'innodb'}
     __use_redis__ = False
 
-    uri_id = sa.Column(sa.ForeignKey('uris.id'), primary_key=True)
-    method_id = sa.Column(sa.ForeignKey('methods.id'), primary_key=True)
+    @sa.ext.declarative.declared_attr
+    def uri_id(cls):
+        return sa.Column(sa.ForeignKey('uris.id'), primary_key=True)
 
-    uri = sa.orm.relationship('URIsModel')
-    method = sa.orm.relationship('MethodsModel')
+    @sa.ext.declarative.declared_attr
+    def method_id(cls):
+        return sa.Column(sa.ForeignKey('methods.id'), primary_key=True)
+
+    @sa.ext.declarative.declared_attr
+    def uri(cls):
+        return sa.orm.relationship('URIsModel')
+
+    @sa.ext.declarative.declared_attr
+    def method(cls):
+        return sa.orm.relationship('MethodsModel')
 
 
-class URIsModel(SQLAlchemyRedisModelBase):
+class URIsModelBase(sa.ext.declarative.AbstractConcreteBase):
     __tablename__ = 'uris'
-    __table_args__ = {'mysql_engine':'innodb'}
     __use_redis__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     uri = sa.Column(sa.String(255), unique=True, nullable=False)
 
 
-class MethodsModel(SQLAlchemyRedisModelBase):
+class MethodsModelBase(sa.ext.declarative.AbstractConcreteBase):
     __tablename__ = 'methods'
-    __table_args__ = {'mysql_engine':'innodb'}
     __use_redis__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
     method = sa.Column(sa.String(10), unique=True, nullable=False)
 
 
-class UsersModel(SQLAlchemyRedisModelBase):
+class UsersModelBase(sa.ext.declarative.AbstractConcreteBase):
     __tablename__ = 'users'
-    __table_args__ = {'mysql_engine':'innodb'}
     __schema__ = get_model_schema(__file__)
+    __realm__= 'myreco'
 
     id = sa.Column(sa.String(255), primary_key=True)
     name = sa.Column(sa.String(255), unique=True, nullable=False)
@@ -70,15 +75,20 @@ class UsersModel(SQLAlchemyRedisModelBase):
     password = sa.Column(sa.String(255), nullable=False)
     admin = sa.Column(sa.Boolean, default=False)
 
-    grants_primaryjoin = 'UsersModel.id == users_grants.c.user_id'
-    grants_secondaryjoin = 'and_('\
+    @sa.ext.declarative.declared_attr
+    def grants(cls):
+        grants_primaryjoin = 'UsersModel.id == users_grants.c.user_id'
+        grants_secondaryjoin = 'and_('\
             'GrantsModel.uri_id == users_grants.c.grant_uri_id, '\
             'GrantsModel.method_id == users_grants.c.grant_method_id)'
 
-    grants = sa.orm.relationship(
-        'GrantsModel', uselist=True, secondary='users_grants',
-        primaryjoin=grants_primaryjoin, secondaryjoin=grants_secondaryjoin)
-    stores = sa.orm.relationship('StoresModel', uselist=True, secondary='users_stores')
+        return sa.orm.relationship(
+            'GrantsModel', uselist=True, secondary='users_grants',
+            primaryjoin=grants_primaryjoin, secondaryjoin=grants_secondaryjoin)
+
+    @sa.ext.declarative.declared_attr
+    def stores(cls):
+        return sa.orm.relationship('StoresModel', uselist=True, secondary='users_stores')
 
     @classmethod
     def authorize(cls, session, authorization, uri_template, path, method):
@@ -109,16 +119,16 @@ class UsersModel(SQLAlchemyRedisModelBase):
     @classmethod
     def _set_objs_ids_and_grant(cls, objs, session):
         objs = cls._to_list(objs)
-        method = MethodsModel.get(session, ids={'method': 'patch'}, todict=False)
+        method = cls.get_model('methods').get(session, ids={'method': 'patch'}, todict=False)
 
         for obj in objs:
             user_uri = '/users/{}'.format(obj['email'])
-            uri = URIsModel.get(session, ids={'uri': user_uri}, todict=False)
+            uri = cls.get_model('uris').get(session, ids={'uri': user_uri}, todict=False)
 
             if uri and method:
                 uri = uri[0]
                 method = method[0]
-                grant = GrantsModel.get(session, {'uri_id': uri.id, 'method_id': method.id})
+                grant = cls.get_model('grants').get(session, {'uri_id': uri.id, 'method_id': method.id})
                 if grant:
                     grant = {'uri_id': uri.id, 'method_id': method.id}
                 else:
@@ -179,22 +189,21 @@ class UsersModel(SQLAlchemyRedisModelBase):
             inst.id = '{}:{}'.format(inst.email, inst.password)
 
 
-from myreco.domain.stores.model import StoresModel
+UsersModelBase = before_operation(AuthorizationHook())(UsersModelBase)
 
 
-UsersModel = before_operation(AuthorizationHook(UsersModel.authorize, AUTH_REALM))(UsersModel)
+def build_users_grants_table(metadata, **kwargs):
+    return sa.Table(
+        'users_grants', metadata,
+        sa.Column('user_id', sa.String(255), sa.ForeignKey('users.id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
+        sa.Column('grant_uri_id', sa.Integer, sa.ForeignKey('grants.uri_id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
+        sa.Column('grant_method_id', sa.Integer, sa.ForeignKey('grants.method_id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
+        **kwargs)
 
 
-users_grants = sa.Table(
-    'users_grants', SQLAlchemyRedisModelBase.metadata,
-    sa.Column('user_id', sa.String(255), sa.ForeignKey('users.id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
-    sa.Column('grant_uri_id', sa.Integer, sa.ForeignKey('grants.uri_id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
-    sa.Column('grant_method_id', sa.Integer, sa.ForeignKey('grants.method_id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
-    mysql_engine='innodb')
-
-
-users_stores = sa.Table(
-    'users_stores', SQLAlchemyRedisModelBase.metadata,
-    sa.Column('user_id', sa.String(255), sa.ForeignKey('users.id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
-    sa.Column('store_id', sa.Integer, sa.ForeignKey('stores.id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
-    mysql_engine='innodb')
+def build_users_stores_table(metadata, **kwargs):
+    return sa.Table(
+        'users_stores', metadata,
+        sa.Column('user_id', sa.String(255), sa.ForeignKey('users.id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
+        sa.Column('store_id', sa.Integer, sa.ForeignKey('stores.id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
+        **kwargs)

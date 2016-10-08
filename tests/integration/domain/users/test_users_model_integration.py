@@ -21,8 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.domain.users.models import UsersModel
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
+from tests.integration.fixtures_models import UsersModel, SQLAlchemyRedisModelBase
 from myreco.base.hooks import AuthorizationHook, before_operation
 from myreco.base.http_api import HttpAPI
 from base64 import b64encode
@@ -37,7 +36,7 @@ def model_base():
     return SQLAlchemyRedisModelBase
 
 
-@before_operation(AuthorizationHook(UsersModel.authorize, 'test'))
+@before_operation(AuthorizationHook())
 class model(SQLAlchemyRedisModelBase):
     __tablename__ = 'test'
     id = sa.Column(sa.Integer, primary_key=True)

@@ -21,9 +21,9 @@
 # SOFTWARE.
 
 
-from myreco.domain.users.models import UsersModel, GrantsModel, URIsModel, MethodsModel
-from myreco.domain.stores.model import StoresModel
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
+from tests.integration.fixtures_models import (
+    SQLAlchemyRedisModelBase, StoresModel, UsersModel,
+    GrantsModel, URIsModel, MethodsModel)
 from myreco.base.http_api import HttpAPI
 from myreco.base.models.base import get_model_schema
 from fakeredis import FakeStrictRedis

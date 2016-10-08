@@ -34,13 +34,16 @@ import sqlalchemy as sa
 
 @pytest.fixture
 def model(model_base):
-    def auth_func(session, auth_token, uri, path, method):
-        if auth_token == '1' and uri == '/' and method == 'GET':
-            return True
-        if auth_token == '2':
-            return False
+    class model_auth(object):
+        __realm__ = 'test'
 
-    @before_operation(AuthorizationHook(auth_func, 'test'))
+        def authorize(session, auth_token, uri, path, method):
+            if auth_token == '1' and uri == '/' and method == 'GET':
+                return True
+            if auth_token == '2':
+                return False
+
+    @before_operation(AuthorizationHook())
     class model(model_base):
         __tablename__ = 'model'
         id = sa.Column(sa.Integer, primary_key=True)
@@ -56,6 +59,10 @@ def model(model_base):
         @classmethod
         def get_test(cls, req, resp, **kwargs):
             pass
+
+        @classmethod
+        def get_model(cls, name):
+            return model_auth
 
     return model
 

@@ -23,7 +23,6 @@
 
 from myreco.base.models.base import get_model_schema
 from myreco.base.json_builder import JsonBuilder
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.domain.engines.types.base import EngineTypeChooser
 from myreco.exceptions import ModelBaseError
 from falcon.errors import HTTPNotFound
@@ -32,21 +31,25 @@ import hashlib
 import json
 
 
-class PlacementsModel(SQLAlchemyRedisModelBase):
+class PlacementsModelBase(sa.ext.declarative.AbstractConcreteBase):
     __tablename__ = 'placements'
-    __table_args__ = {'mysql_engine':'innodb'}
     __schema__ = get_model_schema(__file__)
 
     hash = sa.Column(sa.String(255), primary_key=True)
     small_hash = sa.Column(sa.String(255), unique=True, nullable=False)
     name = sa.Column(sa.String(255), unique=True, nullable=False)
     ab_testing = sa.Column(sa.Boolean, default=False)
-    store_id = sa.Column(sa.ForeignKey('stores.id'), primary_key=True)
 
-    variations = sa.orm.relationship('VariationsModel', uselist=True, passive_deletes=True)
+    @sa.ext.declarative.declared_attr
+    def store_id(cls):
+        return sa.Column(sa.ForeignKey('stores.id'), primary_key=True)
+
+    @sa.ext.declarative.declared_attr
+    def variations(cls):
+        return sa.orm.relationship('VariationsModel', uselist=True, passive_deletes=True)
 
     def __init__(self, session, input_=None, **kwargs):
-        SQLAlchemyRedisModelBase.__init__(self, session, input_=input_, **kwargs)
+        super().__init__(session, input_=input_, **kwargs)
         self._set_hash()
 
     def _set_hash(self):
@@ -59,7 +62,7 @@ class PlacementsModel(SQLAlchemyRedisModelBase):
         if name == 'hash':
             self.small_hash = value[:5]
 
-        SQLAlchemyRedisModelBase.__setattr__(self, name, value)
+        super().__setattr__(name, value)
 
     @classmethod
     def get_recommendations(cls, req, resp):
@@ -106,30 +109,37 @@ class PlacementsModel(SQLAlchemyRedisModelBase):
                 return var['schema']
 
 
-class VariationsModel(SQLAlchemyRedisModelBase):
+class VariationsModelBase(sa.ext.declarative.AbstractConcreteBase):
     __tablename__ = 'variations'
-    __table_args__ = {'mysql_engine':'innodb'}
     __use_redis__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
-    placement_hash = sa.Column(sa.ForeignKey('placements.hash', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
     weight = sa.Column(sa.Float)
 
-    engines_managers = sa.orm.relationship('EnginesManagersModel',
+    @sa.ext.declarative.declared_attr
+    def placement_hash(cls):
+        return sa.Column(sa.ForeignKey('placements.hash', ondelete='CASCADE', onupdate='CASCADE'), nullable=False)
+
+    @sa.ext.declarative.declared_attr
+    def engines_managers(cls):
+        return sa.orm.relationship('EnginesManagersModel',
                 uselist=True, secondary='variations_engines_managers')
 
 
-class ABTestUsersModel(SQLAlchemyRedisModelBase):
+class ABTestUsersModelBase(sa.ext.declarative.AbstractConcreteBase):
     __tablename__ = 'ab_test_users'
-    __table_args__ = {'mysql_engine':'innodb'}
     __use_redis__ = False
 
     id = sa.Column(sa.Integer, primary_key=True)
-    variation_id = sa.Column(sa.ForeignKey('variations.id'), nullable=False)
+
+    @sa.ext.declarative.declared_attr
+    def variation_id(cls):
+        return sa.Column(sa.ForeignKey('variations.id'), nullable=False)
 
 
-variations_engines_managers = sa.Table(
-    'variations_engines_managers', SQLAlchemyRedisModelBase.metadata,
-    sa.Column('variation_id', sa.Integer, sa.ForeignKey('variations.id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
-    sa.Column('engines_managers_id', sa.Integer, sa.ForeignKey('engines_managers.id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False),
-    mysql_engine='innodb')
+def build_variations_engines_managers_table(metadata, **kwargs):
+    return sa.Table(
+        'variations_engines_managers', metadata,
+        sa.Column('variation_id', sa.Integer, sa.ForeignKey('variations.id', ondelete='CASCADE', onupdate='CASCADE'), primary_key=True),
+        sa.Column('engines_managers_id', sa.Integer, sa.ForeignKey('engines_managers.id', ondelete='CASCADE', onupdate='CASCADE'), nullable=False),
+        **kwargs)

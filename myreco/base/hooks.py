@@ -23,32 +23,31 @@
 
 from myreco.exceptions import UnauthorizedError
 from falcon import HTTP_FORBIDDEN, HTTP_METHODS
+from types import MethodType
 
 
 class AuthorizationHook(object):
-    def __init__(self, authorizer_func, realm):
-        self.authorizer = authorizer_func
-        self.realm = realm
+    def __call__(self, req, resp, model, params):
+        users_model = model.get_model('users')
 
-    def __call__(self, req, resp, resource, params):
         authorization = req.auth
         if authorization is None:
-            raise UnauthorizedError('Authorization header is required', self.realm)
+            raise UnauthorizedError('Authorization header is required', users_model.__realm__)
 
         basic_str = 'Basic '
         if authorization.startswith(basic_str):
             authorization = authorization.replace(basic_str, '')
 
         session = req.context['session']
-        authorization = self.authorizer(session, authorization,
-            req.uri_template, req.path, req.method)
+        authorization = users_model.authorize(
+            session, authorization, req.uri_template, req.path, req.method)
 
         if authorization is None:
-            raise UnauthorizedError('Invalid authorization', self.realm)
+            raise UnauthorizedError('Invalid authorization', users_model.__realm__)
 
         elif authorization is False:
             raise UnauthorizedError(
-                'Please refresh your authorization', self.realm, HTTP_FORBIDDEN)
+                'Please refresh your authorization', users_model.__realm__, HTTP_FORBIDDEN)
 
 
 def before_operation(func):
@@ -58,13 +57,21 @@ def before_operation(func):
             setattr(cls, method_name, _before_operation(method))
 
     def _before_operation(func_):
+        cls = None
+        is_cls = False
+        if isinstance(func_, type):
+            is_cls = True
+            cls = func_
+        elif isinstance(func_, MethodType):
+            cls = func_.__self__
+
         def do_before(req, resp, **params):
-            func(req, resp, None, params)
+            func(req, resp, cls, params)
             func_(req, resp, **params)
 
-        if isinstance(func_, type):
+        if is_cls:
             methods = set()
-            for path in func_.__schema__.values():
+            for path in cls.__schema__.values():
                 for method_name, method in path.items():
                     if method_name.upper() in HTTP_METHODS:
                         op_name = method.get('operationId')
@@ -72,9 +79,9 @@ def before_operation(func):
                             methods.add(op_name)
 
             for method in methods:
-                _wrap_class_method(func_, method)
+                _wrap_class_method(cls, method)
 
-            return func_
+            return cls
 
         return do_before
 

@@ -22,7 +22,6 @@
 
 
 from myreco.base.models.base import get_model_schema
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBase
 from myreco.domain.engines.types.base import (
     EngineRecommenderMixin,
     EngineDataImporterBigqueryMixin,
