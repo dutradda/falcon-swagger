@@ -21,16 +21,33 @@
 # SOFTWARE.
 
 
-from myreco.base.models.base import get_model_schema
-from myreco.base.hooks import before_operation, AuthorizationHook
-import sqlalchemy as sa
+from falconswagger.session import Session, RedisSession
+from falconswagger.models.sqlalchemy_redis import SQLAlchemyModelMeta
+from falconswagger.models.redis import RedisModelMeta
 
 
-@before_operation(AuthorizationHook())
-class StoresModelBase(sa.ext.declarative.AbstractConcreteBase):
-    __tablename__ = 'stores'
-    __schema__ = get_model_schema(__file__)
 
-    id = sa.Column(sa.Integer, primary_key=True)
-    name = sa.Column(sa.String(255), unique=True, nullable=False)
-    country = sa.Column(sa.String(255), unique=True, nullable=False)
+class SessionMiddleware(object):
+
+    def __init__(self, sqlalchemy_bind=None, redis_bind=None):
+        self.sqlalchemy_bind = sqlalchemy_bind
+        self.redis_bind = redis_bind
+
+    def process_resource(self, req, resp, model, uri_params):
+        if model.__session__:
+            req.context['session'] = model.__session__
+            return
+
+        if isinstance(model, SQLAlchemyModelMeta):
+            req.context['session'] = Session(
+                bind=self.sqlalchemy_bind, redis_bind=self.redis_bind)
+
+        elif isinstance(model, RedisModelMeta):
+            req.context['session'] = RedisSession(self.redis_bind)
+
+    def process_response(self, req, resp, model):
+        session = req.context.pop('session', None)
+        if session is not None \
+                and isinstance(model, SQLAlchemyModelMeta) \
+                and not model.__session__:
+            session.close()

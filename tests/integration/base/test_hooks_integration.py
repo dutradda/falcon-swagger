@@ -21,8 +21,8 @@
 # SOFTWARE.
 
 
-from myreco.base.hooks import AuthorizationHook, before_operation
-from myreco.base.http_api import HttpAPI
+from falconswagger.hooks import AuthorizationHook, before_operation
+from falconswagger.http_api import HttpAPI
 from falcon import before as falcon_before
 from unittest import mock
 

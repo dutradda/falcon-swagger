@@ -26,7 +26,7 @@ from falcon import HTTP_UNAUTHORIZED, HTTP_BAD_REQUEST
 import json
 
 
-class MyrecoError(Exception):
+class FalconSwaggerError(Exception):
     def __init__(self, message, status, headers=None, input_=None):
         self.message = message
         self.status = status
@@ -57,18 +57,18 @@ class MyrecoError(Exception):
         [resp.append_header(key, value) for key, value in exception.headers.items()]
 
 
-class ModelBaseError(MyrecoError):
+class ModelBaseError(FalconSwaggerError):
     def __init__(self, message, input_=None):
-        MyrecoError.__init__(self, message, HTTP_BAD_REQUEST)
+        FalconSwaggerError.__init__(self, message, HTTP_BAD_REQUEST)
         self.input_ = input_
 
 
-class JSONError(MyrecoError):
+class JSONError(FalconSwaggerError):
     def __init__(self, message, headers=None, input_=None):
-        MyrecoError.__init__(self, message, HTTP_BAD_REQUEST, headers=headers, input_=input_)
+        FalconSwaggerError.__init__(self, message, HTTP_BAD_REQUEST, headers=headers, input_=input_)
 
 
-class UnauthorizedError(MyrecoError):
+class UnauthorizedError(FalconSwaggerError):
     def __init__(self, message, realm, status=HTTP_UNAUTHORIZED):
         headers = {'WWW-Authenticate': 'Basic realm="{}"'.format(realm)}
-        MyrecoError.__init__(self, message, status, headers)
+        FalconSwaggerError.__init__(self, message, status, headers)

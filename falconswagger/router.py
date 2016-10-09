@@ -21,8 +21,8 @@
 # SOFTWARE.
 
 
-from myreco.base.json_builder import JsonBuilder
-from myreco.exceptions import ModelBaseError, JSONError
+from falconswagger.json_builder import JsonBuilder
+from falconswagger.exceptions import ModelBaseError, JSONError
 from collections import defaultdict, deque
 from jsonschema import RefResolver, Draft4Validator
 from falcon import HTTP_METHODS, HTTPMethodNotAllowed

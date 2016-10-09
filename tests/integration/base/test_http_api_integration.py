@@ -1,4 +1,4 @@
-from myreco.base.http_api import HttpAPI
+from falconswagger.http_api import HttpAPI
 from unittest import mock
 from jsonschema import Draft4Validator
 from pytest_falcon.plugin import Client
@@ -128,7 +128,7 @@ class TestHttpAPIErrorHandlingPOST(object):
                 'database message': {
                     'message':  'Cannot add or update a child row: '
                                 'a foreign key constraint fails '
-                                '(`myreco_test`.`model1`, '
+                                '(`falconswagger_test`.`model1`, '
                                 'CONSTRAINT `model1_ibfk_1` FOREIGN '
                                 'KEY (`m2_id`) REFERENCES `model2` '
                                 '(`id`))',

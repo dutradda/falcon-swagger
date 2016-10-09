@@ -21,8 +21,8 @@
 # SOFTWARE.
 
 
-from myreco.base.models.redis import RedisModelBuilder
-from myreco.base.http_api import HttpAPI
+from falconswagger.models.redis import RedisModelBuilder
+from falconswagger.http_api import HttpAPI
 from unittest import mock
 from fakeredis import FakeStrictRedis
 import pytest

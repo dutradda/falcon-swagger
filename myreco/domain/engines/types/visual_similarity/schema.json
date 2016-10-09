@@ -1,9 +1,0 @@
-{
-    "type": "object",
-    "additionalProperties": false,
-    "required": ["item_id_name", "aggregators_ids_name"],
-    "properties": {
-        "item_id_name": {"type": "string"},
-        "aggregators_ids_name": {"type": "string"}
-    }
-}

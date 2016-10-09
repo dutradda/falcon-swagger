@@ -21,8 +21,8 @@
 # SOFTWARE.
 
 
-from myreco.base.middlewares import SessionMiddleware
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBuilder
+from falconswagger.middlewares import SessionMiddleware
+from falconswagger.models.sqlalchemy_redis import SQLAlchemyRedisModelBuilder
 from unittest import mock
 
 import pytest
@@ -47,7 +47,7 @@ def sqlalchemy_middleware(bind, redis_bind):
 
 
 class TestFalconSQLAlchemyRedisMiddleware(object):
-    @mock.patch('myreco.base.middlewares.Session')
+    @mock.patch('falconswagger.middlewares.Session')
     def test_process_resource(self, session, sqlalchemy_middleware, bind, redis_bind):
         req = mock.MagicMock(
             method='POST', uri_template='/test', context=dict())

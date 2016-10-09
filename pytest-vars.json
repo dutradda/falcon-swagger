@@ -4,6 +4,6 @@
         "port": 3306,
         "user": "root",
         "password": "root",
-        "database": "myreco_test"
+        "database": "falconswagger_test"
     }
 }

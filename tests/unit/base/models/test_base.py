@@ -21,9 +21,9 @@
 # SOFTWARE.
 
 
-from myreco.base.models.base import ModelBaseMeta, ModelBase
-from myreco.base.router import ModelRouter
-from myreco.exceptions import ModelBaseError
+from falconswagger.models.base import ModelBaseMeta, ModelBase
+from falconswagger.router import ModelRouter
+from falconswagger.exceptions import ModelBaseError
 from falcon.errors import HTTPNotFound, HTTPMethodNotAllowed
 from jsonschema import ValidationError
 from unittest import mock

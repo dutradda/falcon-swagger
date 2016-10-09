@@ -21,8 +21,8 @@
 # SOFTWARE.
 
 
-from myreco.base.router import Route, build_validator
-from myreco.exceptions import ModelBaseError, JSONError
+from falconswagger.router import Route, build_validator
+from falconswagger.exceptions import ModelBaseError, JSONError
 from falcon.errors import HTTPNotFound, HTTPMethodNotAllowed
 from falcon import HTTP_CREATED, HTTP_NO_CONTENT, HTTP_METHODS
 from falcon.responders import create_default_options

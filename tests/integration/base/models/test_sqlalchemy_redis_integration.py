@@ -21,9 +21,9 @@
 # SOFTWARE.
 
 
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBuilder
-from myreco.base.session import Session
-from myreco.exceptions import ModelBaseError
+from falconswagger.models.sqlalchemy_redis import SQLAlchemyRedisModelBuilder
+from falconswagger.session import Session
+from falconswagger.exceptions import ModelBaseError
 from unittest import mock
 
 import pytest

@@ -21,8 +21,8 @@
 # SOFTWARE.
 
 
-from myreco.base.models.redis import RedisModelMeta, RedisModelBuilder
-from myreco.exceptions import ModelBaseError
+from falconswagger.models.redis import RedisModelMeta, RedisModelBuilder
+from falconswagger.exceptions import ModelBaseError
 from unittest import mock
 import pytest
 import msgpack

@@ -22,9 +22,9 @@
 
 
 from falcon import API, HTTP_INTERNAL_SERVER_ERROR, HTTP_BAD_REQUEST, HTTPError, HTTPNotFound
-from myreco.base.middlewares import SessionMiddleware
-from myreco.base.router import ModelRouter
-from myreco.exceptions import JSONError, ModelBaseError, UnauthorizedError
+from falconswagger.middlewares import SessionMiddleware
+from falconswagger.router import ModelRouter
+from falconswagger.exceptions import JSONError, ModelBaseError, UnauthorizedError
 from sqlalchemy.exc import IntegrityError
 from jsonschema import ValidationError
 import logging

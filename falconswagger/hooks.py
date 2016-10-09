@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.exceptions import UnauthorizedError
+from falconswagger.exceptions import UnauthorizedError
 from falcon import HTTP_FORBIDDEN, HTTP_METHODS
 from types import MethodType
 

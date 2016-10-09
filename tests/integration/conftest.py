@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.base.session import Session
+from falconswagger.session import Session
 from unittest import mock
 from sqlalchemy import create_engine
 

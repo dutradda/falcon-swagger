@@ -35,8 +35,8 @@ from importlib import import_module
 from re import match as re_match, sub as re_sub
 from glob import glob
 
-from myreco.exceptions import ModelBaseError
-from myreco.base.models.base import ModelBaseMeta, ModelBase
+from falconswagger.exceptions import ModelBaseError
+from falconswagger.models.base import ModelBaseMeta, ModelBase
 
 import json
 import msgpack

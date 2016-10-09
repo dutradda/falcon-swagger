@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.base.models.base import ModelBaseMeta, ModelBase
+from falconswagger.models.base import ModelBaseMeta, ModelBase
 from collections import OrderedDict
 from copy import deepcopy
 from types import MethodType

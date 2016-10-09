@@ -1,6 +1,6 @@
 [run]
 omit =
-    myreco/version.py
+    falconswagger/version.py
     *__init__*
 
 branch = True

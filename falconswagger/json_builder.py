@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from myreco.exceptions import ModelBaseError
+from falconswagger.exceptions import ModelBaseError
 from copy import deepcopy
 
 
