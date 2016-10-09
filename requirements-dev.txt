@@ -1,7 +1,7 @@
-pytest==3.0.2
+pytest==3.0.3
 pytest-cov==2.3.1
+pytest-falcon==0.4.2
 pytest-variables[hjson]==1.4
 ipython==5.1.0
 PyMySQL==0.7.9
-pytest-falcon==0.4.2
 fakeredis==0.8.1
