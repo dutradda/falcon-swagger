@@ -31,69 +31,40 @@ from myreco.domain.engines_managers.models import (EnginesManagersVariablesModel
     EnginesManagersModelBase, build_engines_managers_fallbacks_table)
 from myreco.domain.engines.models import EnginesModelBase, EnginesTypesNamesModelBase
 from myreco.domain.items_types.models import ItemsTypesModelBase
-from myreco.base.models.sqlalchemy_redis import SQLAlchemyRedisModelBuilder
+from myreco.domain.models_factory import ModelsFactory
 
 
-SQLAlchemyRedisModelBase = SQLAlchemyRedisModelBuilder()
+table_args = {'mysql_engine':'innodb'}
+factory = ModelsFactory(commons_models_attributes={'__table_args__': table_args},
+    					commons_tables_attributes=table_args)
+models = factory.make_all_models()
 
+GrantsModel = models['grants']
 
-build_users_grants_table(SQLAlchemyRedisModelBase.metadata, mysql_engine='innodb')
-build_users_stores_table(SQLAlchemyRedisModelBase.metadata, mysql_engine='innodb')
-build_variations_engines_managers_table(SQLAlchemyRedisModelBase.metadata, mysql_engine='innodb')
-build_engines_managers_fallbacks_table(SQLAlchemyRedisModelBase.metadata, mysql_engine='innodb')
+URIsModel = models['uris']
 
+MethodsModel = models['methods']
 
-class GrantsModel(GrantsModelBase, SQLAlchemyRedisModelBase):
-    __table_args__ = {'mysql_engine':'innodb'}
+UsersModel = models['users']
 
+StoresModel = models['stores']
 
-class URIsModel(URIsModelBase, SQLAlchemyRedisModelBase):
-    __table_args__ = {'mysql_engine':'innodb'}
+VariablesModel = models['variables']
 
+PlacementsModel = models['placements']
 
-class MethodsModel(MethodsModelBase, SQLAlchemyRedisModelBase):
-    __table_args__ = {'mysql_engine':'innodb'}
+VariationsModel = models['variations']
 
+ABTestUsersModel = models['ab_test_users']
 
-class UsersModel(UsersModelBase, SQLAlchemyRedisModelBase):
-    __table_args__ = {'mysql_engine':'innodb'}
+EnginesManagersVariablesModel = models['engines_managers_variables']
 
+EnginesManagersModel = models['engines_managers']
 
-class StoresModel(StoresModelBase, SQLAlchemyRedisModelBase):
-    __table_args__ = {'mysql_engine':'innodb'}
+EnginesModel = models['engines']
 
+EnginesTypesNamesModel = models['engines_types_names']
 
-class VariablesModel(VariablesModelBase, SQLAlchemyRedisModelBase):
-    __table_args__ = {'mysql_engine':'innodb'}
-
-
-class PlacementsModel(PlacementsModelBase, SQLAlchemyRedisModelBase):
-    __table_args__ = {'mysql_engine':'innodb'}
-
-
-class VariationsModel(VariationsModelBase, SQLAlchemyRedisModelBase):
-    __table_args__ = {'mysql_engine':'innodb'}
-
-
-class ABTestUsersModel(ABTestUsersModelBase, SQLAlchemyRedisModelBase):
-    __table_args__ = {'mysql_engine':'innodb'}
-
-
-class EnginesManagersVariablesModel(EnginesManagersVariablesModelBase, SQLAlchemyRedisModelBase):
-    __table_args__ = {'mysql_engine':'innodb'}
-
-
-class EnginesManagersModel(EnginesManagersModelBase, SQLAlchemyRedisModelBase):
-    __table_args__ = {'mysql_engine':'innodb'}
-
-
-class EnginesModel(EnginesModelBase, SQLAlchemyRedisModelBase):
-    __table_args__ = {'mysql_engine':'innodb'}
-
-
-class EnginesTypesNamesModel(EnginesTypesNamesModelBase, SQLAlchemyRedisModelBase):
-    __table_args__ = {'mysql_engine':'innodb'}
-
-
-class ItemsTypesModel(ItemsTypesModelBase, SQLAlchemyRedisModelBase):
-    __table_args__ = {'mysql_engine':'innodb'}
+ItemsTypesModel = models['items_types']
+    
+SQLAlchemyRedisModelBase = factory.base_model
