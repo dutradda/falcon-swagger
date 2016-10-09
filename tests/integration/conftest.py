@@ -50,8 +50,15 @@ def session(model_base, request, variables, redis):
     conn.commit()
     conn.close()
 
-    url = 'mysql+pymysql://{user}:{password}'\
-        '@{host}:{port}/{database}'.format(**variables['database'])
+    if variables['database']['password']:
+        url = 'mysql+pymysql://{user}:{password}'\
+            '@{host}:{port}/{database}'.format(**variables['database'])
+    else:
+        variables['database'].pop('password')
+        url = 'mysql+pymysql://{user}'\
+            '@{host}:{port}/{database}'.format(**variables['database'])
+        variables['database']['password'] = None
+
     engine = create_engine(url)
     model_base.metadata.bind = engine
     model_base.metadata.create_all()
