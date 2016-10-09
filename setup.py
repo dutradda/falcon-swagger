@@ -14,7 +14,7 @@
 
 
 from falconswagger.version import VERSION
-from setuptools import setup
+from setuptools import setup, find_packages
 
 
 long_description = ''
@@ -34,7 +34,8 @@ with open('requirements-dev.txt') as requirements_dev:
 
 setup(
     name='falcon-swagger',
-    packages=['falconswagger'],
+    packages=find_packages('.'),
+    include_package_data=True,
     version=VERSION,
     description='A Falcon Framework extension featuring Swagger, SQLAlchemy and Redis',
     long_description=long_description,
