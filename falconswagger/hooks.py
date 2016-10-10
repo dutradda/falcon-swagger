@@ -27,26 +27,29 @@ from types import MethodType
 
 
 def authorization_hook(req, resp, model, params):
-    users_model = model.get_model('users')
+    if model.__authorizer__ is None:
+        return
+
+    authorizer = model.__authorizer__
 
     authorization = req.auth
     if authorization is None:
-        raise UnauthorizedError('Authorization header is required', users_model.__realm__)
+        raise UnauthorizedError('Authorization header is required', authorizer.realm)
 
     basic_str = 'Basic '
     if authorization.startswith(basic_str):
         authorization = authorization.replace(basic_str, '')
 
     session = req.context['session']
-    authorization = users_model.authorize(
+    authorization = authorizer.authorize(
         session, authorization, req.uri_template, req.path, req.method)
 
     if authorization is None:
-        raise UnauthorizedError('Invalid authorization', users_model.__realm__)
+        raise UnauthorizedError('Invalid authorization', authorizer.realm)
 
     elif authorization is False:
         raise UnauthorizedError(
-            'Please refresh your authorization', users_model.__realm__, HTTP_FORBIDDEN)
+            'Please refresh your authorization', authorizer.realm, HTTP_FORBIDDEN)
 
 
 def before_operation(func):
@@ -85,3 +88,12 @@ def before_operation(func):
         return do_before
 
     return _before_operation
+
+
+class Authorizer(object):
+
+    def __init__(self, realm):
+        self.realm = realm
+
+    def authorize(self, session, authorization, uri_template, path, method):
+        pass

@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from falconswagger.hooks import authorization_hook
+from falconswagger.hooks import authorization_hook, Authorizer
 from falconswagger.http_api import HttpAPI
 from falcon import before as falcon_before
 from unittest import mock
@@ -34,10 +34,8 @@ import sqlalchemy as sa
 
 @pytest.fixture
 def model(model_base):
-    class model_auth(object):
-        __realm__ = 'test'
-
-        def authorize(session, auth_token, uri, path, method):
+    class MyAuth(Authorizer):
+        def authorize(self, session, auth_token, uri, path, method):
             if auth_token == '1' and uri == '/' and method == 'GET':
                 return True
             if auth_token == '2':
@@ -65,10 +63,7 @@ def model(model_base):
         def get_test(cls, req, resp, **kwargs):
             pass
 
-        @classmethod
-        def get_model(cls, name):
-            return model_auth
-
+    model.__authorizer__ = MyAuth('test')
     return model
 
 

@@ -494,9 +494,11 @@ class _SQLAlchemyModel(ModelBase):
 
 class SQLAlchemyRedisModelBuilder(object):
 
-    def __new__(cls, name='SQLAlchemyRedisModelBase',
-                bind=None, metadata=None, mapper=None, class_registry=None):
-        return declarative_base(
+    def __new__(cls, name='SQLAlchemyRedisModelBase', bind=None, metadata=None,
+                mapper=None, class_registry=None, authorizer=None):
+        base = declarative_base(
             name=name, metaclass=SQLAlchemyModelMeta,
             cls=_SQLAlchemyModel, bind=bind, metadata=metadata,
             mapper=mapper, constructor=_SQLAlchemyModel.__init__)
+        base.__authorizer__ = authorizer
+        return base
