@@ -1,5 +1,4 @@
 SQLAlchemy==1.1.1
-Cython==0.24.1
 falcon==1.1.0b1
 jsonschema==2.5.1
 msgpack-python==0.4.8
