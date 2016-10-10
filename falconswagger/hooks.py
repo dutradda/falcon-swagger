@@ -65,7 +65,6 @@ def before_operation(func):
             cls = func_.__self__
 
         def do_before(req, resp, **params):
-            print(func.__name__)
             func(req, resp, cls, params)
             func_(req, resp, **params)
 

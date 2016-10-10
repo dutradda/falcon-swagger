@@ -23,6 +23,7 @@
 
 from falconswagger.json_builder import JsonBuilder
 from falconswagger.exceptions import ModelBaseError, JSONError
+from falconswagger.hooks import authorization_hook
 from collections import defaultdict, deque
 from jsonschema import RefResolver, Draft4Validator
 from falcon import HTTP_METHODS, HTTPMethodNotAllowed
@@ -75,6 +76,7 @@ class Route(object):
         self._model_dir = model.get_module_path()
         self._body_required = False
         self._has_body_parameter = False
+        self._has_auth = False
 
         query_string_schema = self._build_default_schema()
         uri_template_schema = self._build_default_schema()
@@ -108,6 +110,8 @@ class Route(object):
             self._query_string_validator = build_validator(query_string_schema, self._model_dir)
 
         if headers_schema['properties']:
+            self._has_auth = ('Authorization' in headers_schema['properties']) \
+                and ('Authorization' in headers_schema.get('required', []))
             self._headers_validator = build_validator(headers_schema, self._model_dir)
 
     def _build_default_schema(self):
@@ -133,6 +137,9 @@ class Route(object):
         schema['properties'][name] = property_
 
     def __call__(self, req, resp, **kwargs):
+        if self._has_auth or req.get_header('Authorization'):
+            authorization_hook(req, resp, self.model, kwargs)
+
         body_params = self._build_body_params(req)
         query_string_params = self._build_non_body_params(self._query_string_validator, req.params)
         uri_template_params = self._build_non_body_params(self._uri_template_validator, kwargs)

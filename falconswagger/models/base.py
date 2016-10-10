@@ -60,6 +60,7 @@ class BaseModelRouteMeta(type):
         req_body = parameters['body']
         id_ = parameters['uri_template']
         kwargs = deepcopy(parameters['headers'])
+        kwargs.pop('Authorization', None)
         kwargs.update(parameters['query_string'])
         return session, req_body, id_, kwargs
 

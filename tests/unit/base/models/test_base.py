@@ -109,6 +109,7 @@ class TestModelBase(object):
             }
         }
         req = mock.MagicMock(path='/test', method='POST', params={})
+        req.get_header.return_value = None
         resp = mock.MagicMock()
         model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
@@ -174,6 +175,7 @@ class TestModelBaseBuildsQueryStringParameters(object):
             params={'test': ['1', '2', '3', '4']},
             path='/test',
             method='POST')
+        req.get_header.return_value = None
         resp = mock.MagicMock()
         router = ModelRouter()
         router.add_model(model)
@@ -207,6 +209,7 @@ class TestModelBaseBuildsQueryStringParameters(object):
             params={'test': '1,2,3,4'},
             path='/test',
             method='POST')
+        req.get_header.return_value = None
         resp = mock.MagicMock()
         router = ModelRouter()
         router.add_model(model)
@@ -240,6 +243,7 @@ class TestModelBaseBuildsQueryStringParameters(object):
             params={'test': ['1', '2', '3', '4']},
             path='/test',
             method='POST')
+        req.get_header.return_value = None
         resp = mock.MagicMock()
         router = ModelRouter()
         router.add_model(model)
@@ -273,6 +277,7 @@ class TestModelBaseBuildsQueryStringParameters(object):
             params={'test': '1,2,3,4'},
             path='/test',
             method='POST')
+        req.get_header.return_value = None
         resp = mock.MagicMock()
         router = ModelRouter()
         router.add_model(model)
@@ -307,6 +312,7 @@ class TestModelBaseBuildsUriTemplateParameters(object):
             context={'session': mock.MagicMock()},
             path='/test',
             method='GET')
+        req.get_header.return_value = None
         resp = mock.MagicMock()
         router = ModelRouter()
         router.add_model(model)
@@ -340,6 +346,7 @@ class TestModelBaseBuildsUriTemplateParameters(object):
             context={'session': mock.MagicMock()},
             path='/test',
             method='GET')
+        req.get_header.return_value = None
         resp = mock.MagicMock()
         router = ModelRouter()
         router.add_model(model)
@@ -373,6 +380,7 @@ class TestModelBaseBuildsUriTemplateParameters(object):
             context={'session': mock.MagicMock()},
             path='/test',
             method='GET')
+        req.get_header.return_value = None
         resp = mock.MagicMock()
         router = ModelRouter()
         router.add_model(model)
@@ -406,7 +414,7 @@ class TestModelBaseBuildsHeadersParameters(object):
             context={'session': mock.MagicMock()},
             path='/test',
             method='POST')
-        req.get_header.return_value = '1,2,3,4'
+        req.get_header.side_effect = [None, '1,2,3,4']
         resp = mock.MagicMock()
         router = ModelRouter()
         router.add_model(model)
@@ -414,7 +422,7 @@ class TestModelBaseBuildsHeadersParameters(object):
         route(req, resp)
         kwargs_expected = {'test': ['1', '2', '3', '4']}
 
-        assert req.get_header.call_args_list == [mock.call('test')]
+        assert req.get_header.call_args_list == [mock.call('Authorization'), mock.call('test')]
         assert model.insert.call_args_list == [
             mock.call(req.context['session'], req.context['parameters']['body'], **kwargs_expected)
         ]
@@ -440,7 +448,7 @@ class TestModelBaseBuildsHeadersParameters(object):
             context={'session': mock.MagicMock()},
             path='/test',
             method='POST')
-        req.get_header.return_value = '1,2,3,4'
+        req.get_header.side_effect = [None, '1,2,3,4']
         resp = mock.MagicMock()
         router = ModelRouter()
         router.add_model(model)
@@ -473,7 +481,7 @@ class TestModelBaseBuildsHeadersParameters(object):
             context={'session': mock.MagicMock()},
             path='/test',
             method='POST')
-        req.get_header.return_value = '1,2,3,4'
+        req.get_header.side_effect = [None, '1,2,3,4']
         resp = mock.MagicMock()
         router = ModelRouter()
         router.add_model(model)
