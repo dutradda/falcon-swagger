@@ -26,28 +26,27 @@ from falcon import HTTP_FORBIDDEN, HTTP_METHODS
 from types import MethodType
 
 
-class AuthorizationHook(object):
-    def __call__(self, req, resp, model, params):
-        users_model = model.get_model('users')
+def authorization_hook(req, resp, model, params):
+    users_model = model.get_model('users')
 
-        authorization = req.auth
-        if authorization is None:
-            raise UnauthorizedError('Authorization header is required', users_model.__realm__)
+    authorization = req.auth
+    if authorization is None:
+        raise UnauthorizedError('Authorization header is required', users_model.__realm__)
 
-        basic_str = 'Basic '
-        if authorization.startswith(basic_str):
-            authorization = authorization.replace(basic_str, '')
+    basic_str = 'Basic '
+    if authorization.startswith(basic_str):
+        authorization = authorization.replace(basic_str, '')
 
-        session = req.context['session']
-        authorization = users_model.authorize(
-            session, authorization, req.uri_template, req.path, req.method)
+    session = req.context['session']
+    authorization = users_model.authorize(
+        session, authorization, req.uri_template, req.path, req.method)
 
-        if authorization is None:
-            raise UnauthorizedError('Invalid authorization', users_model.__realm__)
+    if authorization is None:
+        raise UnauthorizedError('Invalid authorization', users_model.__realm__)
 
-        elif authorization is False:
-            raise UnauthorizedError(
-                'Please refresh your authorization', users_model.__realm__, HTTP_FORBIDDEN)
+    elif authorization is False:
+        raise UnauthorizedError(
+            'Please refresh your authorization', users_model.__realm__, HTTP_FORBIDDEN)
 
 
 def before_operation(func):
@@ -66,6 +65,7 @@ def before_operation(func):
             cls = func_.__self__
 
         def do_before(req, resp, **params):
+            print(func.__name__)
             func(req, resp, cls, params)
             func_(req, resp, **params)
 

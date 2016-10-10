@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from falconswagger.hooks import AuthorizationHook, before_operation
+from falconswagger.hooks import authorization_hook, before_operation
 from falconswagger.http_api import HttpAPI
 from falcon import before as falcon_before
 from unittest import mock
@@ -43,7 +43,7 @@ def model(model_base):
             if auth_token == '2':
                 return False
 
-    @before_operation(AuthorizationHook())
+    @before_operation(authorization_hook)
     class model(model_base):
         __tablename__ = 'model'
         id = sa.Column(sa.Integer, primary_key=True)
