@@ -70,11 +70,19 @@ class RedisModelMeta(ModelBaseMeta):
         for key in invalid_keys:
             keys_objs_map.pop(key, None)
 
+        keys_objs_to_del = dict()
+
         if keys_objs_map:
             set_map = OrderedDict()
             counter = 0
-            for key in keys_objs_map:
-                set_map[key] = msgpack.dumps(keys_objs_map[key])
+            for key in set(keys_objs_map.keys()):
+                obj = keys_objs_map[key]
+                if obj.get('_operation') == 'delete':
+                    keys_objs_to_del[key] = obj
+                    keys_objs_map.pop(key)
+                    continue
+
+                set_map[key] = msgpack.dumps(obj)
                 counter += 1
 
                 if counter == cls.CHUNKS:
@@ -85,7 +93,10 @@ class RedisModelMeta(ModelBaseMeta):
             if set_map:
                 session.bind.hmset(cls.__key__, set_map)
 
-        return list(keys_objs_map.values())
+        if keys_objs_to_del:
+            session.bind.hdel(cls.__key__, *keys_objs_to_del.keys())
+
+        return list(keys_objs_map.values()) or list(keys_objs_to_del.values())
 
     def _build_keys_objs_map_with_ids(cls, objs, ids):
         ids = cls._to_list(ids)
@@ -120,9 +131,10 @@ class RedisModelMeta(ModelBaseMeta):
             ids = [cls._build_key(id_) for id_ in cls._to_list(ids)]
             return cls._unpack_objs(session.bind.hmget(cls.__key__, *ids[offset:limit]))
 
-
     def _unpack_objs(cls, objs):
-        return [msgpack.loads(obj, encoding='utf-8') for obj in objs.values()]
+        if isinstance(objs, dict):
+            objs = objs.values()
+        return [msgpack.loads(obj, encoding='utf-8') for obj in objs if obj is not None]
 
 
 class _RedisModel(dict, ModelBase):

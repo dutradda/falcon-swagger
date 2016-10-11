@@ -119,10 +119,13 @@ class TestRedisModelMetaUpdateWithoutIDs(object):
         }
 
         assert model.update(session, [{'id': 1}, {'id': 2}]) == [{'id': 1}, {'id': 2}]
-        assert session.bind.hmset.call_args_list == [
+        assert (session.bind.hmset.call_args_list == [
             mock.call('test', expected_map1),
             mock.call('test', expected_map2)
-        ]
+        ] or session.bind.hmset.call_args_list == [
+            mock.call('test', expected_map2),
+            mock.call('test', expected_map1)
+        ])
 
 
 class TestRedisModelMetaUpdateWithIDs(object):
@@ -204,10 +207,13 @@ class TestRedisModelMetaUpdateWithIDs(object):
         assert model.update(session, [{'id': 1}, {'id': 2}], [{'id': 1}, {'id': 2}]) == [
             {'id': 1}, {'id': 2}
         ]
-        assert session.bind.hmset.call_args_list == [
+        assert (session.bind.hmset.call_args_list == [
             mock.call('test', expected_map1),
             mock.call('test', expected_map2)
-        ]
+        ] or session.bind.hmset.call_args_list == [
+            mock.call('test', expected_map2),
+            mock.call('test', expected_map1)
+        ])
 
 
 class TestRedisModelMetaDelete(object):
