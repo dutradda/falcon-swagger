@@ -260,6 +260,7 @@ class ModelBaseMeta(
 class ModelBase(object):
     __session__ = None
     __authorizer__ = None
+    __api__ = None
 
     def get_key(self, id_names=None):
         return str(self.get_ids_values(id_names))

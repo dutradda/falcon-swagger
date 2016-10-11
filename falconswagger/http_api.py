@@ -53,9 +53,11 @@ class HttpAPI(API):
 
     def associate_model(self, model):
         self._router.add_model(model)
+        model.__api__ = self
 
     def disassociate_model(self, model):
         self._router.remove_model(model)
+        model.__api__ = None
 
     def _get_responder(self, req):
         route, params = self._router.get_route_and_params(req)
