@@ -38,6 +38,7 @@ class HttpAPI(API):
             middleware=SessionMiddleware(sqlalchemy_bind, redis_bind))
         self.add_route = None
         del self.add_route
+        self.models = dict()
 
         for model in models:
             self.associate_model(model)
@@ -52,12 +53,18 @@ class HttpAPI(API):
         self.add_error_handler(UnauthorizedError)
 
     def associate_model(self, model):
-        self._router.add_model(model)
-        model.__api__ = self
+        if model.__api__ is not self:
+            if isinstance(model.__api__, HttpAPI):
+                model.__api__.disassociate_model(model)
+
+            self._router.add_model(model)
+            self.models[model.__key__] = model
+            model.__api__ = self
 
     def disassociate_model(self, model):
-        self._router.remove_model(model)
-        model.__api__ = None
+        if model.__api__ is self:
+            self._router.remove_model(model)
+            self.models.pop(model.__key__)
 
     def _get_responder(self, req):
         route, params = self._router.get_route_and_params(req)
