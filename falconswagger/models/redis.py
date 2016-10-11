@@ -143,18 +143,21 @@ class _RedisModel(dict, ModelBase):
 
 class RedisModelBuilder(object):
 
-    def __new__(cls, name, id_names, schema):
-        return cls._build_model(name, id_names, schema)
+    def __new__(cls, name, id_names, schema, metaclass=None):
+        return cls._build_model(name, id_names, schema, metaclass)
 
     @classmethod
-    def _build_model(cls, name, id_names, schema):
+    def _build_model(cls, name, id_names, schema, metaclass):
+        if metaclass is None:
+            metaclass = RedisModelMeta
+
         class_name = name.capitalize() + 'Model'
         attributes = {
             '__key__': name,
             '__id_names__': tuple(id_names),
             '__schema__': schema
         }
-        model = RedisModelMeta(class_name, (_RedisModel,), attributes)
+        model = metaclass(class_name, (_RedisModel,), attributes)
         model.update = MethodType(RedisModelMeta.update, model)
         model.update_ = MethodType(dict.update, model)
         model.get = MethodType(RedisModelMeta.get, model)
