@@ -119,7 +119,7 @@ def app():
             }
         }
     }
-    return HttpAPI([RedisModelBuilder('test', ['id'], schema)], redis_bind=FakeStrictRedis())
+    return HttpAPI([RedisModelBuilder('TestModel', 'test', ['id'], schema)], redis_bind=FakeStrictRedis())
 
 
 class TestRedisModelPost(object):

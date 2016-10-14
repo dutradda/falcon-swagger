@@ -110,7 +110,7 @@ class RedisModelMeta(ModelBaseMeta):
         return keys_objs_map
 
     def _build_key(cls, id_):
-        return str(cls(id_).get_ids_values(id_.keys()))
+        return cls(id_).get_key(id_.keys())
 
     def delete(cls, session, ids, **kwargs):
         keys = [cls._build_key(id_) for id_ in cls._to_list(ids)]
@@ -155,17 +155,16 @@ class _RedisModel(dict, ModelBase):
 
 class RedisModelBuilder(object):
 
-    def __new__(cls, name, id_names, schema, metaclass=None):
-        return cls._build_model(name, id_names, schema, metaclass)
+    def __new__(cls, class_name, key, id_names, schema, metaclass=None):
+        return cls._build_model(class_name, key, id_names, schema, metaclass)
 
     @classmethod
-    def _build_model(cls, name, id_names, schema, metaclass):
+    def _build_model(cls, class_name, key, id_names, schema, metaclass):
         if metaclass is None:
             metaclass = RedisModelMeta
 
-        class_name = name.capitalize() + 'Model'
         attributes = {
-            '__key__': name,
+            '__key__': key,
             '__id_names__': tuple(id_names),
             '__schema__': schema
         }

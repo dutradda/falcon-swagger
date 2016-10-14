@@ -31,7 +31,7 @@ import msgpack
 class TestRedisModelBuilder(object):
 
     def test_build(self):
-        model = RedisModelBuilder('test', ['id'], {})
+        model = RedisModelBuilder('TestModel', 'test', ['id'], {})
         assert model.__name__ == 'TestModel'
         assert model.__key__ == 'test'
         assert model.__schema__ == {}
@@ -39,7 +39,7 @@ class TestRedisModelBuilder(object):
 
 @pytest.fixture
 def model():
-    return RedisModelBuilder('test', ['id'], {})
+    return RedisModelBuilder('TestModel', 'test', ['id'], {})
 
 
 class TestRedisModelMetaInsert(object):
