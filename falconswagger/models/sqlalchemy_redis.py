@@ -450,21 +450,21 @@ class _SQLAlchemyModel(ModelBase):
         return result
 
     def todict(self, schema=None):
+        if schema is None:
+            schema = type(self).__todict_schema__
+
         dict_inst = self._todict(schema)
-        self._format_output_json(dict_inst)
+        self._format_output_json(dict_inst, schema)
         return dict_inst
 
     def _todict(self, schema=None):
         dict_inst = dict()
-        if schema is None:
-            schema = type(self).__todict_schema__
-
         self._todict_columns(dict_inst, schema)
         self._todict_relationships(dict_inst, schema)
 
         return dict_inst
 
-    def _format_output_json(self, dict_inst):
+    def _format_output_json(self, dict_inst, schema):
         pass
 
     def _todict_columns(self, dict_inst, schema):
