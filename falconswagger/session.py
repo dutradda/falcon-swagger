@@ -142,5 +142,5 @@ def added_to_database(session, instance):
 
 
 class RedisSession(object):
-    def __init__(self, bind=None):
-        self.bind = bind
+    def __init__(self, redis_bind=None):
+        self.redis_bind = redis_bind

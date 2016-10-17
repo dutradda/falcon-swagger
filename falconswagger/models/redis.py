@@ -44,12 +44,12 @@ class RedisModelMeta(ModelBaseMeta):
             counter += 1
 
             if counter == cls.CHUNKS:
-                session.bind.hmset(cls.__key__, ids_objs_map)
+                session.redis_bind.hmset(cls.__key__, ids_objs_map)
                 ids_objs_map = dict()
                 counter = 0
 
         if ids_objs_map:
-            session.bind.hmset(cls.__key__, ids_objs_map)
+            session.redis_bind.hmset(cls.__key__, ids_objs_map)
 
         return objs
 
@@ -63,7 +63,7 @@ class RedisModelMeta(ModelBaseMeta):
             keys_objs_map = OrderedDict([(cls(obj).get_key().encode(), obj) for obj in objs])
 
         keys = set(keys_objs_map.keys())
-        keys.difference_update(set(session.bind.hkeys(cls.__key__)))
+        keys.difference_update(set(session.redis_bind.hkeys(cls.__key__)))
         keys.intersection_update(keys)
         invalid_keys = keys
 
@@ -86,15 +86,15 @@ class RedisModelMeta(ModelBaseMeta):
                 counter += 1
 
                 if counter == cls.CHUNKS:
-                    session.bind.hmset(cls.__key__, set_map)
+                    session.redis_bind.hmset(cls.__key__, set_map)
                     set_map = OrderedDict()
                     counter = 0
 
             if set_map:
-                session.bind.hmset(cls.__key__, set_map)
+                session.redis_bind.hmset(cls.__key__, set_map)
 
         if keys_objs_to_del:
-            session.bind.hdel(cls.__key__, *keys_objs_to_del.keys())
+            session.redis_bind.hdel(cls.__key__, *keys_objs_to_del.keys())
 
         return list(keys_objs_map.values()) or list(keys_objs_to_del.values())
 
@@ -115,21 +115,21 @@ class RedisModelMeta(ModelBaseMeta):
     def delete(cls, session, ids, **kwargs):
         keys = [cls._build_key(id_) for id_ in cls._to_list(ids)]
         if keys:
-            session.bind.hdel(cls.__key__, *keys)
+            session.redis_bind.hdel(cls.__key__, *keys)
 
     def get(cls, session, ids=None, limit=None, offset=None, **kwargs):
         if limit is not None and offset is not None:
             limit += offset
 
         elif ids is None and limit is None and offset is None:
-            return cls._unpack_objs(session.bind.hgetall(cls.__key__))
+            return cls._unpack_objs(session.redis_bind.hgetall(cls.__key__))
 
         if ids is None:
-            keys = session.bind.hkeys(cls.__key__)
-            return cls._unpack_objs(session.bind.hmget(cls.__key__, *keys[offset:limit]))
+            keys = session.redis_bind.hkeys(cls.__key__)
+            return cls._unpack_objs(session.redis_bind.hmget(cls.__key__, *keys[offset:limit]))
         else:
             ids = [cls._build_key(id_) for id_ in cls._to_list(ids)]
-            return cls._unpack_objs(session.bind.hmget(cls.__key__, *ids[offset:limit]))
+            return cls._unpack_objs(session.redis_bind.hmget(cls.__key__, *ids[offset:limit]))
 
     def _unpack_objs(cls, objs):
         if isinstance(objs, dict):
