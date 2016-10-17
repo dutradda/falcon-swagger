@@ -36,6 +36,7 @@ class HttpAPI(API):
     def __init__(self, models, sqlalchemy_bind=None, redis_bind=None):
         API.__init__(self, router=ModelRouter(),
             middleware=SessionMiddleware(sqlalchemy_bind, redis_bind))
+        self._logger = logging.getLogger(type(self).__module__ + '.' + type(self).__name__)
         self.add_route = None
         del self.add_route
         self.models = dict()
@@ -112,4 +113,4 @@ class HttpAPI(API):
     def _handle_generic_error(self, exception, req, resp, params):
         resp.status = HTTP_INTERNAL_SERVER_ERROR
         resp.body = json.dumps({'error': {'message': 'Something unexpected happened'}})
-        logging.exception(exception)
+        self._logger.exception(exception)
