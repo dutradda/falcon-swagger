@@ -30,8 +30,11 @@ from jsonschema import ValidationError
 from collections import defaultdict
 from copy import deepcopy
 from importlib import import_module
+from concurrent.futures import ThreadPoolExecutor
 import json
 import os.path
+import logging
+import random
 
 
 def get_dir_path(filename):
@@ -195,6 +198,7 @@ class ModelBaseRoutesMixinMeta(type):
     def __init__(cls, name, bases, attributes):
         cls.__routes__ = set()
         cls.__key__ = getattr(cls, '__key__', cls.__name__.replace('Model', '').lower())
+        cls._logger = logging.getLogger(cls.__module__ + '.' + cls.__name__)
         schema = getattr(cls, '__schema__', None)
 
         if schema:
@@ -238,11 +242,52 @@ class ModelBaseRoutesMixinMeta(type):
         return '/' + cls.__key__ + '/_schema/'
 
 
+class BaseModelJobsMixinMeta(type):
+
+    def post_job(cls, req, resp):
+        job_hash = '{:x}'.format(random.getrandbits(128))
+        executor = ThreadPoolExecutor(2)
+        job_session = req.context['session']
+        job_session = type(job_session)(bind=job_session.bind, redis_bind=job_session.redis_bind)
+
+        job = executor.submit(cls._run_job, job_session, req, resp)
+        executor.submit(cls._job_watcher, executor, job, job_hash, job_session)
+
+        resp.body = json.dumps({'hash': job_hash})
+
+    def _run_job(cls, job_session, req, resp):
+        pass
+
+    def _job_watcher(cls, executor, job, job_hash, job_session):
+        cls._jobs[job_hash] = {'status': 'running'}
+
+        try:
+            result = job.result()
+        except Exception as error:
+            result = {'name': error.__class__.__name__, 'message': str(error)}
+            cls._jobs[job_hash] = {'status': 'error', 'result': result}
+            cls._logger.exception(error)
+        else:
+            cls._jobs[job_hash] = {'status': 'done', 'result': result}
+
+        job_session.close()
+        executor.shutdown()
+
+    def get_job(cls, req, resp):
+        status = cls._jobs.get(req.context['parameters']['query_string']['hash'])
+
+        if status is None:
+            raise HTTPNotFound()
+
+        resp.body = json.dumps(status)
+
+
 class ModelBaseMeta(
         BaseModelPatchMixinMeta,
         BaseModelDeleteMixinMeta,
         BaseModelGetMixinMeta,
-        ModelBaseRoutesMixinMeta):
+        ModelBaseRoutesMixinMeta,
+        BaseModelJobsMixinMeta):
 
     def _to_list(cls, objs):
         return objs if isinstance(objs, list) else [objs]
