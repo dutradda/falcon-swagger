@@ -243,12 +243,14 @@ class ModelBaseRoutesMixinMeta(type):
 
 
 class BaseModelJobsMixinMeta(type):
+    _jobs = dict()
 
     def post_job(cls, req, resp):
         job_hash = '{:x}'.format(random.getrandbits(128))
         executor = ThreadPoolExecutor(2)
         job_session = req.context['session']
-        job_session = type(job_session)(bind=job_session.bind, redis_bind=job_session.redis_bind)
+        job_session = type(job_session)(bind=job_session.bind.engine.connect(),
+                                        redis_bind=job_session.redis_bind)
 
         job = executor.submit(cls._run_job, job_session, req, resp)
         executor.submit(cls._job_watcher, executor, job, job_hash, job_session)
@@ -270,6 +272,7 @@ class BaseModelJobsMixinMeta(type):
         else:
             cls._jobs[job_hash] = {'status': 'done', 'result': result}
 
+        job_session.bind.close()
         job_session.close()
         executor.shutdown()
 

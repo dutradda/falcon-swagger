@@ -139,11 +139,3 @@ def deleted_from_database(session, instance):
 def added_to_database(session, instance):
     if session.redis_bind is not None and instance is not None:
         session.mark_for_hmset(instance)
-
-
-class RedisSession(object):
-    def __init__(self, redis_bind=None, **kwargs):
-        self.redis_bind = redis_bind
-
-    def close(self, *args, **kwargs):
-        self.redis_bind = None
