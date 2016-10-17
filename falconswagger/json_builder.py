@@ -22,6 +22,7 @@
 
 
 from falconswagger.exceptions import ModelBaseError
+from jsonschema import ValidationError
 from copy import deepcopy
 
 
@@ -63,10 +64,18 @@ class JsonBuilderMeta(type):
 
     def _build_value(cls, value, schema, nested_types, input_):
         type_ = schema['type']
+        exception = ValidationError("invalid value '{}' for type '{}'".format(value, type_),
+                                    instance=input_, schema=schema)
         if type_ == 'array' or type_ == 'object':
-            return cls._type_builder(type_)(value, schema, nested_types, input_)
+            try:
+                return cls._type_builder(type_)(value, schema, nested_types, input_)
+            except ValueError:
+                raise exception
 
-        return cls._type_builder(type_)(value)
+        try:
+            return cls._type_builder(type_)(value)
+        except ValueError:
+            raise exception
 
     def _build_object(cls, value, schema, nested_types, input_):
         if 'object' in nested_types:
