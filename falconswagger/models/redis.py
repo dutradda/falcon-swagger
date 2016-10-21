@@ -169,8 +169,8 @@ class RedisModelBuilder(object):
             '__schema__': schema
         }
         model = metaclass(class_name, (_RedisModel,), attributes)
-        model.update = MethodType(RedisModelMeta.update, model)
+        model.update = MethodType(metaclass.update, model)
         model.update_ = MethodType(dict.update, model)
-        model.get = MethodType(RedisModelMeta.get, model)
+        model.get = MethodType(metaclass.get, model)
         model.get_ = dict.get
         return model
