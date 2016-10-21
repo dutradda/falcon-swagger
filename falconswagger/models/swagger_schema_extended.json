@@ -948,6 +948,7 @@
         }
       },
       "properties": {
+        "id_names": {},
         "$ref": {
           "type": "string"
         },

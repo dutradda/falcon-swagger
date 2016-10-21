@@ -55,7 +55,7 @@ class URISchemaHandler(object):
         self._schemas_path = schemas_path
 
     def __call__(self, uri):
-        schema_filename = os.path.join(self._schemas_path, uri.replace('schema:', ''))
+        schema_filename = os.path.join(self._schemas_path, uri.lstrip('/'))
         with open(schema_filename) as json_schema_file:
             return json.load(json_schema_file)
 
