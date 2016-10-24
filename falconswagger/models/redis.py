@@ -125,8 +125,8 @@ class RedisModelMeta(ModelBaseMeta):
             return cls._unpack_objs(session.redis_bind.hgetall(cls.__key__))
 
         if ids is None:
-            keys = [k.decode() for k in session.redis_bind.hkeys(cls.__key__)]
-            return cls._unpack_objs(session.redis_bind.hmget(cls.__key__, *keys[offset:limit]))
+            keys = [k.decode() for k in session.redis_bind.hkeys(cls.__key__)][offset:limit]
+            return cls._unpack_objs(session.redis_bind.hmget(cls.__key__, keys))
         else:
             ids = [cls._build_key(id_) for id_ in cls._to_list(ids)]
             return cls._unpack_objs(session.redis_bind.hmget(cls.__key__, *ids[offset:limit]))
@@ -144,6 +144,13 @@ class _RedisModel(dict, ModelBase):
             keys = type(self).__id_names__
 
         return tuple([self.get_(key) for key in sorted(keys)])
+
+    def set_ids(self, values, keys=None):
+        if keys is None:
+            keys = type(self).__id_names__
+
+        for key, value in zip(keys, values):
+            self[key] = value
 
     def get_ids_map(self, keys=None):
         if keys is None:
