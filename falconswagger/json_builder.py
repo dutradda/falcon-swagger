@@ -57,8 +57,18 @@ class JsonBuilderMeta(type):
         items_schema = schema.get('items')
         if items_schema:
             nested_types.add('array')
-            values = [cls._build_value(
-                value, items_schema, nested_types, input_) for value in values]
+
+            if isinstance(items_schema, dict):
+                values = [cls._build_value(
+                    value, items_schema, nested_types, input_) for value in values]
+
+            elif isinstance(items_schema, list):
+                if len(items_schema) != len(values):
+                    raise ValidationError(
+                        "size mismatch for items array '{}'".format(', '.join(values)),
+                        instance=input_, schema=items_schema)
+                values = [cls._build_value(value, schema, nested_types, input_) \
+                            for value, schema in zip(values, items_schema)]
 
         return values
 

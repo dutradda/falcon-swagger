@@ -147,7 +147,7 @@ class _RedisModel(dict, ModelBase):
 
     def set_ids(self, values, keys=None):
         if keys is None:
-            keys = type(self).__id_names__
+            keys = sorted(type(self).__id_names__)
 
         for key, value in zip(keys, values):
             self[key] = value
