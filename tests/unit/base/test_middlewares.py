@@ -58,7 +58,7 @@ class TestFalconSQLAlchemyRedisMiddleware(object):
         sqlalchemy_middleware.process_resource(req, resp, resource, params)
 
         assert session.call_args_list == [
-            mock.call(bind=bind.connect(), redis_bind=redis_bind)]
+            mock.call(bind=bind, redis_bind=redis_bind)]
         assert req.context['session'] == session.return_value
 
     def test_process_response(self, sqlalchemy_middleware):

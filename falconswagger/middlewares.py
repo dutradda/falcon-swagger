@@ -37,17 +37,11 @@ class SessionMiddleware(object):
             req.context['session'] = model.__session__
             return
 
-        if self.sqlalchemy_bind:
-            conn = self.sqlalchemy_bind.connect()
-        else:
-            conn = None
-
-        req.context['session'] = Session(bind=conn, redis_bind=self.redis_bind)
+        req.context['session'] = Session(bind=self.sqlalchemy_bind, redis_bind=self.redis_bind)
 
     def process_response(self, req, resp, model):
         session = req.context.pop('session', None)
         if session is not None \
                 and isinstance(model, SQLAlchemyModelMeta) \
                 and not model.__session__:
-            session.bind.close()
             session.close()
