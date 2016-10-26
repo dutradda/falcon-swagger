@@ -210,21 +210,21 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
 
         return or_(*or_clause_args)
 
-    def _get_obj_i_comparison(cls, pk_attributes):
-        if len(pk_attributes) == 1:
-            pk_name = [i for i in pk_attributes.keys()][0]
-            return cls._build_id_attribute_comparison(pk_name, pk_attributes)
+    def _get_obj_i_comparison(cls, attributes):
+        if len(attributes) == 1:
+            attr_name = [i for i in attributes.keys()][0]
+            return cls._build_attribute_comparison(attr_name, attributes)
 
         and_clause_args = []
-        for pk_name in pk_attributes:
-            comparison = cls._build_id_attribute_comparison(
-                pk_name, pk_attributes)
+        for attr_name in attributes:
+            comparison = cls._build_attribute_comparison(
+                attr_name, attributes)
             and_clause_args.append(comparison)
 
         return and_(*and_clause_args)
 
-    def _build_id_attribute_comparison(cls, pk_name, pk_attributes):
-        return getattr(cls, pk_name) == pk_attributes[pk_name]
+    def _build_attribute_comparison(cls, attr_name, attributes):
+        return getattr(cls, attr_name) == attributes[attr_name]
 
     def get(cls, session, ids=None, limit=None, offset=None, todict=True, **kwargs):
         if ids is None:
@@ -248,18 +248,27 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
         query = session.query(cls)
 
         if kwargs:
-            for model_name, ids in kwargs.items():
-                relationship = cls.__relationships__.get(model_name)
-                if not relationship:
-                    raise ModelBaseError("invalid model '{}'".format(model_name), input_=kwargs)
+            for prop_name, value in kwargs.items():
+                if isinstance(value, dict):
+                    relationship = cls.__relationships__.get(prop_name)
+                    if not relationship:
+                        raise ModelBaseError("invalid model '{}'".format(prop_name), input_=kwargs)
 
-                secondary = relationship.prop.secondary
-                model  = cls.get_model_from_rel(relationship)
-                join = secondary if secondary is not None else model
+                    secondary = relationship.prop.secondary
+                    model  = cls.get_model_from_rel(relationship)
+                    join = secondary if secondary is not None else model
 
-                ids = cls._to_list(ids)
-                filters = model.build_filters_by_ids(ids)
-                query = query.join(join).filter(filters)
+                    ids = cls._to_list(value)
+                    filters = model.build_filters_by_ids(ids)
+                    query = query.join(join)
+
+                elif isinstance(value, list):
+                    filters = cls.build_filters_by_ids([{prop_name: v} for v in value])
+
+                else:
+                    filters = cls.build_filters_by_ids([{prop_name: value}])
+
+                query = query.filter(filters)
 
         return query
 
@@ -310,6 +319,8 @@ class _SQLAlchemyModel(ModelBase):
 
         for key, value in kwargs.items():
             self._setattr(key, value, session, input_)
+
+        self._validate()
 
     def _setattr(self, attr_name, value, session, input_):
         cls = type(self)
@@ -429,6 +440,9 @@ class _SQLAlchemyModel(ModelBase):
         else:
             if rel_inst not in getattr(self, attr_name):
                 getattr(self, attr_name).append(rel_inst)
+
+    def _validate(self):
+        pass
 
     def get_related(self, session):
         related = set()

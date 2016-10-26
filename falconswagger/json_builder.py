@@ -96,8 +96,13 @@ class JsonBuilderMeta(type):
         nested_types.add('object')
         for prop in properties:
             key, value = prop.split(':')
+            prop_schema = schema['properties'].get(key)
+            if prop_schema is None:
+                raise ValidationError("Invalid property '{}'".format(key),
+                    instance=input_, schema=schema)
+
             dict_obj[key] = \
-                cls._build_value(value, schema['properties'][key], nested_types, input_)
+                cls._build_value(value, prop_schema, nested_types, input_)
 
         nested_types.discard('object')
         return dict_obj
