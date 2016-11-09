@@ -250,20 +250,15 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
         if kwargs:
             for prop_name, value in kwargs.items():
                 if isinstance(value, dict):
-                    relationship = cls.__relationships__.get(prop_name)
-                    if not relationship:
-                        raise ModelBaseError("invalid model '{}'".format(prop_name), input_=kwargs)
-
-                    secondary = relationship.prop.secondary
-                    model  = cls.get_model_from_rel(relationship)
-                    join = secondary if secondary is not None else model
-
-                    ids = cls._to_list(value)
-                    filters = model.build_filters_by_ids(ids)
-                    query = query.join(join)
+                    query, filters = \
+                        cls._get_query_and_filters_by_relationship(prop_name, value, kwargs, query)
 
                 elif isinstance(value, list):
-                    filters = cls.build_filters_by_ids([{prop_name: v} for v in value])
+                    if value and isinstance(value[0], dict):
+                        query, filters = cls._get_query_and_filters_by_relationship(
+                            prop_name, value, kwargs, query)
+                    else:
+                        filters = cls.build_filters_by_ids([{prop_name: v} for v in value])
 
                 else:
                     filters = cls.build_filters_by_ids([{prop_name: value}])
@@ -271,6 +266,21 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
                 query = query.filter(filters)
 
         return query
+
+    def _get_query_and_filters_by_relationship(cls, prop_name, value, kwargs, query):
+        relationship = cls.__relationships__.get(prop_name)
+        if not relationship:
+            raise ModelBaseError("invalid model '{}'".format(prop_name), input_=kwargs)
+
+        secondary = relationship.prop.secondary
+        model  = cls.get_model_from_rel(relationship)
+        join = secondary if secondary is not None else model
+
+        ids = cls._to_list(value)
+        filters = model.build_filters_by_ids(ids)
+        query = query.join(join)
+
+        return query, filters
 
     def _get_many(cls, session, ids, todict, kwargs):
         if not todict or session.redis_bind is None:
