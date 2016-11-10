@@ -293,7 +293,7 @@ class ModelRouter(object):
                         node = nodes_tree.get(node_name)
                         nodes_tree = node
                         if isinstance(nodes_tree, dict) and not nodes_tree:
-                            self._nodes[last_path_node].pop(node_name)
+                            self._nodes[last_path_node].pop(node_name, None)
 
     def get_route_and_params(self, req):
         path_nodes = deque(req.path.strip('/').split('/'))
