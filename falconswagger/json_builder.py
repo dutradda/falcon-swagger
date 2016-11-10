@@ -24,6 +24,7 @@
 from falconswagger.exceptions import ModelBaseError
 from jsonschema import ValidationError
 from copy import deepcopy
+import json
 
 
 class JsonBuilderMeta(type):
@@ -38,7 +39,10 @@ class JsonBuilderMeta(type):
         return float(value)
 
     def _build_boolean(cls, value):
-        return bool(value)
+        value = json.loads(value)
+        if not isinstance(value, bool):
+            raise ValueError(value)
+        return value
 
     def _build_integer(cls, value):
         return int(value)
