@@ -235,8 +235,14 @@ class ModelBaseRoutesMixinMeta(type):
 
         for uri_template, methods_names in routes.items():
             if not 'OPTIONS' in methods_names:
+                options_operation = create_default_options(methods_names)
+                uri_template_norm = uri_template.replace('{', '_').replace('}', '_')
+                options_operation_name = '{}_{}'.format('options', uri_template_norm)
+                setattr(cls, options_operation_name, options_operation)
+
                 route = Route(uri_template, 'OPTIONS',
-                    create_default_options(methods_names), {}, [], {}, cls)
+                    options_operation_name, {}, [], {}, cls)
+                cls.__routes__.add(route)
 
     def build_schema_uri_template(cls):
         return '/' + cls.__key__ + '/_schema/'

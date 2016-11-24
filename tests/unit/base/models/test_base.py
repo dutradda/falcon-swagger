@@ -90,7 +90,8 @@ class TestModelBaseErrors(object):
         router.add_model(model)
         with pytest.raises(HTTPMethodNotAllowed) as exc_info:
             route, _ = router.get_route_and_params(req)
-        assert exc_info.value.headers == {'Allow': 'POST'}
+        assert exc_info.value.headers == {'Allow': 'POST, OPTIONS'} or \
+            exc_info.value.headers == {'Allow': 'OPTIONS, POST'}
 
 
 class TestModelBase(object):
