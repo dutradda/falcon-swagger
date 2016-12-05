@@ -1071,6 +1071,9 @@
         },
         "oneOf": {
           "$ref": "http://json-schema.org/draft-04/schema#/properties/oneOf"
+        },
+        "patternProperties": {
+          "$ref": "http://json-schema.org/draft-04/schema#/properties/patternProperties"
         }
       },
       "additionalProperties": false
@@ -1115,13 +1118,7 @@
         "externalDocs": {
           "$ref": "#/definitions/externalDocs"
         },
-        "example": {},
-        "anyOf": {
-          "$ref": "http://json-schema.org/draft-04/schema#/properties/anyOf"
-        },
-        "oneOf": {
-          "$ref": "http://json-schema.org/draft-04/schema#/properties/oneOf"
-        }
+        "example": {}
       },
       "additionalProperties": false
     },
