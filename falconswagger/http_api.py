@@ -25,18 +25,19 @@ from falcon import API, HTTP_INTERNAL_SERVER_ERROR, HTTP_BAD_REQUEST, HTTPError,
 from falconswagger.middlewares import SessionMiddleware
 from falconswagger.router import ModelRouter
 from falconswagger.exceptions import JSONError, ModelBaseError, UnauthorizedError
+from falconswagger.mixins import LoggerMixin
 from sqlalchemy.exc import IntegrityError
 from jsonschema import ValidationError
 import logging
 import json
 
 
-class HttpAPI(API):
+class HttpAPI(API, LoggerMixin):
 
     def __init__(self, models, sqlalchemy_bind=None, redis_bind=None):
         API.__init__(self, router=ModelRouter(),
             middleware=SessionMiddleware(sqlalchemy_bind, redis_bind))
-        self._logger = logging.getLogger(type(self).__module__ + '.' + type(self).__name__)
+        self._build_logger()
         self.add_route = None
         del self.add_route
         self.models = dict()
