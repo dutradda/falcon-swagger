@@ -241,21 +241,21 @@ class TestRedisModelMetaGetAll(object):
         session.redis_bind.hkeys.return_value = ['1'.encode(), '2'.encode()]
         model.get(session, limit=1)
 
-        assert session.redis_bind.hmget.call_args_list == [mock.call('test', ['1'])]
+        assert session.redis_bind.hmget.call_args_list == [mock.call('test', '1')]
 
     def test_get_all_with_limit_and_offset(self, model):
         session = mock.MagicMock()
         session.redis_bind.hkeys.return_value = ['1'.encode(), '2'.encode(), '3'.encode()]
         model.get(session, limit=2, offset=1)
 
-        assert session.redis_bind.hmget.call_args_list == [mock.call('test', ['2', '3'])]
+        assert session.redis_bind.hmget.call_args_list == [mock.call('test', '2', '3')]
 
     def test_get_all_with_offset(self, model):
         session = mock.MagicMock()
         session.redis_bind.hkeys.return_value = ['1'.encode(), '2'.encode(), '3'.encode()]
         model.get(session, offset=2)
 
-        assert session.redis_bind.hmget.call_args_list == [mock.call('test', ['3'])]
+        assert session.redis_bind.hmget.call_args_list == [mock.call('test', '3')]
 
 
 class TestRedisModelMetaGetMany(object):

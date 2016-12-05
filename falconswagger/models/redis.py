@@ -126,7 +126,10 @@ class RedisModelMeta(ModelBaseMeta):
 
         if ids is None:
             keys = [k.decode() for k in session.redis_bind.hkeys(cls.__key__)][offset:limit]
-            return cls._unpack_objs(session.redis_bind.hmget(cls.__key__, keys))
+            if keys:
+                return cls._unpack_objs(session.redis_bind.hmget(cls.__key__, *keys))
+            else:
+                return []
         else:
             ids = [cls._build_key(id_) for id_ in cls._to_list(ids)]
             return cls._unpack_objs(session.redis_bind.hmget(cls.__key__, *ids[offset:limit]))
