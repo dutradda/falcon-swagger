@@ -146,7 +146,7 @@ class _RedisModel(dict, ModelBase):
         if keys is None:
             keys = type(self).__id_names__
 
-        return tuple([self.get_(key) for key in sorted(keys)])
+        return tuple([dict.get(self, key) for key in sorted(keys)])
 
     def set_ids(self, values, keys=None):
         if keys is None:
@@ -182,5 +182,4 @@ class RedisModelBuilder(object):
         model.update = MethodType(metaclass.update, model)
         model.update_ = MethodType(dict.update, model)
         model.get = MethodType(metaclass.get, model)
-        model.get_ = dict.get
         return model
