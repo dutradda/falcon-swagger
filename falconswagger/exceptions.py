@@ -72,3 +72,6 @@ class UnauthorizedError(FalconSwaggerError):
     def __init__(self, message, realm, status=HTTP_UNAUTHORIZED):
         headers = {'WWW-Authenticate': 'Basic realm="{}"'.format(realm)}
         FalconSwaggerError.__init__(self, message, status, headers)
+
+class SwaggerAPIError(Exception):
+    pass

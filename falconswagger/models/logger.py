@@ -21,23 +21,10 @@
 # SOFTWARE.
 
 
-import os
-import sys
-import pytest
+import logging
 
 
-ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(ROOT_PATH, '..'))
+class ModelLoggerMetaMixin(type):
 
-
-from falconswagger.models.orm.sqlalchemy_redis import ModelSQLAlchemyRedisFactory
-
-
-@pytest.fixture
-def model_base():
-    return ModelSQLAlchemyRedisFactory.make()
-
-
-@pytest.fixture
-def root_path():
-    return ROOT_PATH
+    def _set_logger(cls):
+        cls._logger = logging.getLogger(cls.__module__ + '.' + cls.__name__)

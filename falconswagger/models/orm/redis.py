@@ -21,14 +21,14 @@
 # SOFTWARE.
 
 
-from falconswagger.models.base import ModelBaseMeta, ModelBase
+from falconswagger.models.orm.redis_base import ModelRedisBaseMeta, ModelRedisBase
 from collections import OrderedDict
 from copy import deepcopy
 from types import MethodType
 import msgpack
 
 
-class RedisModelMeta(ModelBaseMeta):
+class ModelRedisMeta(ModelRedisBaseMeta):
     CHUNKS = 100
 
     def insert(cls, session, objs, **kwargs):
@@ -140,7 +140,7 @@ class RedisModelMeta(ModelBaseMeta):
         return [msgpack.loads(obj, encoding='utf-8') for obj in objs if obj is not None]
 
 
-class _RedisModel(dict, ModelBase):
+class _ModelRedis(dict, ModelRedisBase):
 
     def get_ids_values(self, keys=None):
         if keys is None:
@@ -163,22 +163,21 @@ class _RedisModel(dict, ModelBase):
         return {key: self[key] for key in keys}
 
 
-class RedisModelBuilder(object):
+class ModelRedisFactory(object):
 
-    def __new__(cls, class_name, key, id_names, schema, metaclass=None):
-        return cls._build_model(class_name, key, id_names, schema, metaclass)
-
-    @classmethod
-    def _build_model(cls, class_name, key, id_names, schema, metaclass):
+    @staticmethod
+    def make(class_name, key, id_names, schema=None, metaclass=None):
         if metaclass is None:
-            metaclass = RedisModelMeta
+            metaclass = ModelRedisMeta
 
         attributes = {
             '__key__': key,
             '__id_names__': tuple(id_names),
-            '__schema__': schema
         }
-        model = metaclass(class_name, (_RedisModel,), attributes)
+        if schema is not None:
+            attributes['__schema__'] = schema
+
+        model = metaclass(class_name, (_ModelRedis,), attributes)
         model.update = MethodType(metaclass.update, model)
         model.update_ = MethodType(dict.update, model)
         model.get = MethodType(metaclass.get, model)

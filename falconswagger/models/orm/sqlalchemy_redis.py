@@ -36,14 +36,17 @@ from re import match as re_match, sub as re_sub
 from glob import glob
 
 from falconswagger.exceptions import ModelBaseError
-from falconswagger.models.base import ModelBaseMeta, ModelBase
+from falconswagger.models.orm.redis_base import ModelRedisBaseMeta, ModelRedisBase
+from falconswagger.models.logger import ModelLoggerMetaMixin
+from falconswagger.models.http import ModelHttpMetaMixin
 
 import json
 import msgpack
 import os.path
 
 
-class SQLAlchemyModelInitMixinMeta(DeclarativeMeta, ModelBaseMeta):
+class ModelSQLAlchemyRedisInitMetaMixin(
+    DeclarativeMeta, ModelRedisBaseMeta):
 
     def __init__(cls, name, bases_classes, attributes):
         DeclarativeMeta.__init__(cls, name, bases_classes, attributes)
@@ -70,8 +73,8 @@ class SQLAlchemyModelInitMixinMeta(DeclarativeMeta, ModelBaseMeta):
             cls.__todict_schema__ = {}
             base_class.__all_models__[cls.__key__] = cls
             cls._build_backrefs_for_all_models(base_class.__all_models__.values())
+            ModelRedisBaseMeta.__init__(cls, name, bases_classes, attributes)
 
-            ModelBaseMeta.__init__(cls, name, bases_classes, attributes)
         else:
             cls.__baseclass_name__= name
             cls.__all_models__ = dict()
@@ -141,7 +144,7 @@ class SQLAlchemyModelInitMixinMeta(DeclarativeMeta, ModelBaseMeta):
         return cls.__all_models__[name]
 
 
-class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
+class ModelSQLAlchemyRedisOperationsMetaMixin(type):
 
     def insert(cls, session, objs, commit=True, todict=True, **kwargs):
         input_ = deepcopy(objs)
@@ -315,13 +318,13 @@ class SQLAlchemyModelOperationsMixinMeta(DeclarativeMeta, ModelBaseMeta):
         return objs
 
 
-class SQLAlchemyModelMeta(
-        SQLAlchemyModelInitMixinMeta,
-        SQLAlchemyModelOperationsMixinMeta):
+class ModelSQLAlchemyRedisMeta(
+        ModelSQLAlchemyRedisInitMetaMixin,
+        ModelSQLAlchemyRedisOperationsMetaMixin):
     pass
 
 
-class _SQLAlchemyModel(ModelBase):
+class _ModelSQLAlchemyRedisBase(ModelRedisBase):
 
     def __init__(self, session, input_=None, **kwargs):
         if input_ is None:
@@ -516,13 +519,14 @@ class _SQLAlchemyModel(ModelBase):
                 dict_inst[rel_name] = relationships
 
 
-class SQLAlchemyRedisModelBuilder(object):
+class ModelSQLAlchemyRedisFactory(object):
 
-    def __new__(cls, name='SQLAlchemyRedisModelBase', bind=None, metadata=None,
+    @staticmethod
+    def make(name='ModelSQLAlchemyRedisBase', bind=None, metadata=None,
                 mapper=None, class_registry=None, authorizer=None):
         base = declarative_base(
-            name=name, metaclass=SQLAlchemyModelMeta,
-            cls=_SQLAlchemyModel, bind=bind, metadata=metadata,
-            mapper=mapper, constructor=_SQLAlchemyModel.__init__)
+            name=name, metaclass=ModelSQLAlchemyRedisMeta,
+            cls=_ModelSQLAlchemyRedisBase, bind=bind, metadata=metadata,
+            mapper=mapper, constructor=_ModelSQLAlchemyRedisBase.__init__)
         base.__authorizer__ = authorizer
         return base

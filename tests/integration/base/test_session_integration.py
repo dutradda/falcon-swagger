@@ -24,8 +24,8 @@
 from sqlalchemy.ext.declarative import declarative_base
 from unittest import mock
 
-from falconswagger.session import Session
-from falconswagger.models.sqlalchemy_redis import SQLAlchemyRedisModelBuilder
+from falconswagger.models.orm.session import Session
+from falconswagger.models.orm.sqlalchemy_redis import ModelSQLAlchemyRedisFactory
 
 import msgpack
 import pytest
@@ -34,7 +34,7 @@ import sqlalchemy as sa
 
 @pytest.fixture
 def model_base():
-    return SQLAlchemyRedisModelBuilder()
+    return ModelSQLAlchemyRedisFactory.make()
 
 
 @pytest.fixture
@@ -335,7 +335,7 @@ def model3_related(request, model_base, redis, session, model2_related):
     return model_
 
 
-@mock.patch('falconswagger.session.msgpack', new=mock.MagicMock(dumps=lambda x: x))
+@mock.patch('falconswagger.models.orm.session.msgpack', new=mock.MagicMock(dumps=lambda x: x))
 class TestSessionCommitWithNestedRelatedModels(object):
     def test_redis_update_nested_related(self, session, model1_related, model2_related, model3_related, redis):
         m1 = model1_related(session)

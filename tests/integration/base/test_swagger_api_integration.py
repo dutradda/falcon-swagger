@@ -1,4 +1,4 @@
-from falconswagger.http_api import HttpAPI
+from falconswagger.swagger_api import SwaggerAPI
 from unittest import mock
 from jsonschema import Draft4Validator
 from pytest_falcon.plugin import Client
@@ -53,7 +53,7 @@ def model1(model_base):
 
 @pytest.fixture
 def app(model1, session):
-    app_ = HttpAPI([model1], session.bind, session.redis_bind)
+    app_ = SwaggerAPI([model1], session.bind, session.redis_bind, title='Test API')
     return app_
 
 
@@ -94,11 +94,11 @@ def model1_with_schema(session, model_base):
 
 @pytest.fixture
 def client_with_schema(model1_with_schema, session):
-    app_ = HttpAPI([model1_with_schema], session.bind, session.redis_bind)
+    app_ = SwaggerAPI([model1_with_schema], session.bind, session.redis_bind, title='Test API')
     return Client(app_)
 
 
-class TestHttpAPIErrorHandlingPOST(object):
+class TestSwaggerAPIErrorHandlingPOST(object):
 
     def test_integrity_error_handling_with_duplicated_key(self, client, model1):
         data = json.dumps([{'id': 1}, {'id': 1}])

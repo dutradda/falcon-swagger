@@ -24,6 +24,7 @@
 from falconswagger.json_builder import JsonBuilder
 from falconswagger.exceptions import ModelBaseError, JSONError
 from falconswagger.hooks import authorization_hook
+from falconswagger.utils import build_validator
 from collections import defaultdict, deque
 from jsonschema import RefResolver, Draft4Validator
 from falcon import HTTP_METHODS, HTTPMethodNotAllowed
@@ -36,12 +37,6 @@ import json
 DefaultDict = lambda: defaultdict(DefaultDict)
 
 
-def build_validator(schema, path):
-    handlers = {'': URISchemaHandler(path)}
-    resolver = RefResolver.from_schema(schema, handlers=handlers)
-    return Draft4Validator(schema, resolver=resolver)
-
-
 def _build_private_method_name(method_name):
         return '__{}__'.format(method_name)
 
@@ -49,40 +44,30 @@ def _build_private_method_name(method_name):
 PRIVATE_METHODS_KEYS = set([_build_private_method_name(method) for method in HTTP_METHODS])
 
 
-class URISchemaHandler(object):
-
-    def __init__(self, schemas_path):
-        self._schemas_path = schemas_path
-
-    def __call__(self, uri):
-        schema_filename = os.path.join(self._schemas_path, uri.lstrip('/'))
-        with open(schema_filename) as json_schema_file:
-            return json.load(json_schema_file)
-
-
 class Route(object):
 
     def __init__(
-            self, uri_template, method_name, operation_name,
-            schema, all_methods_parameters, definitions, model):
+            self, uri_template, method_name, operation_name, module,
+            schema, definitions, authorizer=None):
         self.uri_template = uri_template
         self.method_name = method_name
-        self.model = model
         self._operation_name = operation_name
+        self.module = module
+        self._authorizer = authorizer
         self._body_validator = None
         self._uri_template_validator = None
         self._query_string_validator = None
         self._headers_validator = None
-        self._model_dir = model.get_module_path()
+        self._schema_dir = module.__schema_dir__
         self._body_required = False
         self._has_body_parameter = False
-        self._has_auth = False
+        self._auth_required = False
 
         query_string_schema = self._build_default_schema()
         uri_template_schema = self._build_default_schema()
         headers_schema = self._build_default_schema()
 
-        for parameter in all_methods_parameters + schema.get('parameters', []):
+        for parameter in schema.get('parameters', []):
             if parameter['in'] == 'body':
                 if definitions:
                     body_schema = deepcopy(parameter['schema'])
@@ -90,7 +75,7 @@ class Route(object):
                 else:
                     body_schema = parameter['schema']
 
-                self._body_validator = build_validator(body_schema, self._model_dir)
+                self._body_validator = build_validator(body_schema, self._schema_dir)
                 self._body_required = parameter.get('required', False)
                 self._has_body_parameter = True
 
@@ -104,15 +89,20 @@ class Route(object):
                 self._set_parameter_on_schema(parameter, headers_schema)
 
         if uri_template_schema['properties']:
-            self._uri_template_validator = build_validator(uri_template_schema, self._model_dir)
+            self._uri_template_validator = build_validator(uri_template_schema, self._schema_dir)
 
         if query_string_schema['properties']:
-            self._query_string_validator = build_validator(query_string_schema, self._model_dir)
+            self._query_string_validator = build_validator(query_string_schema, self._schema_dir)
 
         if headers_schema['properties']:
-            self._has_auth = ('Authorization' in headers_schema['properties']) \
-                and ('Authorization' in headers_schema.get('required', []))
-            self._headers_validator = build_validator(headers_schema, self._model_dir)
+            has_auth = ('Authorization' in headers_schema['properties'])
+            if has_auth and self._authorizer is None:
+                raise ModelBaseError("'authorizer' must be setted with Authorization header setted")
+
+            self._auth_required = (has_auth
+                and ('Authorization' in headers_schema.get('required', [])))
+
+            self._headers_validator = build_validator(headers_schema, self._schema_dir)
 
     def _build_default_schema(self):
         return {'type': 'object', 'required': [], 'properties': {}}
@@ -137,8 +127,8 @@ class Route(object):
         schema['properties'][name] = property_
 
     def __call__(self, req, resp, **kwargs):
-        if self._has_auth or req.get_header('Authorization'):
-            authorization_hook(req, resp, self.model, kwargs)
+        if self._auth_required:
+            authorization_hook(self._authorizer, req, resp, kwargs)
 
         body_params = self._build_body_params(req)
         query_string_params = self._build_non_body_params(self._query_string_validator, req.params)
@@ -154,10 +144,7 @@ class Route(object):
         if self._body_validator:
             req.context['body_schema'] = self._body_validator.schema
 
-        if hasattr(self.model, '__schema__'):
-            resp.add_link(self.model.build_schema_uri_template(), 'schema')
-
-        getattr(self.model, self._operation_name)(req, resp)
+        getattr(self.module, self._operation_name)(req, resp)
 
     def _build_body_params(self, req):
         if req.content_length and (req.content_type is None or 'application/json' in req.content_type):
@@ -193,7 +180,7 @@ class Route(object):
                     param = kwargs.get(param_name)
 
                 if param:
-                    params[param_name] = JsonBuilder(param, prop)
+                    params[param_name] = JsonBuilder.build(param, prop)
 
             validator.validate(params)
             return params
@@ -230,13 +217,17 @@ class ModelRouter(object):
     def __init__(self):
         self._nodes = DefaultDict()
 
-    def add_model(self, model):
+    def add_model(self, model, base_path=''):
         for route in model.__routes__:
-            uri_template = route.uri_template.strip('/')
-            uri_nodes = deque([UriNode(uri_node) for uri_node in uri_template.split('/')])
-            nodes_tree = self._nodes
-            while uri_nodes:
-                nodes_tree = self._set_node(nodes_tree, uri_nodes, route)
+            self.add_route(route)
+
+    def add_route(self, route, base_path=''):
+        uri_template = route.uri_template.strip('/')
+        uri_template = base_path + uri_template
+        uri_nodes = deque([UriNode(uri_node) for uri_node in uri_template.split('/')])
+        nodes_tree = self._nodes
+        while uri_nodes:
+            nodes_tree = self._set_node(nodes_tree, uri_nodes, route)
 
     def _set_node(self, nodes_tree, uri_nodes, route):
         node_uri_template = uri_nodes.popleft()
@@ -250,8 +241,7 @@ class ModelRouter(object):
             if route_:
                 raise ModelBaseError(
                     "Route with uri_template '{}' and method '{}' was alreadly registered"
-                    " with model '{}'".format(node_uri_template, route.method_name,
-                        route_.model.__key__))
+                    .format(node_uri_template, route.method_name_))
             else:
                 last_node[private_method_name] = route
 
@@ -263,8 +253,8 @@ class ModelRouter(object):
                         if key.regex.match(node_uri_template.example):
                             raise ModelBaseError(
                                 "Ambiguous node uri_template '{}' and '{}'"
-                                " with model '{}'".format(
-                                    node_uri_template, key, route.model.__key__),
+                                .format(
+                                    node_uri_template, key),
                                 input_=nodes_tree)
 
             return nodes_tree[node_uri_template]
@@ -273,30 +263,8 @@ class ModelRouter(object):
         if node_uri_template in PRIVATE_METHODS_KEYS:
             raise ModelBaseError("invalid uri_template with '{}' value".format(node_uri_template))
 
-    def remove_model(self, model):
-        for route in model.__routes__:
-            path_nodes = route.uri_template.strip('/').split('/')
-            nodes_tree = self._nodes
-            for node_name in path_nodes:
-                nodes_tree = nodes_tree.get(node_name)
-                if not nodes_tree:
-                    break
-
-            if nodes_tree:
-                nodes_tree.pop(_build_private_method_name(route.method_name), None)
-
-                for _ in path_nodes:
-                    last_path_node = path_nodes[0]
-                    nodes_tree = self._nodes[last_path_node]
-
-                    for node_name in path_nodes[1:]:
-                        node = nodes_tree.get(node_name)
-                        nodes_tree = node
-                        if isinstance(nodes_tree, dict) and not nodes_tree:
-                            self._nodes[last_path_node].pop(node_name, None)
-
     def get_route_and_params(self, req):
-        path_nodes = deque(req.path.strip('/').split('/'))
+        path_nodes = deque(self._split_uri(req.path))
         params = dict()
         private_method_name = _build_private_method_name(req.method)
         nodes_tree = self._nodes
@@ -324,6 +292,9 @@ class ModelRouter(object):
 
         return route, params
 
+    def _split_uri(self, uri):
+        return uri.strip('/').split('/')
+
     def _match_uri_node_template_and_set_params(self, nodes_tree, path_node, params):
         match_complex = None
         match_simple = None
@@ -346,3 +317,30 @@ class ModelRouter(object):
             return match_simple
 
         return match_complex
+
+    def remove_model(self, model):
+        for route in model.__routes__:
+            self.remove_route(route)
+
+        for route in model.__options_routes__:
+            self.remove_route(route)
+
+    def remove_route(self, route):
+        path_nodes = route.uri_template.strip('/').split('/')
+        nodes_tree = self._nodes
+        nodes_tree_reverse = [nodes_tree]
+
+        for node_name in path_nodes:
+            nodes_tree = nodes_tree.get(node_name)
+            if nodes_tree is None:
+                break
+            else:
+                nodes_tree_reverse.append(nodes_tree)
+
+        if nodes_tree is not None: # this node_tree is a method_map
+            method_map = nodes_tree_reverse.pop()
+            method_map.pop(_build_private_method_name(route.method_name), None)
+
+            if not method_map:
+                while nodes_tree_reverse:
+                    nodes_tree_reverse.pop().pop(path_nodes.pop())

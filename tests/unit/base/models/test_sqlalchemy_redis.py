@@ -21,8 +21,8 @@
 # SOFTWARE.
 
 
-from falconswagger.models.sqlalchemy_redis import SQLAlchemyRedisModelBuilder, SQLAlchemyModelMeta
-from falconswagger.session import Session
+from falconswagger.models.orm.sqlalchemy_redis import ModelSQLAlchemyRedisFactory, ModelSQLAlchemyRedisMeta
+from falconswagger.models.orm.session import Session
 from falconswagger.exceptions import ModelBaseError
 from unittest import mock
 
@@ -32,7 +32,7 @@ import sqlalchemy as sa
 
 @pytest.fixture
 def model_base():
-    return SQLAlchemyRedisModelBuilder()
+    return ModelSQLAlchemyRedisFactory.make()
 
 
 @pytest.fixture
@@ -178,7 +178,7 @@ class TestModelBaseInit(object):
         with pytest.raises(ModelBaseError) as error:
             sa.ext.declarative.declarative_base(
                 name='Invalid',
-                metaclass=SQLAlchemyModelMeta, cls=model)
+                metaclass=ModelSQLAlchemyRedisMeta, cls=model)
 
         assert error.value.args == (
             "'Invalid' class must inherit from 'Test'",)

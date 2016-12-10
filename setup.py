@@ -1,20 +1,88 @@
-# Copyright 2016 Diogo Dutra
+# MIT License
 
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
+# Copyright (c) 2016 Diogo Dutra
 
-#     http://www.apache.org/licenses/LICENSE-2.0
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
 
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
 
 
 from falconswagger.version import VERSION
-from setuptools import setup, find_packages
+from setuptools import setup, find_packages, Extension
+import glob
+import imp
+import io
+import os
+from os import path
+import sys
+
+MYDIR = path.abspath(os.path.dirname(__file__))
+JYTHON = 'java' in sys.platform
+
+try:
+    sys.pypy_version_info
+    PYPY = True
+except AttributeError:
+    PYPY = False
+
+if PYPY or JYTHON:
+    CYTHON = False
+else:
+    try:
+        from Cython.Distutils import build_ext
+        CYTHON = True
+    except ImportError:
+        # TODO(kgriffs): pip now ignores all output, so the user
+        # may not see this message. See also:
+        #
+        #   https://github.com/pypa/pip/issues/2732
+        #
+        print('\nNOTE: Cython not installed. '
+              'Falcon will still work fine, but may run '
+              'a bit slower.\n')
+        CYTHON = False
+
+if CYTHON:
+    def list_modules(dirname):
+        filenames = glob.glob(path.join(dirname, '*.py'))
+
+        module_names = []
+        for name in filenames:
+            module, ext = path.splitext(path.basename(name))
+            if module != '__init__' and module != 'constants':
+                module_names.append(module)
+
+        return module_names
+
+    package_names = ['falconswagger', 'falconswagger.models']
+    ext_modules = [
+        Extension(
+            package + '.' + module,
+            [path.join(*(package.split('.') + [module + '.py']))]
+        )
+        for package in package_names
+        for module in list_modules(path.join(MYDIR, *package.split('.')))
+    ]
+
+    cmdclass = {'build_ext': build_ext}
+
+else:
+    cmdclass = {}
+    ext_modules = []
 
 
 long_description = ''
@@ -51,6 +119,8 @@ setup(
     ],
     tests_require=tests_require,
     install_requires=install_requires,
+    cmdclass=cmdclass,
+    ext_modules=ext_modules,
     classifiers=[
     	'License :: OSI Approved :: MIT License',
         'Development Status :: 3 - Alpha',

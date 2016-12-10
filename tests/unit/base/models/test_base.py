@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from falconswagger.models.base import ModelBaseMeta, ModelBase
+from falconswagger.models.orm.redis_base import ModelRedisBaseMeta, ModelRedisBase
 from falconswagger.router import ModelRouter
 from falconswagger.exceptions import ModelBaseError
 from falcon.errors import HTTPNotFound, HTTPMethodNotAllowed
@@ -32,12 +32,12 @@ import pytest
 
 class TestModelBaseErrors(object):
     def test_without_schema_and_without_key(self):
-        model = ModelBaseMeta('TestModel', (ModelBase,), {})
+        model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {})
         assert model.__key__ == 'test'
         assert not hasattr(model, '__schema__')
 
     def test_without_schema_and_with_key(self):
-        model = ModelBaseMeta('TestModel', (ModelBase,), {'__key__': 'test123'})
+        model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__key__': 'test123'})
         assert model.__key__ == 'test123'
 
     def test_with_schema_without_operation_id(self):
@@ -49,7 +49,7 @@ class TestModelBaseErrors(object):
             }
         }
         with pytest.raises(ValidationError) as exc_info:
-            ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
+            ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         assert exc_info.value.message == "'operationId' is a required property"
 
     def test_with_schema_with_operation_with_parameters_with_invalid_operationId(self):
@@ -67,7 +67,7 @@ class TestModelBaseErrors(object):
             }
         }
         with pytest.raises(ModelBaseError) as exc_info:
-            ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
+            ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         assert exc_info.value.args[0] == "'operationId' 'test' was not found"
 
     def test_raises_method_not_allowed_error(self):
@@ -85,40 +85,13 @@ class TestModelBaseErrors(object):
             }
         }
         req = mock.MagicMock(path='/test', method='GET')
-        model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
+        model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         router = ModelRouter()
         router.add_model(model)
         with pytest.raises(HTTPMethodNotAllowed) as exc_info:
             route, _ = router.get_route_and_params(req)
         assert exc_info.value.headers == {'Allow': 'POST, OPTIONS'} or \
             exc_info.value.headers == {'Allow': 'OPTIONS, POST'}
-
-
-class TestModelBase(object):
-    def test_resp_add_link(self):
-        schema = {
-            '/test': {
-                'post': {
-                    'responses': {'200': {'description': 'test'}},
-                    'operationId': 'post_by_body',
-                    'parameters': [{
-                        'name': 'test',
-                        'in': 'query',
-                        'type': 'array'
-                    }]
-                }
-            }
-        }
-        req = mock.MagicMock(path='/test', method='POST', params={})
-        req.get_header.return_value = None
-        resp = mock.MagicMock()
-        model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
-        model.insert = mock.MagicMock(return_value=[{}])
-        router = ModelRouter()
-        router.add_model(model)
-        route, _ = router.get_route_and_params(req)
-        route(req, resp)
-        assert resp.add_link.call_args_list == [mock.call('/test/_schema/', 'schema')]
 
 
 class TestModelBaseBuildsQueryStringParameters(object):
@@ -136,7 +109,7 @@ class TestModelBaseBuildsQueryStringParameters(object):
                 }
             }
         }
-        model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
+        model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
@@ -169,7 +142,7 @@ class TestModelBaseBuildsQueryStringParameters(object):
                 }
             }
         }
-        model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
+        model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
@@ -203,7 +176,7 @@ class TestModelBaseBuildsQueryStringParameters(object):
                 }
             }
         }
-        model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
+        model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
@@ -237,7 +210,7 @@ class TestModelBaseBuildsQueryStringParameters(object):
                 }
             }
         }
-        model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
+        model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
@@ -271,7 +244,7 @@ class TestModelBaseBuildsQueryStringParameters(object):
                 }
             }
         }
-        model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
+        model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
@@ -307,7 +280,7 @@ class TestModelBaseBuildsUriTemplateParameters(object):
                 }
             }
         }
-        model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
+        model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.get = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
@@ -341,7 +314,7 @@ class TestModelBaseBuildsUriTemplateParameters(object):
                 }
             }
         }
-        model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
+        model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.get = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
@@ -375,7 +348,7 @@ class TestModelBaseBuildsUriTemplateParameters(object):
                 }
             }
         }
-        model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
+        model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.get = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
@@ -409,13 +382,13 @@ class TestModelBaseBuildsHeadersParameters(object):
                 }
             }
         }
-        model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
+        model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
             path='/test',
             method='POST')
-        req.get_header.side_effect = [None, '1,2,3,4']
+        req.get_header.return_value = '1,2,3,4'
         resp = mock.MagicMock()
         router = ModelRouter()
         router.add_model(model)
@@ -423,7 +396,7 @@ class TestModelBaseBuildsHeadersParameters(object):
         route(req, resp)
         kwargs_expected = {'test': ['1', '2', '3', '4']}
 
-        assert req.get_header.call_args_list == [mock.call('Authorization'), mock.call('test')]
+        assert req.get_header.call_args_list == [mock.call('test')]
         assert model.insert.call_args_list == [
             mock.call(req.context['session'], req.context['parameters']['body'], **kwargs_expected)
         ]
@@ -443,13 +416,13 @@ class TestModelBaseBuildsHeadersParameters(object):
                 }
             }
         }
-        model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
+        model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
             path='/test',
             method='POST')
-        req.get_header.side_effect = [None, '1,2,3,4']
+        req.get_header.return_value = '1,2,3,4'
         resp = mock.MagicMock()
         router = ModelRouter()
         router.add_model(model)
@@ -476,13 +449,13 @@ class TestModelBaseBuildsHeadersParameters(object):
                 }
             }
         }
-        model = ModelBaseMeta('TestModel', (ModelBase,), {'__schema__': schema})
+        model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
             path='/test',
             method='POST')
-        req.get_header.side_effect = [None, '1,2,3,4']
+        req.get_header.return_value = '1,2,3,4'
         resp = mock.MagicMock()
         router = ModelRouter()
         router.add_model(model)

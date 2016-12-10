@@ -21,8 +21,8 @@
 # SOFTWARE.
 
 
-from falconswagger.models.sqlalchemy_redis import SQLAlchemyRedisModelBuilder
-from falconswagger.session import Session
+from falconswagger.models.orm.sqlalchemy_redis import ModelSQLAlchemyRedisFactory
+from falconswagger.models.orm.session import Session
 from falconswagger.exceptions import ModelBaseError
 from unittest import mock
 

@@ -21,23 +21,21 @@
 # SOFTWARE.
 
 
-import os
-import sys
-import pytest
+from falconswagger.utils import build_validator, get_model_schema, get_dir_path
+import json
+import os.path
 
 
-ROOT_PATH = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(os.path.join(ROOT_PATH, '..'))
+SWAGGER_TEMPLATE = get_model_schema(__file__, 'swagger_template.json')
 
 
-from falconswagger.models.orm.sqlalchemy_redis import ModelSQLAlchemyRedisFactory
+SWAGGER_SCHEMA = get_model_schema(__file__, 'swagger_schema_extended.json')
 
 
-@pytest.fixture
-def model_base():
-    return ModelSQLAlchemyRedisFactory.make()
+SWAGGER_VALIDATOR_FUNC = lambda module_path=get_dir_path(__file__): build_validator(
+	{'$ref': 'swagger_schema_extended.json#/definitions/paths'},
+	module_path
+)
 
 
-@pytest.fixture
-def root_path():
-    return ROOT_PATH
+SWAGGER_VALIDATOR = SWAGGER_VALIDATOR_FUNC()

@@ -26,12 +26,7 @@ from falcon import HTTP_FORBIDDEN, HTTP_METHODS
 from types import MethodType
 
 
-def authorization_hook(req, resp, model, params):
-    if model.__authorizer__ is None:
-        return
-
-    authorizer = model.__authorizer__
-
+def authorization_hook(authorizer, req, resp, params):
     authorization = req.auth
     if authorization is None:
         raise UnauthorizedError('Authorization header is required', authorizer.realm)

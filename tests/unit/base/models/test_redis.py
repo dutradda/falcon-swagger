@@ -21,17 +21,17 @@
 # SOFTWARE.
 
 
-from falconswagger.models.redis import RedisModelMeta, RedisModelBuilder
+from falconswagger.models.orm.redis import ModelRedisMeta, ModelRedisFactory
 from falconswagger.exceptions import ModelBaseError
 from unittest import mock
 import pytest
 import msgpack
 
 
-class TestRedisModelBuilder(object):
+class TestModelRedisFactory(object):
 
     def test_build(self):
-        model = RedisModelBuilder('TestModel', 'test', ['id'], {})
+        model = ModelRedisFactory.make('TestModel', 'test', ['id'], {})
         assert model.__name__ == 'TestModel'
         assert model.__key__ == 'test'
         assert model.__schema__ == {}
@@ -39,10 +39,10 @@ class TestRedisModelBuilder(object):
 
 @pytest.fixture
 def model():
-    return RedisModelBuilder('TestModel', 'test', ['id'], {})
+    return ModelRedisFactory.make('TestModel', 'test', ['id'], {})
 
 
-class TestRedisModelMetaInsert(object):
+class TestModelRedisMetaInsert(object):
 
     def test_without_objects(self, model):
         session = mock.MagicMock()
@@ -73,7 +73,7 @@ class TestRedisModelMetaInsert(object):
             mock.call('test', expected_map2)]
 
 
-class TestRedisModelMetaUpdateWithoutIDs(object):
+class TestModelRedisMetaUpdateWithoutIDs(object):
 
     def test_without_objects_and_without_ids(self, model):
         session = mock.MagicMock()
@@ -128,7 +128,7 @@ class TestRedisModelMetaUpdateWithoutIDs(object):
         ])
 
 
-class TestRedisModelMetaUpdateWithIDs(object):
+class TestModelRedisMetaUpdateWithIDs(object):
 
     def test_without_objects_and_with_ids(self, model):
         session = mock.MagicMock()
@@ -216,7 +216,7 @@ class TestRedisModelMetaUpdateWithIDs(object):
         ])
 
 
-class TestRedisModelMetaDelete(object):
+class TestModelRedisMetaDelete(object):
 
     def test_without_ids(self, model):
         session = mock.MagicMock()
@@ -229,7 +229,7 @@ class TestRedisModelMetaDelete(object):
         assert session.redis_bind.hdel.call_args_list == [mock.call('test', '(1,)')]
 
 
-class TestRedisModelMetaGetAll(object):
+class TestModelRedisMetaGetAll(object):
 
     def test_get_all(self, model):
         session = mock.MagicMock()
@@ -258,7 +258,7 @@ class TestRedisModelMetaGetAll(object):
         assert session.redis_bind.hmget.call_args_list == [mock.call('test', '3')]
 
 
-class TestRedisModelMetaGetMany(object):
+class TestModelRedisMetaGetMany(object):
 
     def test_get_many(self, model):
         session = mock.MagicMock()

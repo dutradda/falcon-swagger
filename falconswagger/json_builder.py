@@ -114,7 +114,8 @@ class JsonBuilderMeta(type):
 
 class JsonBuilder(metaclass=JsonBuilderMeta):
 
-    def __new__(cls, json_value, schema):
+    @classmethod
+    def build(cls, json_value, schema):
         nested_types = set()
         input_ = deepcopy(json_value)
         return cls._build_value(json_value, schema, nested_types, input_)

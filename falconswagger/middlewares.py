@@ -21,9 +21,8 @@
 # SOFTWARE.
 
 
-from falconswagger.session import Session
-from falconswagger.models.sqlalchemy_redis import SQLAlchemyModelMeta
-from falconswagger.models.redis import RedisModelMeta
+from falconswagger.models.orm.session import Session
+from falconswagger.models.orm.sqlalchemy_redis import ModelSQLAlchemyRedisMeta
 
 
 class SessionMiddleware(object):
@@ -33,7 +32,7 @@ class SessionMiddleware(object):
         self.redis_bind = redis_bind
 
     def process_resource(self, req, resp, model, uri_params):
-        if model.__session__:
+        if getattr(model, '__session__', None):
             req.context['session'] = model.__session__
             return
 
@@ -42,6 +41,6 @@ class SessionMiddleware(object):
     def process_response(self, req, resp, model):
         session = req.context.pop('session', None)
         if session is not None \
-                and isinstance(model, SQLAlchemyModelMeta) \
-                and not model.__session__:
+                and hasattr(session, 'close') \
+                and not getattr(model, '__session__', None):
             session.close()

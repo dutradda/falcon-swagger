@@ -22,7 +22,7 @@
 
 
 from falconswagger.hooks import authorization_hook, Authorizer
-from falconswagger.http_api import HttpAPI
+from falconswagger.swagger_api import SwaggerAPI
 from falcon import before as falcon_before
 from unittest import mock
 
@@ -42,6 +42,7 @@ def model(model_base):
                 return False
 
     class model(model_base):
+        __authorizer__ = MyAuth('test')
         __tablename__ = 'model'
         id = sa.Column(sa.Integer, primary_key=True)
         __schema__ = {
@@ -63,13 +64,12 @@ def model(model_base):
         def get_test(cls, req, resp, **kwargs):
             pass
 
-    model.__authorizer__ = MyAuth('test')
     return model
 
 
 @pytest.fixture
 def app(model):
-    return HttpAPI({model}, sqlalchemy_bind=mock.MagicMock())
+    return SwaggerAPI({model}, sqlalchemy_bind=mock.MagicMock(), title='Test API')
 
 
 class TestAuthorizationHook(object):

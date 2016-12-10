@@ -21,8 +21,8 @@
 # SOFTWARE.
 
 
-from falconswagger.models.redis import RedisModelBuilder
-from falconswagger.http_api import HttpAPI
+from falconswagger.models.orm.redis import ModelRedisFactory
+from falconswagger.swagger_api import SwaggerAPI
 from unittest import mock
 from fakeredis import FakeStrictRedis
 import pytest
@@ -119,10 +119,11 @@ def app():
             }
         }
     }
-    return HttpAPI([RedisModelBuilder('TestModel', 'test', ['id'], schema)], redis_bind=FakeStrictRedis())
+    return SwaggerAPI([ModelRedisFactory.make('TestModel', 'test', ['id'], schema)],
+                      redis_bind=FakeStrictRedis(), title='Test API')
 
 
-class TestRedisModelPost(object):
+class TestModelRedisPost(object):
     def test_post_without_ids(self, client):
         body = {
             'id': 1,

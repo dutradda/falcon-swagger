@@ -22,13 +22,13 @@
 
 
 from falconswagger.middlewares import SessionMiddleware
-from falconswagger.models.sqlalchemy_redis import SQLAlchemyRedisModelBuilder
+from falconswagger.models.orm.sqlalchemy_redis import ModelSQLAlchemyRedisFactory
 from unittest import mock
 
 import pytest
 
 
-SQLAlchemyRedisModelBase = SQLAlchemyRedisModelBuilder()
+ModelSQLAlchemyRedisBase = ModelSQLAlchemyRedisFactory.make()
 
 
 @pytest.fixture
@@ -52,7 +52,7 @@ class TestFalconSQLAlchemyRedisMiddleware(object):
         req = mock.MagicMock(
             method='POST', uri_template='/test', context=dict())
         resp = mock.MagicMock()
-        resource = SQLAlchemyRedisModelBase
+        resource = ModelSQLAlchemyRedisBase
         params = mock.MagicMock()
 
         sqlalchemy_middleware.process_resource(req, resp, resource, params)
@@ -66,7 +66,7 @@ class TestFalconSQLAlchemyRedisMiddleware(object):
         req = mock.MagicMock(
             method='POST', uri_template='/test', context={'session': session})
         resp = mock.MagicMock()
-        resource = SQLAlchemyRedisModelBase
+        resource = ModelSQLAlchemyRedisBase
         params = mock.MagicMock()
 
         sqlalchemy_middleware.process_response(req, resp, resource)
@@ -76,7 +76,7 @@ class TestFalconSQLAlchemyRedisMiddleware(object):
         req = mock.MagicMock(
             method='POST', uri_template='/test', context=dict())
         resp = mock.MagicMock()
-        resource = SQLAlchemyRedisModelBase
+        resource = ModelSQLAlchemyRedisBase
         params = mock.MagicMock()
 
         sqlalchemy_middleware.process_response(req, resp, resource)

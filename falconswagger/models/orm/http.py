@@ -21,8 +21,11 @@
 # SOFTWARE.
 
 
-from falconswagger.router import Route, build_validator
+from falconswagger.router import Route
+from falconswagger.utils import build_validator
 from falconswagger.exceptions import ModelBaseError, JSONError
+from falconswagger.models.logger import ModelLoggerMetaMixin
+from falconswagger.models.http import ModelJobsMetaMixin, ModelHttpMetaMixin
 from falcon.errors import HTTPNotFound, HTTPMethodNotAllowed
 from falcon import HTTP_CREATED, HTTP_NO_CONTENT, HTTP_METHODS
 from falcon.responders import create_default_options
@@ -31,31 +34,14 @@ from collections import defaultdict
 from copy import deepcopy
 from importlib import import_module
 from concurrent.futures import ThreadPoolExecutor
+from copy import deepcopy
 import json
 import os.path
 import logging
 import random
+import re
 
-
-def get_dir_path(filename):
-    return os.path.dirname(os.path.abspath(filename))
-
-
-def get_model_schema(filename, schema_name='schema.json'):
-    return json.load(open(os.path.join(get_dir_path(filename), schema_name)))
-
-
-def get_module_path(cls):
-    module_filename = import_module(cls.__module__).__file__
-    return get_dir_path(module_filename)
-
-
-SWAGGER_VALIDATOR = build_validator(
-    {'$ref': 'swagger_schema_extended.json#/definitions/paths'},
-    get_dir_path(__file__))
-
-
-class BaseModelRouteMeta(type):
+class _ModelContextMetaMixin(type):
 
     def _get_context_values(cls, context):
         session = context['session']
@@ -68,7 +54,8 @@ class BaseModelRouteMeta(type):
         return session, req_body, id_, kwargs
 
 
-class BaseModelPostMixinMeta(BaseModelRouteMeta):
+
+class _ModelPostMetaMixin(_ModelContextMetaMixin):
 
     def post_by_body(cls, req, resp):
         cls._insert(req, resp)
@@ -94,7 +81,7 @@ class BaseModelPostMixinMeta(BaseModelRouteMeta):
         cls._insert(req, resp, with_update=True)
 
 
-class BaseModelPutMixinMeta(BaseModelPostMixinMeta):
+class _ModelPutMetaMixin(_ModelPostMetaMixin):
 
     def put_by_body(cls, req, resp):
         cls._update(req, resp)
@@ -134,7 +121,7 @@ class BaseModelPutMixinMeta(BaseModelPostMixinMeta):
             resp.body = json.dumps(objs[0])
 
 
-class BaseModelPatchMixinMeta(BaseModelPutMixinMeta):
+class _ModelPatchMetaMixin(_ModelPutMetaMixin):
 
     def patch_by_body(cls, req, resp):
         cls._update(req, resp)
@@ -150,7 +137,7 @@ class BaseModelPatchMixinMeta(BaseModelPutMixinMeta):
             raise HTTPNotFound()
 
 
-class BaseModelDeleteMixinMeta(BaseModelRouteMeta):
+class _ModelDeleteMetaMixin(_ModelContextMetaMixin):
 
     def delete_by_body(cls, req, resp):
         session, req_body, _, kwargs = cls._get_context_values(req.context)
@@ -165,7 +152,7 @@ class BaseModelDeleteMixinMeta(BaseModelRouteMeta):
         resp.status = HTTP_NO_CONTENT
 
 
-class BaseModelGetMixinMeta(BaseModelRouteMeta):
+class _ModelGetMetaMixin(_ModelContextMetaMixin):
 
     def get_by_body(cls, req, resp):
         session, req_body, _, kwargs = cls._get_context_values(req.context)
@@ -193,128 +180,29 @@ class BaseModelGetMixinMeta(BaseModelRouteMeta):
         resp.body = json.dumps(cls.__schema__)
 
 
-class ModelBaseRoutesMixinMeta(type):
 
-    def __init__(cls, name, bases, attributes):
-        cls.__routes__ = set()
-        cls.__key__ = getattr(cls, '__key__', cls.__name__.replace('Model', '').lower())
-        cls._logger = logging.getLogger(cls.__module__ + '.' + cls.__name__)
-        schema = getattr(cls, '__schema__', None)
-
-        if schema:
-            SWAGGER_VALIDATOR.validate(schema)
-            cls._build_routes_from_schema(schema)
-
-    def get_module_path(cls):
-        return get_module_path(cls)
-
-    def _build_routes_from_schema(cls, schema):
-        for uri_template in schema:
-            all_methods_parameters = schema[uri_template].get('parameters', [])
-            for method_name in HTTP_METHODS:
-                method = schema[uri_template].get(method_name.lower())
-                if method:
-                    operation_id = method['operationId']
-                    try:
-                        action = getattr(cls, operation_id)
-                    except AttributeError:
-                        raise ModelBaseError("'operationId' '{}' was not found".format(operation_id))
-
-                    definitions = schema.get('definitions')
-                    route = Route(uri_template, method_name, operation_id,
-                                    method, all_methods_parameters, definitions, cls)
-                    cls.__routes__.add(route)
-
-        schema_route = \
-            Route(cls.build_schema_uri_template(), 'GET', 'get_schema', {}, [], {}, cls)
-        cls.__routes__.add(schema_route)
-
-        routes = defaultdict(set)
-        for route in cls.__routes__:
-            routes[route.uri_template].add(route.method_name)
-
-        for uri_template, methods_names in routes.items():
-            if not 'OPTIONS' in methods_names:
-                options_operation = create_default_options(methods_names)
-                uri_template_norm = uri_template.replace('{', '_').replace('}', '_')
-                options_operation_name = '{}_{}'.format('options', uri_template_norm)
-                setattr(cls, options_operation_name, options_operation)
-
-                route = Route(uri_template, 'OPTIONS',
-                    options_operation_name, {}, [], {}, cls)
-                cls.__routes__.add(route)
-
-    def build_schema_uri_template(cls):
-        return '/' + cls.__key__ + '/_schema/'
-
-
-class BaseModelJobsMixinMeta(type):
-    _jobs = dict()
+class ModelSessionJobsMetaMixin(ModelJobsMetaMixin):
+    _sessions = dict()
 
     def post_job(cls, req, resp):
-        job_hash = '{:x}'.format(random.getrandbits(128))
-        executor = ThreadPoolExecutor(2)
         job_session = req.context['session']
         job_session = type(job_session)(bind=job_session.bind.engine.connect(),
                                         redis_bind=job_session.redis_bind)
+        req.context['job_session'] = job_session
+        ModelJobsMetaMixin.post_job(cls, req, resp)
+        cls._sessions[json.loads(resp.body)['hash']] = job_session
 
-        job = executor.submit(cls._run_job, job_session, req, resp)
-        executor.submit(cls._job_watcher, executor, job, job_hash, job_session)
-
-        resp.body = json.dumps({'hash': job_hash})
-
-    def _run_job(cls, job_session, req, resp):
-        pass
-
-    def _job_watcher(cls, executor, job, job_hash, job_session):
-        cls._jobs[job_hash] = {'status': 'running'}
-
-        try:
-            result = job.result()
-        except Exception as error:
-            result = {'name': error.__class__.__name__, 'message': str(error)}
-            cls._jobs[job_hash] = {'status': 'error', 'result': result}
-            cls._logger.exception(error)
-        else:
-            cls._jobs[job_hash] = {'status': 'done', 'result': result}
-
-        job_session.bind.close()
-        job_session.close()
-        executor.shutdown()
-
-    def get_job(cls, req, resp):
-        status = cls._jobs.get(req.context['parameters']['query_string']['hash'])
-
-        if status is None:
-            raise HTTPNotFound()
-
-        resp.body = json.dumps(status)
+    def _job_watcher(cls, job, job_hash):
+        ModelJobsMetaMixin._job_watcher(cls, job, job_hash)
+        cls._sessions[job_hash].bind.close()
+        cls._sessions[job_hash].close()
+        cls._sessions.pop(job_hash)
 
 
-class ModelBaseMeta(
-        BaseModelPatchMixinMeta,
-        BaseModelDeleteMixinMeta,
-        BaseModelGetMixinMeta,
-        ModelBaseRoutesMixinMeta,
-        BaseModelJobsMixinMeta):
-
-    def _to_list(cls, objs):
-        return objs if isinstance(objs, list) else [objs]
-
-    def get_filters_names_key(cls):
-        return cls.__key__ + '_filters_names'
-
-    def get_key(cls, filters_names=None):
-        if not filters_names or filters_names == cls.__key__:
-            return cls.__key__
-
-        return '{}_{}'.format(cls.__key__, filters_names)
-
-
-class ModelBase(object):
-    __session__ = None
-    __authorizer__ = None
-    __api__ = None
-
-    def get_key(self, id_names=None):
-        return str(self.get_ids_values(id_names))
+class ModelOrmHttpMetaMixin(
+        ModelHttpMetaMixin,
+        _ModelPatchMetaMixin,
+        _ModelDeleteMetaMixin,
+        _ModelGetMetaMixin,
+        ModelSessionJobsMetaMixin):
+    pass

@@ -1,4 +1,5 @@
-include falconswagger/models/swagger_schema_extended.json
+include falconswagger/swagger_schema_extended.json
+include falconswagger/swagger_template.json
 include README.md
 include requirements.txt
 include requirements-dev.txt
