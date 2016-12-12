@@ -3,3 +3,4 @@ include falconswagger/swagger_template.json
 include README.md
 include requirements.txt
 include requirements-dev.txt
+include version.py
