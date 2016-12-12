@@ -21,7 +21,7 @@
 # SOFTWARE.
 
 
-from falconswagger.version import VERSION
+from version import VERSION
 from setuptools import setup, find_packages, Extension
 import glob
 import imp
