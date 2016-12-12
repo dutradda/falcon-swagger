@@ -24,7 +24,7 @@ class HelloModelMeta(ModelHttpMeta):
    }
 
    def get_hello_you(cls, req, resp):
-      you = req.context['parameters']['uri_template']['name']
+      you = req.context['parameters']['path']['name']
       resp.body = 'Hello {}!\n'.format(you)
                   
    def get_hello_world(cls, req, resp):

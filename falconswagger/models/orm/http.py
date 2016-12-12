@@ -47,7 +47,7 @@ class _ModelContextMetaMixin(type):
         session = context['session']
         parameters = context['parameters']
         req_body = parameters['body']
-        id_ = parameters['uri_template']
+        id_ = parameters['path']
         kwargs = deepcopy(parameters['headers'])
         kwargs.pop('Authorization', None)
         kwargs.update(parameters['query_string'])

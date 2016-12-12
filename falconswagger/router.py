@@ -136,7 +136,7 @@ class Route(object):
         headers_params = self._build_non_body_params(self._headers_validator, req, 'headers')
         req.context['parameters'] = {
             'query_string': query_string_params,
-            'uri_template': uri_template_params,
+            'path': uri_template_params,
             'headers': headers_params,
             'body': body_params
         }
