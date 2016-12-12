@@ -21,7 +21,6 @@
 # SOFTWARE.
 
 
-from version import VERSION
 from setuptools import setup, find_packages, Extension
 import glob
 import imp
@@ -83,6 +82,10 @@ if CYTHON:
 else:
     cmdclass = {}
     ext_modules = []
+
+
+with open('version.txt') as version_file:
+    VERSION = version_file.read()
 
 
 long_description = ''
