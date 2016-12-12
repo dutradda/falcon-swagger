@@ -103,41 +103,43 @@ class SwaggerAPI(API, LoggerMixin):
         self.swagger['definitions'] = definitions
 
     def associate_model(self, model):
-        if model.__api__ is not self:
-            if isinstance(model.__api__, SwaggerAPI):
-                model.__api__.disassociate_model(model)
+        if hasattr(model, '__schema__'):
+            if model.__api__ is not self:
+                if isinstance(model.__api__, SwaggerAPI):
+                    model.__api__.disassociate_model(model)
 
-            base_path = self.swagger.get('basePath', '')
-            base_path = '' if base_path == '/' else base_path
+                base_path = self.swagger.get('basePath', '')
+                base_path = '' if base_path == '/' else base_path
 
-            self._router.add_model(model, base_path)
-            self.models[model.__key__] = model
-            model.__api__ = self
+                self._router.add_model(model, base_path)
+                self.models[model.__key__] = model
+                model.__api__ = self
 
-            model_paths = deepcopy(model.__schema__)
-            definitions = {}
+                model_paths = deepcopy(model.__schema__)
+                definitions = {}
 
-            for definition, values in model_paths.pop('definitions', {}).items():
-                definitions['{}.{}'.format(model.__name__, definition)] = values
+                for definition, values in model_paths.pop('definitions', {}).items():
+                    definitions['{}.{}'.format(model.__name__, definition)] = values
 
-            for path in model_paths.values():
-                for method in path.values():
-                    if not isinstance(method, list):
-                        opId = method['operationId']
-                        method['operationId'] = '{}.{}'.format(model.__name__, opId)
+                for path in model_paths.values():
+                    for method in path.values():
+                        if not isinstance(method, list):
+                            opId = method['operationId']
+                            method['operationId'] = '{}.{}'.format(model.__name__, opId)
 
-            self._validate_model_paths(model_paths, model.__name__)
-            self.swagger['paths'].update(model_paths)
-            self.swagger['definitions'].update(definitions)
+                self._validate_model_paths(model_paths, model.__name__)
+                self.swagger['paths'].update(model_paths)
+                self.swagger['definitions'].update(definitions)
 
     def disassociate_model(self, model):
-        if model.__api__ is self:
-            self._router.remove_model(model)
-            self.models.pop(model.__key__)
-            [self.swagger['paths'].pop(path, None) for path in model.__schema__]
+        if hasattr(model, '__schema__'):
+            if model.__api__ is self:
+                self._router.remove_model(model)
+                self.models.pop(model.__key__)
+                [self.swagger['paths'].pop(path, None) for path in model.__schema__]
 
-            for definition in model.__schema__.get('definitions', {}):
-                self.swagger['definitions'].pop('{}.{}'.format(model.__name__, definition))
+                for definition in model.__schema__.get('definitions', {}):
+                    self.swagger['definitions'].pop('{}.{}'.format(model.__name__, definition))
 
     def _validate_model_paths(self, model_paths, model_name):
         for path in model_paths:
