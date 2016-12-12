@@ -84,7 +84,7 @@ else:
     ext_modules = []
 
 
-with open('version.txt') as version_file:
+with open(os.path.join(MYDIR, 'version.txt')) as version_file:
     VERSION = version_file.read()
 
 
