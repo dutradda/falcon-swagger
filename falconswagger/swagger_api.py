@@ -34,6 +34,7 @@ from jsonschema import ValidationError
 from copy import deepcopy
 import logging
 import json
+import re
 
 
 class SwaggerAPI(API, LoggerMixin):
@@ -128,6 +129,12 @@ class SwaggerAPI(API, LoggerMixin):
                             method['operationId'] = '{}.{}'.format(model.__name__, opId)
 
                 self._validate_model_paths(model_paths, model.__name__)
+                json_paths = json.dumps(model_paths)
+                re.subn(r'"#/definitions/([a-zA-Z0-9_]+)"',
+                        r'"#/definitions/{}.\1"'.format(model.__name__),
+                        json_paths)
+                json_paths = json.loads(json_paths)
+
                 self.swagger['paths'].update(model_paths)
                 self.swagger['definitions'].update(definitions)
 
