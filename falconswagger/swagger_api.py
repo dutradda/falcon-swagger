@@ -130,10 +130,10 @@ class SwaggerAPI(API, LoggerMixin):
 
                 self._validate_model_paths(model_paths, model.__name__)
                 json_paths = json.dumps(model_paths)
-                re.subn(r'"#/definitions/([a-zA-Z0-9_]+)"',
+                json_paths = re.sub(r'"#/definitions/([a-zA-Z0-9_]+)"',
                         r'"#/definitions/{}.\1"'.format(model.__name__),
                         json_paths)
-                json_paths = json.loads(json_paths)
+                model_paths = json.loads(json_paths)
 
                 self.swagger['paths'].update(model_paths)
                 self.swagger['definitions'].update(definitions)
