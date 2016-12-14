@@ -858,11 +858,11 @@ class TestModelBaseUpdate(object):
 class TestModelBaseGet(object):
     def test_if_query_get_calls_hmget_correctly(self, session, redis, model1):
         model1.get(session, {'id': 1})
-        assert redis.hmget.call_args_list == [mock.call('model1', ['(1,)'])]
+        assert redis.hmget.call_args_list == [mock.call('model1', ['1'])]
 
     def test_if_query_get_calls_hmget_correctly_with_two_ids(self, session, redis, model1):
         model1.get(session, [{'id': 1}, {'id': 2}])
-        assert redis.hmget.call_args_list == [mock.call('model1', ['(1,)', '(2,)'])]
+        assert redis.hmget.call_args_list == [mock.call('model1', ['1', '2'])]
 
     def test_if_query_get_builds_redis_left_ids_correctly_with_result_found_on_redis_with_one_id(
             self, model1, session, redis):
@@ -905,19 +905,19 @@ class TestModelBaseGet(object):
         session.add_all([model1(session, id=1), model1(session, id=2), model1(session, id=3)])
         session.commit()
         model1.get(session, [{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}], limit=2)
-        assert redis.hmget.call_args_list == [mock.call('model1', ['(1,)', '(2,)'])]
+        assert redis.hmget.call_args_list == [mock.call('model1', ['1', '2'])]
 
     def test_with_ids_and_offset(self, model1, session, redis):
         session.add_all([model1(session, id=1), model1(session, id=2), model1(session, id=3)])
         session.commit()
         model1.get(session, [{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}], offset=2)
-        assert redis.hmget.call_args_list == [mock.call('model1', ['(3,)', '(4,)'])]
+        assert redis.hmget.call_args_list == [mock.call('model1', ['3', '4'])]
 
     def test_with_ids_and_limit_and_offset(self, model1, session, redis):
         session.add_all([model1(session, id=1), model1(session, id=2), model1(session, id=3)])
         session.commit()
         model1.get(session, [{'id': 1}, {'id': 2}, {'id': 3}, {'id': 4}], limit=2, offset=1)
-        assert redis.hmget.call_args_list == [mock.call('model1', ['(2,)', '(3,)'])]
+        assert redis.hmget.call_args_list == [mock.call('model1', ['2', '3'])]
 
     def test_with_missing_id(self, model1, session, redis):
         session.add(model1(session, id=1))

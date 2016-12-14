@@ -69,4 +69,8 @@ class ModelRedisBase(object):
     __api__ = None
 
     def get_key(self, id_names=None):
-        return str(self.get_ids_values(id_names))
+        return type(self).get_instance_key(self, id_names)
+
+    @classmethod
+    def get_instance_key(cls, instance, id_names=None):
+        return '_%%sep%_'.join([str(v) for v in cls.get_ids_values(instance, id_names)])

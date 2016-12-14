@@ -142,18 +142,21 @@ class ModelRedisMeta(ModelRedisBaseMeta):
 
 class _ModelRedis(dict, ModelRedisBase):
 
-    def get_ids_values(self, keys=None):
+    @classmethod
+    def get_ids_values(cls, obj, keys=None):
         if keys is None:
-            keys = type(self).__id_names__
+            keys = cls.__id_names__
 
-        return tuple([dict.get(self, key) for key in sorted(keys)])
+        return tuple([dict.get(obj, key) for key in sorted(keys)])
 
-    def set_ids(self, values, keys=None):
+    @classmethod
+    def set_ids(cls, instance, key, keys=None):
         if keys is None:
-            keys = sorted(type(self).__id_names__)
+            keys = sorted(cls.__id_names__)
 
+        values = key.split('_%%sep%_')
         for key, value in zip(keys, values):
-            self[key] = value
+            instance[key] = value
 
     def get_ids_map(self, keys=None):
         if keys is None:
@@ -172,7 +175,7 @@ class ModelRedisFactory(object):
 
         attributes = {
             '__key__': key,
-            '__id_names__': tuple(id_names),
+            '__id_names__': sorted(tuple(id_names)),
         }
         if schema is not None:
             attributes['__schema__'] = schema

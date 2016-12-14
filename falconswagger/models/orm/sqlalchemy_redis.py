@@ -431,18 +431,19 @@ class _ModelSQLAlchemyRedisBase(ModelRedisBase):
                 getattr(self, attr_name).remove(rel_inst)
             else:
                 columns_str = ', '.join(rel_model.primaries_keys)
-                ids_str = ', '.join([str(id_) for id_ in rel_inst.get_ids_values()])
+                ids_str = ', '.join([str(id_) for id_ in type(rel_inst).get_ids_values(rel_inst)])
                 error_message = "can't remove model '{}' on column(s) '{}' with value(s) {}"
                 error_message = error_message.format(rel_model.__key__, columns_str, ids_str)
                 raise ModelBaseError(error_message, input_)
         else:
             setattr(self, attr_name, None)
 
-    def get_ids_values(self, id_names=None):
+    @classmethod
+    def get_ids_values(cls, obj, id_names=None):
         if id_names is None:
-            id_names = sorted(type(self).__id_names__)
+            id_names = cls.__id_names__
 
-        return tuple([getattr(self, id_name) for id_name in id_names])
+        return tuple([getattr(obj, id_name) for id_name in id_names])
 
     def _do_insert(self, session, attr_name, relationship, rel_values):
         rel_model = type(self).get_model_from_rel(relationship)
