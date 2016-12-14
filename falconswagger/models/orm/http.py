@@ -25,7 +25,7 @@ from falconswagger.router import Route
 from falconswagger.utils import build_validator
 from falconswagger.exceptions import ModelBaseError, JSONError
 from falconswagger.models.logger import ModelLoggerMetaMixin
-from falconswagger.models.http import ModelJobsMetaMixin, ModelHttpMetaMixin
+from falconswagger.models.http import ModelHttpMetaMixin
 from falcon.errors import HTTPNotFound, HTTPMethodNotAllowed
 from falcon import HTTP_CREATED, HTTP_NO_CONTENT, HTTP_METHODS
 from falcon.responders import create_default_options
@@ -181,22 +181,59 @@ class _ModelGetMetaMixin(_ModelContextMetaMixin):
 
 
 
-class ModelSessionJobsMetaMixin(ModelJobsMetaMixin):
-    _sessions = dict()
+class ModelJobsMetaMixin(type):
 
     def post_job(cls, req, resp):
         job_session = req.context['session']
         job_session = type(job_session)(bind=job_session.bind.engine.connect(),
                                         redis_bind=job_session.redis_bind)
         req.context['job_session'] = job_session
-        ModelJobsMetaMixin.post_job(cls, req, resp)
-        cls._sessions[json.loads(resp.body)['hash']] = job_session
 
-    def _job_watcher(cls, job, job_hash):
-        ModelJobsMetaMixin._job_watcher(cls, job, job_hash)
-        cls._sessions[job_hash].bind.close()
-        cls._sessions[job_hash].close()
-        cls._sessions.pop(job_hash)
+        job_hash = '{:x}'.format(random.getrandbits(128))
+        executor = ThreadPoolExecutor(2)
+
+        job = executor.submit(cls._run_job, req, resp)
+        executor.submit(cls._job_watcher, job, job_hash, job_session)
+
+        resp.body = json.dumps({'hash': job_hash})
+
+    def _run_job(cls, req, resp):
+        pass
+
+    def _job_watcher(cls, job, job_hash, session):
+        cls._set_job(job_hash, {'status': 'running'}, session)
+
+        try:
+            result = job.result()
+        except Exception as error:
+            result = {'name': error.__class__.__name__, 'message': str(error)}
+            status = 'error'
+            cls._logger.exception(error)
+
+        else:
+            status = 'done'
+
+        cls._set_job(job_hash, {'status': status, 'result': result}, session)
+        session.bind.close()
+        session.close()
+
+    def _set_job(cls, job_hash, status, session):
+        session.redis_bind.hset(cls._build_jobs_key(), job_hash, json.dumps(status))
+
+    def _build_jobs_key(cls):
+        return cls.__key__ + '_jobs'
+
+    def get_job(cls, req, resp):
+        job_hash = req.context['parameters']['query_string']['hash']
+        status = cls._get_job(job_hash, req.context['session'])
+
+        if status is None:
+            raise HTTPNotFound()
+
+        resp.body = status
+
+    def _get_job(cls, job_hash, session):
+        return session.redis_bind.hget(cls._build_jobs_key(), job_hash)
 
 
 class ModelOrmHttpMetaMixin(
@@ -204,5 +241,5 @@ class ModelOrmHttpMetaMixin(
         _ModelPatchMetaMixin,
         _ModelDeleteMetaMixin,
         _ModelGetMetaMixin,
-        ModelSessionJobsMetaMixin):
+        ModelJobsMetaMixin):
     pass

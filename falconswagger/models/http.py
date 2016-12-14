@@ -102,43 +102,7 @@ class ModelHttpMetaMixin(type):
                 cls.__routes__.add(route)
 
 
-class ModelJobsMetaMixin(type):
-    _jobs = dict()
-
-    def post_job(cls, req, resp):
-        job_hash = '{:x}'.format(random.getrandbits(128))
-        executor = ThreadPoolExecutor(2)
-
-        job = executor.submit(cls._run_job, req, resp)
-        executor.submit(cls._job_watcher, job, job_hash)
-
-        resp.body = json.dumps({'hash': job_hash})
-
-    def _run_job(cls, req, resp):
-        pass
-
-    def _job_watcher(cls, job, job_hash):
-        cls._jobs[job_hash] = {'status': 'running'}
-
-        try:
-            result = job.result()
-        except Exception as error:
-            result = {'name': error.__class__.__name__, 'message': str(error)}
-            cls._jobs[job_hash] = {'status': 'error', 'result': result}
-            cls._logger.exception(error)
-        else:
-            cls._jobs[job_hash] = {'status': 'done', 'result': result}
-
-    def get_job(cls, req, resp):
-        status = cls._jobs.get(req.context['parameters']['query_string']['hash'])
-
-        if status is None:
-            raise HTTPNotFound()
-
-        resp.body = json.dumps(status)
-
-
-class ModelHttpMeta(ModelLoggerMetaMixin, ModelHttpMetaMixin, ModelJobsMetaMixin):
+class ModelHttpMeta(ModelLoggerMetaMixin, ModelHttpMetaMixin):
     __authorizer__ = None
     __api__ = None
 
