@@ -212,6 +212,98 @@ class UriNode(str):
         return uri_node
 
 
+class DefaultDictRouter(object):
+    _method_map_key = '__method_map__'
+
+    def __init__(self):
+        self._nodes = DefaultDict()
+
+    def add_route(self, uri_template, method_map, resource, *args, **kwargs):
+        uri_nodes = deque([UriNode(uri_node) for uri_node in uri_template.split('/')])
+        nodes_tree = self._nodes
+        while uri_nodes:
+            nodes_tree = self._set_node(nodes_tree, uri_nodes, method_map, resource)
+
+    def _set_node(self, nodes_tree, uri_nodes, method_map, resource):
+        node_uri_template = uri_nodes.popleft()
+        self._raise_method_map_error(node_uri_template)
+
+        if len(uri_nodes) == 0:
+            last_node = nodes_tree[node_uri_template]
+            resource_method_map = last_node.get(type(self)._method_map_key)
+
+            if resource_method_map:
+                raise ModelBaseError(
+                    "Route with uri_template '{}' was alreadly registered by resource '{}'"
+                    .format(node_uri_template, str(resource_method_map[0])))
+            else:
+                last_node[type(self)._method_map_key] = (resource, method_map)
+
+        else:
+            if node_uri_template.is_complex:
+                for key in nodes_tree.keys():
+                    if isinstance(key, UriNode) and \
+                            key != node_uri_template and key.is_complex:
+                        if key.regex.match(node_uri_template.example):
+                            raise ModelBaseError(
+                                "Ambiguous node uri_template '{}' and '{}'"
+                                .format(
+                                    node_uri_template, key),
+                                input_=nodes_tree)
+
+            return nodes_tree[node_uri_template]
+
+    def _raise_method_map_error(self, node_uri_template):
+        if type(self)._method_map_key == node_uri_template:
+            raise ModelBaseError("invalid uri_template with '{}' value".format(node_uri_template))
+
+    def find(self, path):
+        path_nodes = deque(path.split('/'))
+        params = dict()
+        nodes_tree = self._nodes
+        resource, method_map = None, None
+
+        while path_nodes:
+            path_node = path_nodes.popleft()
+            self._raise_method_map_error(path_node)
+            match = self._match_uri_node_template_and_set_params(nodes_tree, path_node, params)
+
+            if match is None:
+                break
+
+            elif path_nodes:
+                nodes_tree = nodes_tree[match]
+
+            else:
+                (resource, method_map) = nodes_tree[match][type(self)._method_map_key]
+                break
+
+        return resource, method_map, params, path
+
+    def _match_uri_node_template_and_set_params(self, nodes_tree, path_node, params):
+        match_complex = None
+        match_simple = None
+        for uri_node_template in nodes_tree.keys():
+            if not isinstance(uri_node_template, UriNode):
+                continue
+
+            if uri_node_template.is_complex:
+                uri_regex_match = uri_node_template.regex.match(path_node)
+                if uri_regex_match:
+                    params.update(uri_regex_match.groupdict())
+                    match_complex = uri_node_template
+                    continue
+
+            elif str(uri_node_template) == str(path_node):
+                match_simple = uri_node_template
+                continue
+
+        if match_simple is not None:
+            return match_simple
+
+        return match_complex
+
+
 class ModelRouter(object):
 
     def __init__(self):
