@@ -35,6 +35,7 @@ from copy import deepcopy
 from importlib import import_module
 from concurrent.futures import ThreadPoolExecutor
 from copy import deepcopy
+from datetime import datetime
 import json
 import os.path
 import logging
@@ -202,6 +203,7 @@ class ModelJobsMetaMixin(type):
 
     def _job_watcher(cls, job, job_hash, session):
         cls._set_job(job_hash, {'status': 'running'}, session)
+        start_time = datetime.now()
 
         try:
             result = job.result()
@@ -213,7 +215,11 @@ class ModelJobsMetaMixin(type):
         else:
             status = 'done'
 
-        cls._set_job(job_hash, {'status': status, 'result': result}, session)
+        end_time = datetime.now()
+        elapsed_time = str(end_time - start_time)[:-3]
+        job_obj = {'status': status, 'result': result, 'elapsed_time': elapsed_time}
+
+        cls._set_job(job_hash, job_obj, session)
         session.bind.close()
         session.close()
 
