@@ -226,4 +226,4 @@ class SwaggerAPI(API, LoggerMixin):
     def _handle_generic_error(self, exception, req, resp, params):
         resp.status = HTTP_INTERNAL_SERVER_ERROR
         resp.body = json.dumps({'error': {'message': 'Something unexpected happened'}})
-        self._logger.exception(exception)
+        self._logger.exception('ERROR Unexpected')

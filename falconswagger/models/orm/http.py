@@ -210,7 +210,7 @@ class ModelJobsMetaMixin(type):
         except Exception as error:
             result = {'name': error.__class__.__name__, 'message': str(error)}
             status = 'error'
-            cls._logger.exception(error)
+            cls._logger.exception('ERROR from job {}'.format(job_hash))
 
         else:
             status = 'done'
