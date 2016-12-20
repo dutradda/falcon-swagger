@@ -224,7 +224,10 @@ class ModelJobsMetaMixin(type):
         session.close()
 
     def _set_job(cls, job_hash, status, session):
-        session.redis_bind.hset(cls._build_jobs_key(), job_hash, json.dumps(status))
+        key = cls._build_jobs_key()
+        session.redis_bind.hset(key, job_hash, json.dumps(status))
+        if session.redis_bind.ttl(key) > 0:
+            session.redis_bind.expire(key, 7*24*60*60)
 
     def _build_jobs_key(cls):
         return cls.__key__ + '_jobs'
