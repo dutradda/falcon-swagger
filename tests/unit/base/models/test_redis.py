@@ -51,7 +51,7 @@ class TestModelRedisMetaInsert(object):
     def test_with_objects_len_less_than_chunks(self, model):
         session = mock.MagicMock()
         expected_map = {
-            '1': msgpack.dumps({'id': 1})
+            b'1': msgpack.dumps({'id': 1})
         }
 
         assert model.insert(session, [{'id': 1}]) == [{'id': 1}]
@@ -60,10 +60,10 @@ class TestModelRedisMetaInsert(object):
     def test_with_objects_len_greater_than_chunks(self, model):
         session = mock.MagicMock()
         expected_map1 = {
-            '1': msgpack.dumps({'id': 1})
+            b'1': msgpack.dumps({'id': 1})
         }
         expected_map2 = {
-            '2': msgpack.dumps({'id': 2})
+            b'2': msgpack.dumps({'id': 2})
         }
 
         model.CHUNKS = 1
@@ -226,7 +226,7 @@ class TestModelRedisMetaDelete(object):
     def test_delete(self, model):
         session = mock.MagicMock()
         model.delete(session, {'id': 1})
-        assert session.redis_bind.hdel.call_args_list == [mock.call('test', '1')]
+        assert session.redis_bind.hdel.call_args_list == [mock.call('test', b'1')]
 
 
 class TestModelRedisMetaGetAll(object):
@@ -241,21 +241,21 @@ class TestModelRedisMetaGetAll(object):
         session.redis_bind.hkeys.return_value = ['1'.encode(), '2'.encode()]
         model.get(session, limit=1)
 
-        assert session.redis_bind.hmget.call_args_list == [mock.call('test', '1')]
+        assert session.redis_bind.hmget.call_args_list == [mock.call('test', b'1')]
 
     def test_get_all_with_limit_and_offset(self, model):
         session = mock.MagicMock()
         session.redis_bind.hkeys.return_value = ['1'.encode(), '2'.encode(), '3'.encode()]
         model.get(session, limit=2, offset=1)
 
-        assert session.redis_bind.hmget.call_args_list == [mock.call('test', '2', '3')]
+        assert session.redis_bind.hmget.call_args_list == [mock.call('test', b'2', b'3')]
 
     def test_get_all_with_offset(self, model):
         session = mock.MagicMock()
         session.redis_bind.hkeys.return_value = ['1'.encode(), '2'.encode(), '3'.encode()]
         model.get(session, offset=2)
 
-        assert session.redis_bind.hmget.call_args_list == [mock.call('test', '3')]
+        assert session.redis_bind.hmget.call_args_list == [mock.call('test', b'3')]
 
 
 class TestModelRedisMetaGetMany(object):
@@ -263,19 +263,19 @@ class TestModelRedisMetaGetMany(object):
     def test_get_many(self, model):
         session = mock.MagicMock()
         model.get(session, {'id': 1})
-        assert session.redis_bind.hmget.call_args_list == [mock.call('test', '1')]
+        assert session.redis_bind.hmget.call_args_list == [mock.call('test', b'1')]
 
     def test_get_many_with_limit(self, model):
         session = mock.MagicMock()
         model.get(session, [{'id': 1}, {'id': 2}], limit=1)
-        assert session.redis_bind.hmget.call_args_list == [mock.call('test', '1')]
+        assert session.redis_bind.hmget.call_args_list == [mock.call('test', b'1')]
 
     def test_get_many_with_limit_and_offset(self, model):
         session = mock.MagicMock()
         model.get(session, [{'id': 1}, {'id': 2}, {'id': 3}], limit=2, offset=1)
-        assert session.redis_bind.hmget.call_args_list == [mock.call('test', '2', '3')]
+        assert session.redis_bind.hmget.call_args_list == [mock.call('test', b'2', b'3')]
 
     def test_get_many_with_offset(self, model):
         session = mock.MagicMock()
         model.get(session, [{'id': 1}, {'id': 2}, {'id': 3}], offset=2)
-        assert session.redis_bind.hmget.call_args_list == [mock.call('test', '3')]
+        assert session.redis_bind.hmget.call_args_list == [mock.call('test', b'3')]

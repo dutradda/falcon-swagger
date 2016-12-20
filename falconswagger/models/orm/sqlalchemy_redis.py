@@ -296,7 +296,7 @@ class ModelSQLAlchemyRedisOperationsMetaMixin(type):
                 return insts
 
         model_redis_key = type(cls).get_key(cls, '_'.join(kwargs.keys()))
-        ids_redis_keys = [cls(session, **id_).get_key(id_.keys()) for id_ in ids]
+        ids_redis_keys = [cls.get_instance_key(id_, id_.keys()) for id_ in ids]
         objs = session.redis_bind.hmget(model_redis_key, ids_redis_keys)
         ids_not_cached = [id_ for i, (id_, obj) in enumerate(zip(ids, objs)) if obj is None]
         objs = [msgpack.loads(obj, encoding='utf-8') for obj in objs if obj is not None]
@@ -524,10 +524,12 @@ class ModelSQLAlchemyRedisFactory(object):
 
     @staticmethod
     def make(name='ModelSQLAlchemyRedisBase', bind=None, metadata=None,
-                mapper=None, class_registry=None, authorizer=None):
+             mapper=None, class_registry=None, authorizer=None, keys_separator=b'|'):
         base = declarative_base(
             name=name, metaclass=ModelSQLAlchemyRedisMeta,
             cls=_ModelSQLAlchemyRedisBase, bind=bind, metadata=metadata,
             mapper=mapper, constructor=_ModelSQLAlchemyRedisBase.__init__)
         base.__authorizer__ = authorizer
+        base.__keys_separator__ = \
+            keys_separator.decode() if isinstance(keys_separator, str) else keys_separator
         return base

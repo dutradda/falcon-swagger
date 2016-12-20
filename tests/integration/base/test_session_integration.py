@@ -102,7 +102,7 @@ class TestSessionCommitRedisSet(object):
         session.add(model1(session, id=1))
         session.commit()
 
-        assert redis.hmset.call_args_list == [mock.call('test1', {'1': msgpack.dumps({'id': 1})})]
+        assert redis.hmset.call_args_list == [mock.call('test1', {b'1': msgpack.dumps({'id': 1})})]
 
     def test_if_two_instance_are_seted_on_redis(self, session, model1, redis):
         session.add(model1(session, id=1))
@@ -110,7 +110,7 @@ class TestSessionCommitRedisSet(object):
         session.commit()
 
         assert redis.hmset.call_args_list == [
-            mock.call('test1', {'1': msgpack.dumps({'id': 1}), '2': msgpack.dumps({'id': 2})})]
+            mock.call('test1', {b'1': msgpack.dumps({'id': 1}), b'2': msgpack.dumps({'id': 2})})]
 
     def test_if_two_commits_sets_redis_correctly(self, session, model1, redis):
         session.add(model1(session, id=1))
@@ -119,8 +119,8 @@ class TestSessionCommitRedisSet(object):
         session.commit()
 
         assert redis.hmset.call_args_list == [
-            mock.call('test1', {'1': msgpack.dumps({'id': 1})}),
-            mock.call('test1', {'2': msgpack.dumps({'id': 2})})]
+            mock.call('test1', {b'1': msgpack.dumps({b'id': 1})}),
+            mock.call('test1', {b'2': msgpack.dumps({b'id': 2})})]
 
     def test_if_error_right_raised(self, session, model1, redis):
         class ExceptionTest(Exception):
@@ -140,8 +140,8 @@ class TestSessionCommitRedisSet(object):
         session.commit()
 
         expected = [
-            mock.call('test1', {'1': msgpack.dumps({'id': 1}), '2': msgpack.dumps({'id': 2})}),
-            mock.call('test2', {'1': msgpack.dumps({'id': 1}), '2': msgpack.dumps({'id': 2})})
+            mock.call('test1', {b'1': msgpack.dumps({'id': 1}), b'2': msgpack.dumps({'id': 2})}),
+            mock.call('test2', {b'1': msgpack.dumps({'id': 1}), b'2': msgpack.dumps({'id': 2})})
         ]
 
         assert len(expected) == len(redis.hmset.call_args_list)
@@ -159,10 +159,10 @@ class TestSessionCommitRedisSet(object):
         session.commit()
 
         expected = [
-            mock.call('test1', {'1': msgpack.dumps({'id': 1})}),
-            mock.call('test2', {'1': msgpack.dumps({'id': 1})}),
-            mock.call('test1', {'2': msgpack.dumps({'id': 2})}),
-            mock.call('test2', {'2': msgpack.dumps({'id': 2})})
+            mock.call('test1', {b'1': msgpack.dumps({'id': 1})}),
+            mock.call('test2', {b'1': msgpack.dumps({'id': 1})}),
+            mock.call('test1', {b'2': msgpack.dumps({'id': 2})}),
+            mock.call('test2', {b'2': msgpack.dumps({'id': 2})})
         ]
 
         assert len(expected) == len(redis.hmset.call_args_list)
@@ -188,7 +188,7 @@ class TestSessionCommitRedisDelete(object):
         session.delete(inst1)
         session.commit()
 
-        assert redis.hdel.call_args_list == [mock.call('test1', '1')]
+        assert redis.hdel.call_args_list == [mock.call('test1', b'1')]
 
     def test_if_two_instance_are_deleted_from_redis(self, session, model1, redis):
         inst1 = model1(session, id=1)
@@ -200,8 +200,8 @@ class TestSessionCommitRedisDelete(object):
         session.delete(inst2)
         session.commit()
 
-        assert (redis.hdel.call_args_list == [mock.call('test1', '1', '2')] or
-            redis.hdel.call_args_list == [mock.call('test1', '2', '1')])
+        assert (redis.hdel.call_args_list == [mock.call('test1', b'1', b'2')] or
+            redis.hdel.call_args_list == [mock.call('test1', b'2', b'1')])
 
     def test_if_two_commits_delete_redis_correctly(self, session, model1, redis):
         inst1 = model1(session, id=1)
@@ -215,8 +215,8 @@ class TestSessionCommitRedisDelete(object):
         session.commit()
 
         assert redis.hdel.call_args_list == [
-            mock.call('test1', '1'),
-            mock.call('test1', '2')
+            mock.call('test1', b'1'),
+            mock.call('test1', b'2')
         ]
 
     def test_if_error_right_raised(self, session, model1, redis):
@@ -252,8 +252,8 @@ class TestSessionCommitRedisDelete(object):
             assert len(call[0]) == 3
             assert call[1] == {}
             assert call[0][0] == 'test1' or call[0][0] == 'test2'
-            assert call[0][1] == '1' or call[0][1] == '2'
-            assert call[0][2] == '1' or call[0][2] == '2'
+            assert call[0][1] == b'1' or call[0][1] == b'2'
+            assert call[0][2] == b'1' or call[0][2] == b'2'
 
     def test_if_two_commits_delete_redis_with_two_models_correctly(
             self, session, model1, model2, redis):
@@ -277,7 +277,7 @@ class TestSessionCommitRedisDelete(object):
             assert len(call[0]) == 2
             assert call[1] == {}
             assert call[0][0] == 'test1' or call[0][0] == 'test2'
-            assert call[0][1] == '1' or call[0][1] == '2'
+            assert call[0][1] == b'1' or call[0][1] == b'2'
 
 
 class TestSessionCommitRedisDeleteWithoutUseRedisFlag(object):
@@ -363,9 +363,9 @@ class TestSessionCommitWithNestedRelatedModels(object):
             'model2_id': 1,
             'model2': m2_expected
         }
-        call1 = mock.call('test1', {'1': m1_expected})
-        call2 = mock.call('test2', {'1': m2_expected})
-        call3 = mock.call('test3', {'1': m3_expected})
+        call1 = mock.call('test1', {b'1': m1_expected})
+        call2 = mock.call('test2', {b'1': m2_expected})
+        call3 = mock.call('test3', {b'1': m3_expected})
 
         assert redis.hmset.call_args_list == [call1, call2, call3] or \
             redis.hmset.call_args_list == [call1, call3, call2] or \
@@ -389,7 +389,7 @@ class TestSessionCommitWithNestedRelatedModels(object):
         session.delete(m1)
         session.commit()
 
-        assert redis.hdel.call_args_list == [mock.call('test1', '1')]
+        assert redis.hdel.call_args_list == [mock.call('test1', b'1')]
 
         m2_expected = {
             'id': 1,
@@ -400,8 +400,8 @@ class TestSessionCommitWithNestedRelatedModels(object):
             'model2_id': 1,
             'model2': m2_expected
         }
-        call2 = mock.call('test2', {'1': m2_expected})
-        call3 = mock.call('test3', {'1': m3_expected})
+        call2 = mock.call('test2', {b'1': m2_expected})
+        call3 = mock.call('test3', {b'1': m3_expected})
 
         assert redis.hmset.call_args_list == [call2, call3] or \
             redis.hmset.call_args_list == [call3, call2]

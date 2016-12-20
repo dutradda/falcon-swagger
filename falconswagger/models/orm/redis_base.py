@@ -62,15 +62,27 @@ class ModelRedisBaseMeta(ModelLoggerMetaMixin, ModelOrmHttpMetaMixin):
 
         return '{}_{}'.format(cls.__key__, filters_names)
 
+    def get_instance_key(cls, instance, id_names=None):
+        if isinstance(instance, dict):
+            ids_ = [str(v) for v in ModelRedisBaseMeta.get_ids_values(cls, instance, id_names)]
+        else:
+            ids_ = [str(v) for v in cls.get_ids_values(instance, id_names)]
+
+        return cls.__keys_separator__.decode().join(ids_).encode()
+
+    def get_ids_values(cls, obj, keys=None):
+        if keys is None:
+            keys = cls.__id_names__
+
+        return tuple([dict.get(obj, key) for key in sorted(keys)])
+
+
 
 class ModelRedisBase(object):
     __session__ = None
     __authorizer__ = None
     __api__ = None
+    __id_names__ = None
 
     def get_key(self, id_names=None):
         return type(self).get_instance_key(self, id_names)
-
-    @classmethod
-    def get_instance_key(cls, instance, id_names=None):
-        return '_%%sep%_'.join([str(v) for v in cls.get_ids_values(instance, id_names)])

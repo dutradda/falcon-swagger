@@ -168,8 +168,6 @@ class Route(object):
         else:
             return None
 
-        return req.stream
-
     def _build_non_body_params(self, validator, kwargs, type_=None):
         if validator:
             params = {}
@@ -179,7 +177,7 @@ class Route(object):
                 else:
                     param = kwargs.get(param_name)
 
-                if param:
+                if param is not None:
                     params[param_name] = JsonBuilder.build(param, prop)
 
             validator.validate(params)
@@ -388,8 +386,12 @@ class ModelRouter(object):
         return uri.strip('/').split('/')
 
     def _match_uri_node_template_and_set_params(self, nodes_tree, path_node, params):
+        if not '{' in path_node or not '}' in path_node:
+            if path_node in nodes_tree:
+                return path_node
+
         match_complex = None
-        match_simple = None
+
         for uri_node_template in nodes_tree.keys():
             if not isinstance(uri_node_template, UriNode):
                 continue
@@ -400,13 +402,6 @@ class ModelRouter(object):
                     params.update(uri_regex_match.groupdict())
                     match_complex = uri_node_template
                     continue
-
-            elif str(uri_node_template) == str(path_node):
-                match_simple = uri_node_template
-                continue
-
-        if match_simple is not None:
-            return match_simple
 
         return match_complex
 

@@ -60,7 +60,7 @@ class ModelRedisMeta(ModelRedisBaseMeta):
         if ids:
             keys_objs_map = cls._build_keys_objs_map_with_ids(objs, ids)
         else:
-            keys_objs_map = OrderedDict([(cls(obj).get_key().encode(), obj) for obj in objs])
+            keys_objs_map = OrderedDict([(cls.get_instance_key(obj), obj) for obj in objs])
 
         keys = set(keys_objs_map.keys())
         keys.difference_update(set(session.redis_bind.hkeys(cls.__key__)))
@@ -105,12 +105,12 @@ class ModelRedisMeta(ModelRedisBaseMeta):
         for obj in objs:
             obj_ids = cls(obj).get_ids_map(ids[0].keys())
             if obj_ids in ids:
-                keys_objs_map[cls._build_key(obj_ids).encode()] = obj
+                keys_objs_map[cls._build_key(obj_ids)] = obj
 
         return keys_objs_map
 
     def _build_key(cls, id_):
-        return cls(id_).get_key(id_.keys())
+        return cls.get_instance_key(id_, id_.keys())
 
     def delete(cls, session, ids, **kwargs):
         keys = [cls._build_key(id_) for id_ in cls._to_list(ids)]
@@ -125,7 +125,7 @@ class ModelRedisMeta(ModelRedisBaseMeta):
             return cls._unpack_objs(session.redis_bind.hgetall(cls.__key__))
 
         if ids is None:
-            keys = [k.decode() for k in session.redis_bind.hkeys(cls.__key__)][offset:limit]
+            keys = [k for k in session.redis_bind.hkeys(cls.__key__)][offset:limit]
             if keys:
                 return cls._unpack_objs(session.redis_bind.hmget(cls.__key__, *keys))
             else:
@@ -143,20 +143,13 @@ class ModelRedisMeta(ModelRedisBaseMeta):
 class _ModelRedis(dict, ModelRedisBase):
 
     @classmethod
-    def get_ids_values(cls, obj, keys=None):
-        if keys is None:
-            keys = cls.__id_names__
-
-        return tuple([dict.get(obj, key) for key in sorted(keys)])
-
-    @classmethod
     def set_ids(cls, instance, key, keys=None):
         if keys is None:
             keys = sorted(cls.__id_names__)
 
-        values = key.split('_%%sep%_')
+        values = key.split(cls.__keys_separator__)
         for key, value in zip(keys, values):
-            instance[key] = value
+            instance[key] = value.decode()
 
     def get_ids_map(self, keys=None):
         if keys is None:
@@ -169,13 +162,15 @@ class _ModelRedis(dict, ModelRedisBase):
 class ModelRedisFactory(object):
 
     @staticmethod
-    def make(class_name, key, id_names, schema=None, metaclass=None):
+    def make(class_name, key, id_names, schema=None, metaclass=None, keys_separator=b'|'):
         if metaclass is None:
             metaclass = ModelRedisMeta
 
         attributes = {
             '__key__': key,
             '__id_names__': sorted(tuple(id_names)),
+            '__keys_separator__': \
+                keys_separator.decode() if isinstance(keys_separator, str) else keys_separator
         }
         if schema is not None:
             attributes['__schema__'] = schema
