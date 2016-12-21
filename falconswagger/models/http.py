@@ -23,9 +23,9 @@
 
 from falconswagger.router import Route
 from falconswagger.exceptions import ModelBaseError, JSONError
-from falconswagger.models.logger import ModelLoggerMetaMixin
 from falconswagger.constants import SWAGGER_VALIDATOR
 from falconswagger.utils import get_dir_path, get_module_path, build_validator
+from falconswagger.models.base import ModelBaseMeta
 from falcon.errors import HTTPNotFound, HTTPMethodNotAllowed
 from falcon import HTTP_CREATED, HTTP_NO_CONTENT, HTTP_METHODS
 from falcon.responders import create_default_options
@@ -37,75 +37,53 @@ import json
 import os.path
 import logging
 import random
-import re
 
 
-def _camel_case_convert(name):
-    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
-    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
+class ModelHttpMeta(ModelBaseMeta):
 
-
-class ModelHttpMetaMixin(type):
-
-    def _set_key(cls):
-        name = cls.__name__.replace('Model', '')
-        cls.__key__ = getattr(cls, '__key__', _camel_case_convert(name))
-
-    def _set_routes(cls):
+    def __init__(cls, name, bases_classes, attributes):
         SWAGGER_VALIDATOR.validate(cls.__schema__)
-        cls.__routes__ = set()
-        cls.__options_routes__ = set()
-        dict_ = defaultdict(list)
-        schema = cls.__schema__
-        cls._set_key()
+        ModelBaseMeta.__init__(cls, name, bases_classes, attributes)
+
+        if not hasattr(cls, '__api__'):
+            cls.__api__ = None
 
         if not hasattr(cls, '__schema_dir__'):
             cls.__schema_dir__ = get_module_path(cls)
+        
+        cls._set_default_options()
 
-        for uri_template in schema:
-            all_methods_parameters = schema[uri_template].get('parameters', [])
-            for method_name in HTTP_METHODS:
-                method_schema = schema[uri_template].get(method_name.lower())
-                if method_schema:
-                    method_schema = deepcopy(method_schema)
-                    operation_id = method_schema['operationId']
-
-                    try:
-                        getattr(cls, operation_id)
-                    except AttributeError:
-                        raise ModelBaseError("'operationId' '{}' was not found".format(operation_id))
-
-                    definitions = schema.get('definitions')
-
-                    parameters = method_schema.get('parameters', [])
-                    parameters.extend(all_methods_parameters)
-                    method_schema['parameters'] = parameters
-
-                    route = Route(uri_template, method_name, operation_id, cls,
-                                  method_schema, definitions, cls.__authorizer__)
-                    cls.__routes__.add(route)
-
-        routes = defaultdict(set)
-        for route in cls.__routes__:
-            routes[route.uri_template].add(route.method_name)
-
-        for uri_template, methods_names in routes.items():
-            if not 'OPTIONS' in methods_names:
-                options_operation = create_default_options(methods_names)
+    def _set_default_options(cls):
+        for uri_template, schema in cls.__schema__.items():
+            if not 'options' in schema:
+                options_operation = create_default_options(schema.keys())
                 uri_template_norm = uri_template.replace('{', '_').replace('}', '_')
                 options_operation_name = '{}_{}'.format(uri_template_norm, 'options')
+
                 setattr(cls, options_operation_name, options_operation)
+                schema['options'] = cls._build_options_schema(options_operation_name)
 
-                route = Route(uri_template, 'OPTIONS', options_operation_name,
-                              cls, {}, [], cls.__authorizer__)
-                cls.__options_routes__.add(route)
-                cls.__routes__.add(route)
+    def on_delete(cls, req, resp):
+        cls._execute_operation(req, resp)
 
+    def _execute_operation(cls, req, resp):
+        operation_name = req.context['method_schema']['operationId']
+        getattr(cls, operation_name)(req, resp)
 
-class ModelHttpMeta(ModelLoggerMetaMixin, ModelHttpMetaMixin):
-    __authorizer__ = None
-    __api__ = None
+    def on_get(cls, req, resp):
+        cls._execute_operation(req, resp)
 
-    def __init__(cls, name, bases_classes, attributes):
-        cls._set_logger()
-        cls._set_routes()
+    def on_patch(cls, req, resp):
+        cls._execute_operation(req, resp)
+
+    def on_post(cls, req, resp):
+        cls._execute_operation(req, resp)
+
+    def on_put(cls, req, resp):
+        cls._execute_operation(req, resp)
+
+    def on_head(cls, req, resp):
+        cls._execute_operation(req, resp)
+
+    def on_options(cls, req, resp):
+        cls._execute_operation(req, resp)

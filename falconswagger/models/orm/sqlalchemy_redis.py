@@ -71,13 +71,11 @@ class ModelSQLAlchemyRedisInitMetaMixin(
             cls.__key__ = str(cls.__table__.name)
             cls.__use_redis__ = getattr(cls, '__use_redis__', True)
             cls.__todict_schema__ = {}
-            base_class.__all_models__[cls.__key__] = cls
-            cls._build_backrefs_for_all_models(base_class.__all_models__.values())
+            cls._build_backrefs_for_all_models(type(cls).__all_models__.values())
             ModelRedisBaseMeta.__init__(cls, name, bases_classes, attributes)
 
         else:
             cls.__baseclass_name__= name
-            cls.__all_models__ = dict()
 
     def _build_primary_keys(cls):
         primaries_keys = {}
@@ -141,7 +139,7 @@ class ModelSQLAlchemyRedisInitMetaMixin(
         return relationship.prop.argument
 
     def get_model(cls, name):
-        return cls.__all_models__[name]
+        return type(cls).__all_models__[name]
 
 
 class ModelSQLAlchemyRedisOperationsMetaMixin(type):

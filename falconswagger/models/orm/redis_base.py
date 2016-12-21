@@ -24,8 +24,8 @@
 from falconswagger.router import Route
 from falconswagger.utils import build_validator
 from falconswagger.exceptions import ModelBaseError, JSONError
-from falconswagger.models.logger import ModelLoggerMetaMixin
-from falconswagger.models.orm.http import ModelOrmHttpMetaMixin
+from falconswagger.models.orm.http import ModelOrmHttpMeta
+from falconswagger.models.base import ModelBaseMeta
 from falcon.errors import HTTPNotFound, HTTPMethodNotAllowed
 from falcon import HTTP_CREATED, HTTP_NO_CONTENT, HTTP_METHODS
 from falcon.responders import create_default_options
@@ -40,15 +40,13 @@ import logging
 import random
 
 
-class ModelRedisBaseMeta(ModelLoggerMetaMixin, ModelOrmHttpMetaMixin):
+class ModelRedisBaseMeta(ModelOrmHttpMeta):
 
-    def __init__(cls, name, base_classes, attributes):
-        cls._set_logger()
-
+    def __init__(cls, name, bases_classes, attributes):
         if hasattr(cls, '__schema__'):
-            cls._set_routes()
+            ModelOrmHttpMeta.__init__(cls, name, bases_classes, attributes)
         else:
-            cls._set_key()
+            ModelBaseMeta.__init__(cls, name, bases_classes, attributes)
 
     def _to_list(cls, objs):
         return objs if isinstance(objs, list) else [objs]

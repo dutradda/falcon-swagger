@@ -57,10 +57,18 @@ class FalconSwaggerError(Exception):
         [resp.append_header(key, value) for key, value in exception.headers.items()]
 
 
-class ModelBaseError(FalconSwaggerError):
+class _BadRequestError(FalconSwaggerError):
     def __init__(self, message, input_=None):
         FalconSwaggerError.__init__(self, message, HTTP_BAD_REQUEST)
         self.input_ = input_
+
+
+class ModelBaseError(_BadRequestError):
+    pass
+
+
+class SwaggerMethodError(_BadRequestError):
+    pass
 
 
 class JSONError(FalconSwaggerError):
@@ -72,6 +80,7 @@ class UnauthorizedError(FalconSwaggerError):
     def __init__(self, message, realm, status=HTTP_UNAUTHORIZED):
         headers = {'WWW-Authenticate': 'Basic realm="{}"'.format(realm)}
         FalconSwaggerError.__init__(self, message, status, headers)
+
 
 class SwaggerAPIError(Exception):
     pass

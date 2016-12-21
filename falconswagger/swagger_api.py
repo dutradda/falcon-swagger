@@ -22,12 +22,13 @@
 
 
 from falcon import API, HTTP_INTERNAL_SERVER_ERROR, HTTP_BAD_REQUEST, HTTPError, HTTPNotFound
-from falconswagger.middlewares import SessionMiddleware
+from falconswagger.middlewares import SessionMiddleware, SwaggerMiddleware
 from falconswagger.router import ModelRouter, Route
 from falconswagger.exceptions import JSONError, ModelBaseError, UnauthorizedError, SwaggerAPIError
 from falconswagger.mixins import LoggerMixin
 from falconswagger.utils import get_module_path
 from falconswagger.constants import SWAGGER_TEMPLATE, SWAGGER_SCHEMA
+from falconswagger.hooks import authorization_hook
 from sqlalchemy.exc import IntegrityError
 from jsonschema import Draft4Validator
 from jsonschema import ValidationError
@@ -41,42 +42,29 @@ class SwaggerAPI(API, LoggerMixin):
 
     def __init__(self, models, sqlalchemy_bind=None, redis_bind=None,
                  middleware=None, router=None, swagger_template=None,
-                 title=None, version='1.0.0', authorizer=None):
-        if sqlalchemy_bind is not None or redis_bind is not None:
-            sess_mid = SessionMiddleware(sqlalchemy_bind, redis_bind)
-
-            if middleware is None:
-                middleware = sess_mid
-            else:
-                middleware.append(sess_mid)
-
-        if router is None:
-            router = ModelRouter()
-
-        API.__init__(self, router=router, middleware=middleware)
+                 title=None, version='1.0.0', authorizer=None,
+                 get_swagger_req_auth=True):
         self._build_logger()
-
-        type(self).__schema_dir__ = get_module_path(type(self))
-
-        if bool(title is None) == bool(swagger_template is None):
-            raise SwaggerAPIError("One of 'title' or 'swagger_template' "
-                                  "arguments must be setted.")
-
-        if version != '1.0.0' and swagger_template is not None:
-            raise SwaggerAPIError("'version' argument can't be setted when "
-                                  "'swagger_template' was setted.")
-
+        self._validate_metadata(title, version, swagger_template)
+        middleware = self._set_session_middleware(sqlalchemy_bind, redis_bind, middleware)
         self._set_swagger_template(swagger_template, title, version)
+        self.authorizer = authorizer
+        self._get_swagger_req_auth = get_swagger_req_auth
 
-        self._logger = logging.getLogger(type(self).__module__ + '.' + type(self).__name__)
         self.models = dict()
-        self.add_route = None
-        del self.add_route
-
         for model in models:
             self.associate_model(model)
 
-        self._set_swagger_json_route(authorizer)
+        swagger_mid = SwaggerMiddleware(self.swagger, self.models, authorizer=authorizer)
+        middleware.append(swagger_mid)
+
+        API.__init__(self, router=router, middleware=middleware)
+
+        for model in self.models.values():
+            for uri_template in getattr(model, '__schema__', {}):
+                self.add_route(uri_template, model)
+
+        self.add_route('/swagger.json', self)
 
         self.add_error_handler(Exception, self._handle_generic_error)
         self.add_error_handler(HTTPError, self._handle_http_error)
@@ -86,6 +74,26 @@ class SwaggerAPI(API, LoggerMixin):
         self.add_error_handler(JSONError)
         self.add_error_handler(ModelBaseError)
         self.add_error_handler(UnauthorizedError)
+
+    def _set_session_middleware(self, sqlalchemy_bind, redis_bind, middleware):
+        if sqlalchemy_bind is not None or redis_bind is not None:
+            sess_mid = SessionMiddleware(sqlalchemy_bind, redis_bind)
+
+            if middleware is None:
+                middleware = [sess_mid]
+            else:
+                middleware.append(sess_mid)
+
+        return middleware
+
+    def _validate_metadata(self, title, version, swagger_template):
+        if bool(title is None) == bool(swagger_template is None):
+            raise SwaggerAPIError("One of 'title' or 'swagger_template' "
+                                  "arguments must be setted.")
+
+        if version != '1.0.0' and swagger_template is not None:
+            raise SwaggerAPIError("'version' argument can't be setted when "
+                                  "'swagger_template' was setted.")
 
     def _set_swagger_template(self, swagger_template, title, version):
         if swagger_template is None:
@@ -109,11 +117,7 @@ class SwaggerAPI(API, LoggerMixin):
                 if isinstance(model.__api__, SwaggerAPI):
                     model.__api__.disassociate_model(model)
 
-                base_path = self.swagger.get('basePath', '')
-                base_path = '' if base_path == '/' else base_path
-
-                self._router.add_model(model, base_path)
-                self.models[model.__key__] = model
+                self.models[model.__name__] = model
                 model.__api__ = self
 
                 model_paths = deepcopy(model.__schema__)
@@ -141,8 +145,7 @@ class SwaggerAPI(API, LoggerMixin):
     def disassociate_model(self, model):
         if hasattr(model, '__schema__'):
             if model.__api__ is self:
-                self._router.remove_model(model)
-                self.models.pop(model.__key__)
+                self.models.pop(model.__name__)
                 [self.swagger['paths'].pop(path, None) for path in model.__schema__]
 
                 for definition in model.__schema__.get('definitions', {}):
@@ -160,42 +163,17 @@ class SwaggerAPI(API, LoggerMixin):
             if path in model.__schema__:
                 return model.__name__
 
-    def _set_swagger_json_route(self, authorizer):
-        if authorizer:
-            schema = {
-                'parameters': [{
-                    'name': 'Authorization',
-                    'in': 'header',
-                    'required': True,
-                    'type': 'string'
-                }]
-            }
-        else:
-            schema = {}
+    def add_route(self, uri_template, resource, *args, **kwargs):
+        base_path = self.swagger.get('basePath', '')
+        base_path = '' if base_path == '/' else base_path.strip('/')
+        uri_template = '/'.join([base_path, uri_template.strip('/')])
+        return API.add_route(self, uri_template, resource, *args, **kwargs)
 
-        self._swagger_route = Route('/swagger.json', 'GET', '_get_swagger_json',
-                      self, schema, [], authorizer)
-        self._router.add_route(self._swagger_route, self.swagger.get('basePath', ''))
+    def on_get(self, req, resp):
+        if self.authorizer and self._get_swagger_req_auth:
+            authorization_hook(self.authorizer, req, resp, {})
 
-    def _get_swagger_json(self, req, resp):
         resp.body = json.dumps(self.swagger, indent=2)
-
-    def _get_responder(self, req):
-        route, params = self._router.get_route_and_params(req)
-        if route is None:
-            return self._get_sink_responder(req)
-
-        return route, params, route.module, route.uri_template
-
-    def _get_sink_responder(self, path):
-        params = {}
-        for pattern, sink in self._sinks:
-            m = pattern.match(path)
-            if m:
-                params = m.groupdict()
-                return sink, params, None, None
-        else:
-            raise HTTPNotFound()
 
     def _handle_http_error(self, exception, req, resp, params):
         self._compose_error_response(req, resp, exception)

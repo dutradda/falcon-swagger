@@ -21,10 +21,30 @@
 # SOFTWARE.
 
 
+from falconswagger.exceptions import ModelBaseError
+import re
 import logging
 
 
-class ModelLoggerMetaMixin(type):
+def _camel_case_convert(name):
+    s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
+    return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
-    def _set_logger(cls):
-        cls._logger = logging.getLogger(cls.__module__ + '.' + cls.__name__)
+
+class ModelBaseMeta(type):
+	__all_models__ = dict()
+
+	def __init__(cls, name, bases_classes, attributes):
+		if not hasattr(cls, '__key__'):
+	        name = cls.__name__.replace('Model', '')
+	        cls.__key__ = getattr(cls, '__key__', _camel_case_convert(name))
+
+	    all_models = type(cls).__all_models__
+	    key = cls.__key__
+
+	    if key in all_models:
+	    	raise ModelBaseError("The model '{}' was already declared with key '{}'".format(
+	    		all_models[key], key))
+
+	    all_models[key] = cls
+		cls._logger = logging.getLogger(cls.__module__ + '.' + cls.__name__)
