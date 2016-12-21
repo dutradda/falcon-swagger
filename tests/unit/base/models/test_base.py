@@ -22,7 +22,8 @@
 
 
 from falconswagger.models.orm.redis_base import ModelRedisBaseMeta, ModelRedisBase
-from falconswagger.router import ModelRouter
+from falconswagger.models.base import ModelBaseMeta
+from falconswagger.middlewares import SwaggerMiddleware
 from falconswagger.exceptions import ModelBaseError
 from falcon.errors import HTTPNotFound, HTTPMethodNotAllowed
 from jsonschema import ValidationError
@@ -32,11 +33,13 @@ import pytest
 
 class TestModelBaseErrors(object):
     def test_without_schema_and_without_key(self):
+        ModelBaseMeta.__all_models__.clear()
         model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {})
         assert model.__key__ == 'test'
         assert not hasattr(model, '__schema__')
 
     def test_without_schema_and_with_key(self):
+        ModelBaseMeta.__all_models__.clear()
         model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__key__': 'test123'})
         assert model.__key__ == 'test123'
 
@@ -84,12 +87,11 @@ class TestModelBaseErrors(object):
                 }
             }
         }
-        req = mock.MagicMock(path='/test', method='GET')
+        req = mock.MagicMock(uri_template='/test', method='GET')
         model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
-        router = ModelRouter()
-        router.add_model(model)
+        mid = SwaggerMiddleware([model])
         with pytest.raises(HTTPMethodNotAllowed) as exc_info:
-            route, _ = router.get_route_and_params(req)
+            mid.process_resource(req, mock.MagicMock(), model, {})
         assert exc_info.value.headers == {'Allow': 'POST, OPTIONS'} or \
             exc_info.value.headers == {'Allow': 'OPTIONS, POST'}
 
@@ -109,19 +111,18 @@ class TestModelBaseBuildsQueryStringParameters(object):
                 }
             }
         }
+        ModelBaseMeta.__all_models__.clear()
         model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
             params={'test': '1,2,3,4'},
-            path='/test',
+            uri_template='/test',
             method='POST')
         req.get_header.return_value = None
         resp = mock.MagicMock()
-        router = ModelRouter()
-        router.add_model(model)
-        route, _ = router.get_route_and_params(req)
-        route(req, resp)
+        mid = SwaggerMiddleware([model])
+        mid.process_resource(req, mock.MagicMock(), model, {})
         kwargs_expected = {'test': ['1', '2', '3', '4']}
 
         assert model.insert.call_args_list == [
@@ -142,19 +143,18 @@ class TestModelBaseBuildsQueryStringParameters(object):
                 }
             }
         }
+        ModelBaseMeta.__all_models__.clear()
         model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
             params={'test': ['1', '2', '3', '4']},
-            path='/test',
+            uri_template='/test',
             method='POST')
         req.get_header.return_value = None
         resp = mock.MagicMock()
-        router = ModelRouter()
-        router.add_model(model)
-        route, _ = router.get_route_and_params(req)
-        route(req, resp)
+        mid = SwaggerMiddleware([model])
+        mid.process_resource(req, mock.MagicMock(), model, {})
         kwargs_expected = {'test': ['1', '2', '3', '4']}
 
         assert model.insert.call_args_list == [
@@ -176,19 +176,18 @@ class TestModelBaseBuildsQueryStringParameters(object):
                 }
             }
         }
+        ModelBaseMeta.__all_models__.clear()
         model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
             params={'test': '1,2,3,4'},
-            path='/test',
+            uri_template='/test',
             method='POST')
         req.get_header.return_value = None
         resp = mock.MagicMock()
-        router = ModelRouter()
-        router.add_model(model)
-        route, _ = router.get_route_and_params(req)
-        route(req, resp)
+        mid = SwaggerMiddleware([model])
+        mid.process_resource(req, mock.MagicMock(), model, {})
         kwargs_expected = {'test': ['1', '2', '3', '4']}
 
         assert model.insert.call_args_list == [
@@ -210,19 +209,18 @@ class TestModelBaseBuildsQueryStringParameters(object):
                 }
             }
         }
+        ModelBaseMeta.__all_models__.clear()
         model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
             params={'test': ['1', '2', '3', '4']},
-            path='/test',
+            uri_template='/test',
             method='POST')
         req.get_header.return_value = None
         resp = mock.MagicMock()
-        router = ModelRouter()
-        router.add_model(model)
-        route, _ = router.get_route_and_params(req)
-        route(req, resp)
+        mid = SwaggerMiddleware([model])
+        mid.process_resource(req, mock.MagicMock(), model, {})
         kwargs_expected = {'test': [1., 2., 3., 4.]}
 
         assert model.insert.call_args_list == [
@@ -244,19 +242,18 @@ class TestModelBaseBuildsQueryStringParameters(object):
                 }
             }
         }
+        ModelBaseMeta.__all_models__.clear()
         model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
             params={'test': '1,2,3,4'},
-            path='/test',
+            uri_template='/test',
             method='POST')
         req.get_header.return_value = None
         resp = mock.MagicMock()
-        router = ModelRouter()
-        router.add_model(model)
-        route, _ = router.get_route_and_params(req)
-        route(req, resp)
+        mid = SwaggerMiddleware([model])
+        mid.process_resource(req, mock.MagicMock(), model, {})
         kwargs_expected = {'test': [1., 2., 3., 4.]}
 
         assert model.insert.call_args_list == [
@@ -267,7 +264,7 @@ class TestModelBaseBuildsQueryStringParameters(object):
 class TestModelBaseBuildsUriTemplateParameters(object):
     def test_if_operation_builds_uri_template_parameters_with_array_without_items_as_string(self):
         schema = {
-            '/test': {
+            '/{test}': {
                 'get': {
                     'responses': {'200': {'description': 'test'}},
                     'operationId': 'get_by_uri_template',
@@ -280,18 +277,17 @@ class TestModelBaseBuildsUriTemplateParameters(object):
                 }
             }
         }
+        ModelBaseMeta.__all_models__.clear()
         model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.get = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
-            path='/test',
+            uri_template='/{test}',
             method='GET')
         req.get_header.return_value = None
         resp = mock.MagicMock()
-        router = ModelRouter()
-        router.add_model(model)
-        route, _ = router.get_route_and_params(req)
-        route(req, resp, **{'test': '1,2,3,4'})
+        mid = SwaggerMiddleware([model])
+        mid.process_resource(req, mock.MagicMock(), model, {'test': '1,2,3,4'})
         kwargs_expected = {'test': ['1', '2', '3', '4']}
 
         assert model.get.call_args_list == [
@@ -300,7 +296,7 @@ class TestModelBaseBuildsUriTemplateParameters(object):
 
     def test_if_operation_builds_uri_template_parameters_with_array_with_items_as_string(self):
         schema = {
-            '/test': {
+            '/{test}': {
                 'get': {
                     'responses': {'200': {'description': 'test'}},
                     'operationId': 'get_by_uri_template',
@@ -314,18 +310,17 @@ class TestModelBaseBuildsUriTemplateParameters(object):
                 }
             }
         }
+        ModelBaseMeta.__all_models__.clear()
         model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.get = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
-            path='/test',
+            uri_template='/{test}',
             method='GET')
         req.get_header.return_value = None
         resp = mock.MagicMock()
-        router = ModelRouter()
-        router.add_model(model)
-        route, _ = router.get_route_and_params(req)
-        route(req, resp, **{'test': '1,2,3,4'})
+        mid = SwaggerMiddleware([model])
+        mid.process_resource(req, mock.MagicMock(), model, {'test': '1,2,3,4'})
         kwargs_expected = {'test': ['1', '2', '3', '4']}
 
         assert model.get.call_args_list == [
@@ -334,7 +329,7 @@ class TestModelBaseBuildsUriTemplateParameters(object):
 
     def test_if_operation_builds_uri_template_parameters_with_array_with_items_with_type_as_string(self):
         schema = {
-            '/test': {
+            '/{test}': {
                 'get': {
                     'responses': {'200': {'description': 'test'}},
                     'operationId': 'get_by_uri_template',
@@ -348,18 +343,17 @@ class TestModelBaseBuildsUriTemplateParameters(object):
                 }
             }
         }
+        ModelBaseMeta.__all_models__.clear()
         model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.get = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
-            path='/test',
+            uri_template='/{test}',
             method='GET')
         req.get_header.return_value = None
         resp = mock.MagicMock()
-        router = ModelRouter()
-        router.add_model(model)
-        route, _ = router.get_route_and_params(req)
-        route(req, resp, **{'test': '1,2,3,4'})
+        mid = SwaggerMiddleware([model])
+        mid.process_resource(req, mock.MagicMock(), model, {'test': '1,2,3,4'})
         kwargs_expected = {'test': [1., 2., 3., 4.]}
 
         assert model.get.call_args_list == [
@@ -382,18 +376,17 @@ class TestModelBaseBuildsHeadersParameters(object):
                 }
             }
         }
+        ModelBaseMeta.__all_models__.clear()
         model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
-            path='/test',
+            uri_template='/test',
             method='POST')
         req.get_header.return_value = '1,2,3,4'
         resp = mock.MagicMock()
-        router = ModelRouter()
-        router.add_model(model)
-        route, _ = router.get_route_and_params(req)
-        route(req, resp)
+        mid = SwaggerMiddleware([model])
+        mid.process_resource(req, mock.MagicMock(), model, {})
         kwargs_expected = {'test': ['1', '2', '3', '4']}
 
         assert req.get_header.call_args_list == [mock.call('test')]
@@ -416,18 +409,17 @@ class TestModelBaseBuildsHeadersParameters(object):
                 }
             }
         }
+        ModelBaseMeta.__all_models__.clear()
         model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
-            path='/test',
+            uri_template='/test',
             method='POST')
         req.get_header.return_value = '1,2,3,4'
         resp = mock.MagicMock()
-        router = ModelRouter()
-        router.add_model(model)
-        route, _ = router.get_route_and_params(req)
-        route(req, resp)
+        mid = SwaggerMiddleware([model])
+        mid.process_resource(req, mock.MagicMock(), model, {})
         kwargs_expected = {'test': ['1', '2', '3', '4']}
 
         assert model.insert.call_args_list == [
@@ -449,18 +441,17 @@ class TestModelBaseBuildsHeadersParameters(object):
                 }
             }
         }
+        ModelBaseMeta.__all_models__.clear()
         model = ModelRedisBaseMeta('TestModel', (ModelRedisBase,), {'__schema__': schema})
         model.insert = mock.MagicMock(return_value=[{}])
         req = mock.MagicMock(
             context={'session': mock.MagicMock()},
-            path='/test',
+            uri_template='/test',
             method='POST')
         req.get_header.return_value = '1,2,3,4'
         resp = mock.MagicMock()
-        router = ModelRouter()
-        router.add_model(model)
-        route, _ = router.get_route_and_params(req)
-        route(req, resp)
+        mid = SwaggerMiddleware([model])
+        mid.process_resource(req, mock.MagicMock(), model, {})
         kwargs_expected = {'test': [1., 2., 3., 4.]}
 
         assert model.insert.call_args_list == [

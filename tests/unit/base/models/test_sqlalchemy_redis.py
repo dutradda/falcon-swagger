@@ -31,11 +31,6 @@ import sqlalchemy as sa
 
 
 @pytest.fixture
-def model_base():
-    return ModelSQLAlchemyRedisFactory.make()
-
-
-@pytest.fixture
 def model1(model_base):
     class model1(model_base):
         __tablename__ = 'model1'

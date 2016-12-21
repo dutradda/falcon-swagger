@@ -43,6 +43,16 @@ class ModelHttpMeta(ModelBaseMeta):
 
     def __init__(cls, name, bases_classes, attributes):
         SWAGGER_VALIDATOR.validate(cls.__schema__)
+
+        for path in cls.__schema__:
+            if path != 'definitions':
+                for key, method_schema in cls.__schema__[path].items():
+                    if key != 'parameters' and key != 'definitions':
+                        operation_id = method_schema['operationId']
+                        if not hasattr(cls, operation_id):
+                            raise ModelBaseError(
+                                "'operationId' '{}' was not found".format(operation_id))
+
         ModelBaseMeta.__init__(cls, name, bases_classes, attributes)
 
         if not hasattr(cls, '__api__'):
@@ -56,34 +66,42 @@ class ModelHttpMeta(ModelBaseMeta):
     def _set_default_options(cls):
         for uri_template, schema in cls.__schema__.items():
             if not 'options' in schema:
-                options_operation = create_default_options(schema.keys())
-                uri_template_norm = uri_template.replace('{', '_').replace('}', '_')
-                options_operation_name = '{}_{}'.format(uri_template_norm, 'options')
+                options_operation = create_default_options([k.upper() for k in schema.keys()])
+                uri_template_norm = uri_template.strip('/').replace('{', '_').replace('}', '_')
+                options_operation_name = '{}_{}'.format('options', uri_template_norm) \
+                    if uri_template_norm else 'options'
 
                 setattr(cls, options_operation_name, options_operation)
                 schema['options'] = cls._build_options_schema(options_operation_name)
 
-    def on_delete(cls, req, resp):
-        cls._execute_operation(req, resp)
+    def _build_options_schema(cls, options_operation_name):
+        return {
+            'operationId': options_operation_name,
+            'responses': {
+                '204': {
+                    'description': 'No Content',
+                    'headers': {'Allow': {'type': 'string'}}
+                }
+            }
+        }
 
-    def _execute_operation(cls, req, resp):
-        operation_name = req.context['method_schema']['operationId']
-        getattr(cls, operation_name)(req, resp)
+    def on_delete(cls, req, resp, **kwargs):
+        pass
 
-    def on_get(cls, req, resp):
-        cls._execute_operation(req, resp)
+    def on_get(cls, req, resp, **kwargs):
+        pass
 
-    def on_patch(cls, req, resp):
-        cls._execute_operation(req, resp)
+    def on_head(cls, req, resp, **kwargs):
+        pass
 
-    def on_post(cls, req, resp):
-        cls._execute_operation(req, resp)
+    def on_options(cls, req, resp, **kwargs):
+        pass
 
-    def on_put(cls, req, resp):
-        cls._execute_operation(req, resp)
+    def on_patch(cls, req, resp, **kwargs):
+        pass
 
-    def on_head(cls, req, resp):
-        cls._execute_operation(req, resp)
+    def on_post(cls, req, resp, **kwargs):
+        pass
 
-    def on_options(cls, req, resp):
-        cls._execute_operation(req, resp)
+    def on_put(cls, req, resp, **kwargs):
+        pass

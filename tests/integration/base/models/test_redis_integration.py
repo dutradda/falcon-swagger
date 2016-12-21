@@ -23,6 +23,7 @@
 
 from falconswagger.models.orm.redis import ModelRedisFactory
 from falconswagger.swagger_api import SwaggerAPI
+from falconswagger.models.base import ModelBaseMeta
 from unittest import mock
 from fakeredis import FakeStrictRedis
 import pytest
@@ -119,6 +120,7 @@ def app():
             }
         }
     }
+    ModelBaseMeta.__all_models__.clear()
     return SwaggerAPI([ModelRedisFactory.make('TestModel', 'test', ['id'], schema)],
                       redis_bind=FakeStrictRedis(), title='Test API')
 

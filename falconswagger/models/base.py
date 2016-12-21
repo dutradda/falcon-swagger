@@ -32,19 +32,19 @@ def _camel_case_convert(name):
 
 
 class ModelBaseMeta(type):
-	__all_models__ = dict()
+    __all_models__ = dict()
 
-	def __init__(cls, name, bases_classes, attributes):
-		if not hasattr(cls, '__key__'):
-	        name = cls.__name__.replace('Model', '')
-	        cls.__key__ = getattr(cls, '__key__', _camel_case_convert(name))
+    def __init__(cls, name, bases_classes, attributes):
+        if not hasattr(cls, '__key__'):
+            name = cls.__name__.replace('Model', '')
+            cls.__key__ = getattr(cls, '__key__', _camel_case_convert(name))
 
-	    all_models = type(cls).__all_models__
-	    key = cls.__key__
+        all_models = type(cls).__all_models__
+        key = cls.__key__
 
-	    if key in all_models:
-	    	raise ModelBaseError("The model '{}' was already declared with key '{}'".format(
-	    		all_models[key], key))
+        if key in all_models:
+            raise ModelBaseError("The model '{}' was already declared with key '{}'".format(
+                all_models[key], key))
 
-	    all_models[key] = cls
-		cls._logger = logging.getLogger(cls.__module__ + '.' + cls.__name__)
+        all_models[key] = cls
+        cls._logger = logging.getLogger(cls.__module__ + '.' + cls.__name__)

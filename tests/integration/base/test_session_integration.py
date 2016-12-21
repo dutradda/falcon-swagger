@@ -33,11 +33,6 @@ import sqlalchemy as sa
 
 
 @pytest.fixture
-def model_base():
-    return ModelSQLAlchemyRedisFactory.make()
-
-
-@pytest.fixture
 def redis():
     r = mock.MagicMock()
     r.smembers = lambda x: {x.replace('_filters_names', '').encode()}
@@ -45,48 +40,42 @@ def redis():
 
 
 @pytest.fixture
-def model1(request, model_base, redis, session):
+def model1(model_base):
     class model_(model_base):
         __tablename__ = 'test1'
         __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
-
-    model_base.metadata.create_all()
     return model_
 
 
 @pytest.fixture
-def model2(request, model_base, redis, session):
+def model2(model_base):
     class model_(model_base):
         __tablename__ = 'test2'
         __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
-
-    model_base.metadata.create_all()
     return model_
 
 
 @pytest.fixture
-def model1_no_redis(request, model_base, redis, session):
+def model1_no_redis(model_base):
     class model_(model_base):
         __tablename__ = 'test1'
         __table_args__ = {'mysql_engine':'innodb'}
         __use_redis__ = False
         id = sa.Column(sa.Integer, primary_key=True)
-
-    model_base.metadata.create_all()
     return model_
 
 
 class TestSessionCommitWithoutRedis(object):
-    def test_set_without_redis(self, session, model1, redis):
+    def test_set_without_redis(self, model1, session, redis):
         session.redis_bind = None
         session.add(model1(session, id=1))
         session.commit()
 
         assert redis.hmset.call_args_list == []
 
-    def test_delete_without_redis(self, session, model1, redis):
+    def test_delete_without_redis(self, model1, session, redis):
         session.redis_bind = None
         m1 = model1(session, id=1)
         session.add(m1)
@@ -98,13 +87,13 @@ class TestSessionCommitWithoutRedis(object):
 
 
 class TestSessionCommitRedisSet(object):
-    def test_if_instance_is_seted_on_redis(self, session, model1, redis):
+    def test_if_instance_is_seted_on_redis(self, model1, session, redis):
         session.add(model1(session, id=1))
         session.commit()
 
         assert redis.hmset.call_args_list == [mock.call('test1', {b'1': msgpack.dumps({'id': 1})})]
 
-    def test_if_two_instance_are_seted_on_redis(self, session, model1, redis):
+    def test_if_two_instance_are_seted_on_redis(self, model1, session, redis):
         session.add(model1(session, id=1))
         session.add(model1(session, id=2))
         session.commit()
@@ -112,7 +101,7 @@ class TestSessionCommitRedisSet(object):
         assert redis.hmset.call_args_list == [
             mock.call('test1', {b'1': msgpack.dumps({'id': 1}), b'2': msgpack.dumps({'id': 2})})]
 
-    def test_if_two_commits_sets_redis_correctly(self, session, model1, redis):
+    def test_if_two_commits_sets_redis_correctly(self, model1, session, redis):
         session.add(model1(session, id=1))
         session.commit()
         session.add(model1(session, id=2))
@@ -122,7 +111,7 @@ class TestSessionCommitRedisSet(object):
             mock.call('test1', {b'1': msgpack.dumps({b'id': 1})}),
             mock.call('test1', {b'2': msgpack.dumps({b'id': 2})})]
 
-    def test_if_error_right_raised(self, session, model1, redis):
+    def test_if_error_right_raised(self, model1, session, redis):
         class ExceptionTest(Exception):
             pass
 
@@ -132,7 +121,7 @@ class TestSessionCommitRedisSet(object):
             session.commit()
 
     def test_if_istances_are_seted_on_redis_with_two_models_correctly(
-            self, session, model1, model2, redis):
+            self, model1, model2, session, redis):
         session.add(model1(session, id=1))
         session.add(model2(session, id=1))
         session.add(model1(session, id=2))
@@ -150,7 +139,7 @@ class TestSessionCommitRedisSet(object):
             assert call_ in expected
 
     def test_if_two_commits_sets_redis_with_two_models_correctly(
-            self, session, model1, model2, redis):
+            self, model1, model2, session, redis):
         session.add(model1(session, id=1))
         session.add(model2(session, id=1))
         session.commit()
@@ -172,7 +161,7 @@ class TestSessionCommitRedisSet(object):
 
 
 class TestSessionCommitRedisSetWithoutUseRedisFlag(object):
-    def test_if_instance_is_seted_on_redis(self, session, model1_no_redis, redis):
+    def test_if_instance_is_seted_on_redis(self, model1_no_redis, session, redis):
         session.add(model1_no_redis(session, id=1))
         session.commit()
 
@@ -180,7 +169,7 @@ class TestSessionCommitRedisSetWithoutUseRedisFlag(object):
 
 
 class TestSessionCommitRedisDelete(object):
-    def test_if_instance_is_deleted_from_redis(self, session, model1, redis):
+    def test_if_instance_is_deleted_from_redis(self, model1, session, redis):
         inst1 = model1(session, id=1)
         session.add(inst1)
         session.commit()
@@ -190,7 +179,7 @@ class TestSessionCommitRedisDelete(object):
 
         assert redis.hdel.call_args_list == [mock.call('test1', b'1')]
 
-    def test_if_two_instance_are_deleted_from_redis(self, session, model1, redis):
+    def test_if_two_instance_are_deleted_from_redis(self, model1, session, redis):
         inst1 = model1(session, id=1)
         inst2 = model1(session, id=2)
         session.add_all([inst1, inst2])
@@ -203,7 +192,7 @@ class TestSessionCommitRedisDelete(object):
         assert (redis.hdel.call_args_list == [mock.call('test1', b'1', b'2')] or
             redis.hdel.call_args_list == [mock.call('test1', b'2', b'1')])
 
-    def test_if_two_commits_delete_redis_correctly(self, session, model1, redis):
+    def test_if_two_commits_delete_redis_correctly(self, model1, session, redis):
         inst1 = model1(session, id=1)
         inst2 = model1(session, id=2)
         session.add_all([inst1, inst2])
@@ -219,7 +208,7 @@ class TestSessionCommitRedisDelete(object):
             mock.call('test1', b'2')
         ]
 
-    def test_if_error_right_raised(self, session, model1, redis):
+    def test_if_error_right_raised(self, model1, session, redis):
         class ExceptionTest(Exception):
             pass
 
@@ -232,7 +221,7 @@ class TestSessionCommitRedisDelete(object):
             session.commit()
 
     def test_if_istances_are_seted_on_redis_with_two_models_correctly(
-            self, session, model1, model2, redis):
+            self, model1, model2, session, redis):
         inst1 = model1(session, id=1)
         inst2 = model1(session, id=2)
         inst3 = model2(session, id=1)
@@ -256,7 +245,7 @@ class TestSessionCommitRedisDelete(object):
             assert call[0][2] == b'1' or call[0][2] == b'2'
 
     def test_if_two_commits_delete_redis_with_two_models_correctly(
-            self, session, model1, model2, redis):
+            self, model1, model2, session, redis):
         inst1 = model1(session, id=1)
         inst2 = model1(session, id=2)
         inst3 = model2(session, id=1)
@@ -281,7 +270,7 @@ class TestSessionCommitRedisDelete(object):
 
 
 class TestSessionCommitRedisDeleteWithoutUseRedisFlag(object):
-    def test_if_instance_is_deleted_from_redis(self, session, model1_no_redis, redis):
+    def test_if_instance_is_deleted_from_redis(self, model1_no_redis, session, redis):
         inst1 = model1_no_redis(session, id=1)
         session.add(inst1)
         session.commit()
@@ -293,51 +282,45 @@ class TestSessionCommitRedisDeleteWithoutUseRedisFlag(object):
 
 
 @pytest.fixture
-def model1_related(request, model_base, redis, session):
-    class model_(model_base):
+def model1_related(model_base):
+    class test1(model_base):
         __tablename__ = 'test1'
         __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
         test = sa.Column(sa.String(255))
-
-    model_base.metadata.create_all()
-    return model_
+    return test1
 
 
 @pytest.fixture
-def model2_related(request, model_base, redis, session, model1_related):
+def model2_related(model_base, model1_related):
     mtm_table = sa.Table(
         'model1_model2', model_base.metadata,
         sa.Column('model1_id', sa.Integer, sa.ForeignKey('test1.id', ondelete='CASCADE')),
         sa.Column('model2_id', sa.Integer, sa.ForeignKey('test2.id', ondelete='CASCADE')),
         mysql_engine='innodb'
     )
-    class model_(model_base):
+    class test2(model_base):
         __tablename__ = 'test2'
         __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
         model1 = sa.orm.relationship(model1_related, uselist=True, secondary=mtm_table)
-
-    model_base.metadata.create_all()
-    return model_
+    return test2
 
 
 @pytest.fixture
-def model3_related(request, model_base, redis, session, model2_related):
-    class model_(model_base):
+def model3_related(model_base, model2_related):
+    class test3(model_base):
         __tablename__ = 'test3'
         __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
         model2_id = sa.Column(sa.ForeignKey('test2.id'))
         model2 = sa.orm.relationship(model2_related)
-
-    model_base.metadata.create_all()
-    return model_
+    return test3
 
 
 @mock.patch('falconswagger.models.orm.session.msgpack', new=mock.MagicMock(dumps=lambda x: x))
 class TestSessionCommitWithNestedRelatedModels(object):
-    def test_redis_update_nested_related(self, session, model1_related, model2_related, model3_related, redis):
+    def test_redis_update_nested_related(self, model1_related, model2_related, model3_related, session, redis):
         m1 = model1_related(session)
         m2 = model2_related(session)
         m2.model1 = [m1]
@@ -374,7 +357,7 @@ class TestSessionCommitWithNestedRelatedModels(object):
             redis.hmset.call_args_list == [call3, call2, call1] or \
             redis.hmset.call_args_list == [call3, call1, call2]
 
-    def test_redis_update_nested_related_deleted(self, session, model1_related, model2_related, model3_related, redis):
+    def test_redis_update_nested_related_deleted(self, model1_related, model2_related, model3_related, session, redis):
         m1 = model1_related(session)
         m2 = model2_related(session)
         m2.model1 = [m1]

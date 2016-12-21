@@ -33,16 +33,10 @@ import sqlalchemy as sa
 
 
 @pytest.fixture
-def model(model_base):
-    class MyAuth(Authorizer):
-        def authorize(self, session, auth_token, uri, path, method):
-            if auth_token == '1' and uri == '/' and method == 'GET':
-                return True
-            if auth_token == '2':
-                return False
+def model(model_base, request):
+    type(model_base).__all_models__ = {}
 
     class model(model_base):
-        __authorizer__ = MyAuth('test')
         __tablename__ = 'model'
         id = sa.Column(sa.Integer, primary_key=True)
         __schema__ = {
@@ -69,7 +63,15 @@ def model(model_base):
 
 @pytest.fixture
 def app(model):
-    return SwaggerAPI({model}, sqlalchemy_bind=mock.MagicMock(), title='Test API')
+    class MyAuth(Authorizer):
+        def authorize(self, session, auth_token, uri, path, method):
+            if auth_token == '1' and uri == '/' and method == 'GET':
+                return True
+            if auth_token == '2':
+                return False
+
+    return SwaggerAPI({model}, sqlalchemy_bind=mock.MagicMock(),
+                      title='Test API', authorizer=MyAuth('test'))
 
 
 class TestAuthorizationHook(object):

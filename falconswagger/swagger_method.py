@@ -25,11 +25,13 @@ from falconswagger.json_builder import JsonBuilder
 from falconswagger.exceptions import SwaggerMethodError, JSONError
 from falconswagger.utils import build_validator
 from copy import deepcopy
+import json
 
 
 class SwaggerMethod(object):
 
-    def __init__(self, schema, definitions, schema_dir):
+    def __init__(self, operation, schema, definitions, schema_dir):
+        self._operation = operation
         self._body_validator = None
         self._uri_template_validator = None
         self._query_string_validator = None
@@ -100,7 +102,7 @@ class SwaggerMethod(object):
 
         schema['properties'][name] = property_
 
-    def set_swagger_parameters(self, req, resp, uri_params):
+    def __call__(self, req, resp, uri_params):
         body_params = self._build_body_params(req)
         query_string_params = self._build_non_body_params(self._query_string_validator, req.params)
         uri_template_params = self._build_non_body_params(self._uri_template_validator, uri_params)
@@ -114,6 +116,8 @@ class SwaggerMethod(object):
 
         if self._body_validator:
             req.context['body_schema'] = self._body_validator.schema
+
+        self._operation(req, resp)
 
     def _build_body_params(self, req):
         if req.content_length and (req.content_type is None or 'application/json' in req.content_type):
@@ -139,10 +143,10 @@ class SwaggerMethod(object):
 
     def _build_non_body_params(self, validator, params, type_=None):
         if validator:
-            params = {}
             for param_name, prop in validator.schema['properties'].items():
                 if type_ == 'headers':
                     param = params.get_header(param_name)
+                    params = {}
                 else:
                     param = params.get(param_name)
 

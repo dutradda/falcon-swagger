@@ -37,16 +37,13 @@ from glob import glob
 
 from falconswagger.exceptions import ModelBaseError
 from falconswagger.models.orm.redis_base import ModelRedisBaseMeta, ModelRedisBase
-from falconswagger.models.logger import ModelLoggerMetaMixin
-from falconswagger.models.http import ModelHttpMetaMixin
 
 import json
 import msgpack
 import os.path
 
 
-class ModelSQLAlchemyRedisInitMetaMixin(
-    DeclarativeMeta, ModelRedisBaseMeta):
+class ModelSQLAlchemyRedisInitMetaMixin(DeclarativeMeta, ModelRedisBaseMeta):
 
     def __init__(cls, name, bases_classes, attributes):
         DeclarativeMeta.__init__(cls, name, bases_classes, attributes)
@@ -71,11 +68,14 @@ class ModelSQLAlchemyRedisInitMetaMixin(
             cls.__key__ = str(cls.__table__.name)
             cls.__use_redis__ = getattr(cls, '__use_redis__', True)
             cls.__todict_schema__ = {}
-            cls._build_backrefs_for_all_models(type(cls).__all_models__.values())
+            # base_class.__all_models__[cls.__key__] = cls
+            # cls._build_backrefs_for_all_models(base_class.__all_models__.values())
             ModelRedisBaseMeta.__init__(cls, name, bases_classes, attributes)
+            cls._build_backrefs_for_all_models(type(cls).__all_models__.values())
 
         else:
             cls.__baseclass_name__= name
+            cls.__all_models__ = dict()
 
     def _build_primary_keys(cls):
         primaries_keys = {}
@@ -140,6 +140,7 @@ class ModelSQLAlchemyRedisInitMetaMixin(
 
     def get_model(cls, name):
         return type(cls).__all_models__[name]
+        # return cls.__all_models__[name]
 
 
 class ModelSQLAlchemyRedisOperationsMetaMixin(type):

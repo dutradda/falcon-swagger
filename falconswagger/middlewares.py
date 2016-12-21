@@ -29,6 +29,8 @@ from falconswagger.exceptions import SwaggerAPIError
 from falcon import HTTP_METHODS
 from falcon.errors import HTTPMethodNotAllowed
 from collections import defaultdict
+from copy import deepcopy
+import json
 
 
 class SessionMiddleware(object):
@@ -54,37 +56,33 @@ class SessionMiddleware(object):
 
 class SwaggerMiddleware(object):
 
-    def __init__(self, schema, models_map, authorizer=None):
-        self.schema = schema
+    def __init__(self, models, authorizer=None):
         self.authorizer = authorizer
-        self._build_uri_method_map(models_map)
+        self._build_uri_method_map(models)
 
-    def _build_uri_method_map(self):
+    def _build_uri_method_map(self, models):
         self._uri_method_map = defaultdict(dict)
-        paths_schema = self.schema['paths']
 
-        for uri_template in paths_schema:
-            all_methods_parameters = paths_schema[uri_template].get('parameters', [])
-            self._validate_authorizer(all_methods_parameters)
+        for model in models:
+            for uri_template, uri_schema in model.__schema__.items():
+                all_methods_parameters = uri_schema.get('parameters', [])
+                self._validate_authorizer(all_methods_parameters)
 
-            for method_name in HTTP_METHODS:
-                method_schema = paths_schema[uri_template].get(method_name.lower())
+                for method_name in HTTP_METHODS:
+                    method_schema = uri_schema.get(method_name.lower())
 
-                if method_schema is not None:
-                    method_schema = deepcopy(method_schema)
+                    if method_schema is not None:
+                        method_schema = deepcopy(method_schema)
+                        definitions = model.__schema__.get('definitions')
+                        parameters = method_schema.get('parameters', [])
+                        self._validate_authorizer(parameters)
+                        parameters.extend(all_methods_parameters)
 
-                    model_name, operation_id = '.'.split(method_schema['operationId'])
-                    model = models_map[model_name]
-
-                    definitions = paths_schema.get('definitions')
-
-                    parameters = method_schema.get('parameters', [])
-                    self._validate_authorizer(parameters)
-                    parameters.extend(all_methods_parameters)
-
-                    method_schema['parameters'] = parameters
-                    method = SwaggerMethod(method_schema, definitions, get_module_path(model))
-                    self._uri_method_map[uri_template][method_name] = method
+                        method_schema['parameters'] = parameters
+                        operation = getattr(model, method_schema['operationId'])
+                        method = SwaggerMethod(operation, method_schema,
+                                               definitions, get_module_path(model))
+                        self._uri_method_map[uri_template.strip('/')][method_name] = method
 
     def _validate_authorizer(self, parameters):
         for param in parameters:
@@ -93,14 +91,15 @@ class SwaggerMiddleware(object):
                     "'authorizer' attribute must be setted with 'Authorization' header setted")
 
     def process_resource(self, req, resp, model, uri_params):
-        method = self._uri_method_map[req.uri_template].get(req.method)
+        uri_template = req.uri_template.strip('/')
+        method = self._uri_method_map[uri_template].get(req.method)
         if method is None:
-            raise HTTPMethodNotAllowed()
+            raise HTTPMethodNotAllowed(self._uri_method_map[uri_template].keys())
 
         elif method.auth_required or (self.authorizer and req.get_header('Authorization')):
-            authorization_hook(self.authorizer, req, resp, kwargs)
+            authorization_hook(self.authorizer, req, resp, uri_params)
 
-        method.set_swagger_parameters(req, resp, uri_params)
+        method(req, resp, uri_params)
 
     def process_response(self, req, resp, model):
         pass

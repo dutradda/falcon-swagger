@@ -55,7 +55,7 @@ class SwaggerAPI(API, LoggerMixin):
         for model in models:
             self.associate_model(model)
 
-        swagger_mid = SwaggerMiddleware(self.swagger, self.models, authorizer=authorizer)
+        swagger_mid = SwaggerMiddleware(models, authorizer=authorizer)
         middleware.append(swagger_mid)
 
         API.__init__(self, router=router, middleware=middleware)

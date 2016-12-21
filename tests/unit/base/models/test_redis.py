@@ -23,6 +23,7 @@
 
 from falconswagger.models.orm.redis import ModelRedisMeta, ModelRedisFactory
 from falconswagger.exceptions import ModelBaseError
+from falconswagger.models.base import ModelBaseMeta
 from unittest import mock
 import pytest
 import msgpack
@@ -31,6 +32,7 @@ import msgpack
 class TestModelRedisFactory(object):
 
     def test_build(self):
+        ModelBaseMeta.__all_models__.clear()
         model = ModelRedisFactory.make('TestModel', 'test', ['id'], {})
         assert model.__name__ == 'TestModel'
         assert model.__key__ == 'test'
@@ -39,6 +41,7 @@ class TestModelRedisFactory(object):
 
 @pytest.fixture
 def model():
+    ModelBaseMeta.__all_models__.clear()
     return ModelRedisFactory.make('TestModel', 'test', ['id'], {})
 
 

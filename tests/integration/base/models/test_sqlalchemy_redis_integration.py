@@ -113,15 +113,13 @@ def model2_mtm(model_base):
         __tablename__ = 'model2'
         __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
-        model1 = sa.orm.relationship(
-            'model1', secondary='mtm', uselist=True)
+        model1 = sa.orm.relationship('model1', secondary='mtm', uselist=True)
 
     return model2
 
 
 @pytest.fixture
-def model3_mtm(model_base, model1, model2_mtm):
-    model1_ = model1
+def model3_mtm(model_base):
 
     class model3(model_base):
         __tablename__ = 'model3'
@@ -129,24 +127,21 @@ def model3_mtm(model_base, model1, model2_mtm):
         id = sa.Column(sa.Integer, primary_key=True)
         model1_id = sa.Column(sa.ForeignKey('model1.id', ondelete='CASCADE'))
         model2_id = sa.Column(sa.ForeignKey('model2.id', ondelete='CASCADE'))
-        model1 = sa.orm.relationship(model1_)
-        model2 = sa.orm.relationship(model2_mtm)
+        model1 = sa.orm.relationship('model1')
+        model2 = sa.orm.relationship('model2')
 
     return model3
 
 
 @pytest.fixture
-def model2_primary_join(model_base, model1):
-    model1_ = model1
-
+def model2_primary_join(model_base):
     class model2(model_base):
         __tablename__ = 'model2'
         __table_args__ = {'mysql_engine':'innodb'}
         id = sa.Column(sa.Integer, primary_key=True)
         id2 = sa.Column(sa.Integer)
         model1_id = sa.Column(sa.ForeignKey('model1.id', ondelete='CASCADE'))
-        model1 = sa.orm.relationship(
-            model1_,
+        model1 = sa.orm.relationship('model1',
             primaryjoin='and_(model2.model1_id==model1.id, model2.id2==model1.id)')
 
     return model2

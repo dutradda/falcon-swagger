@@ -58,7 +58,7 @@ def app(model1, session):
 
 
 @pytest.fixture
-def model1_with_schema(session, model_base):
+def model1_with_schema(model_base):
     class model2(model_base):
         __tablename__ = 'model2'
         __table_args__ = {'mysql_engine': 'innodb'}
@@ -100,7 +100,7 @@ def client_with_schema(model1_with_schema, session):
 
 class TestSwaggerAPIErrorHandlingPOST(object):
 
-    def test_integrity_error_handling_with_duplicated_key(self, client, model1):
+    def test_integrity_error_handling_with_duplicated_key(self, model1, client):
         data = json.dumps([{'id': 1}, {'id': 1}])
         resp = client.post('/model1/', data=data)
 
@@ -116,7 +116,7 @@ class TestSwaggerAPIErrorHandlingPOST(object):
             }
         }
 
-    def test_integrity_error_handling_with_foreign_key(self, client, model1):
+    def test_integrity_error_handling_with_foreign_key(self, model1, client):
         data = json.dumps([{'m2_id': 1}])
         resp = client.post('/model1/', data=data)
 
@@ -137,7 +137,7 @@ class TestSwaggerAPIErrorHandlingPOST(object):
             }
         }
 
-    def test_json_validation_error_handling(self, client_with_schema, model1_with_schema):
+    def test_json_validation_error_handling(self, model1_with_schema, client_with_schema):
         resp = client_with_schema.post('/model1/', data='"test"')
 
         assert resp.status_code == 400
@@ -151,7 +151,7 @@ class TestSwaggerAPIErrorHandlingPOST(object):
             }
         }
 
-    def test_json_error_handling(self, client_with_schema, model1_with_schema):
+    def test_json_error_handling(self, model1_with_schema, client_with_schema):
         resp = client_with_schema.post('/model1/', data='test')
 
         assert resp.status_code == 400
@@ -162,7 +162,7 @@ class TestSwaggerAPIErrorHandlingPOST(object):
             }
         }
 
-    def test_model_base_error_handling_with_post_and_with_nested_delete(self, client, model1):
+    def test_model_base_error_handling_with_post_and_with_nested_delete(self, model1, client):
         data = [{'model2_': {'id': 1, '_operation': 'delete'}}]
         resp = client.post('/model1/', data=json.dumps(data))
 
@@ -174,7 +174,7 @@ class TestSwaggerAPIErrorHandlingPOST(object):
             }
         }
 
-    def test_model_base_error_handling_with_post_and_with_nested_remove(self, client, model1):
+    def test_model_base_error_handling_with_post_and_with_nested_remove(self, model1, client):
         data = [{'model2_': {'id': 1, '_operation': 'remove'}}]
         resp = client.post('/model1/', data=json.dumps(data))
 
@@ -186,7 +186,7 @@ class TestSwaggerAPIErrorHandlingPOST(object):
             }
         }
 
-    def test_model_base_error_handling_with_post_and_with_nested_update(self, client, model1):
+    def test_model_base_error_handling_with_post_and_with_nested_update(self, model1, client):
         data = [{'model2_': {'id': 1, '_operation': 'update'}}]
         resp = client.post('/model1/', data=json.dumps(data))
 
@@ -198,7 +198,7 @@ class TestSwaggerAPIErrorHandlingPOST(object):
             }
         }
 
-    def test_model_base_error_handling_with_put_and_with_nested_delete(self, client, model1):
+    def test_model_base_error_handling_with_put_and_with_nested_delete(self, model1, client):
         resp = client.post('/model1/', data='[{}]')
         assert resp.status_code == 201
         data = [{'id': 1, 'model2_': {'id': 1, '_operation': 'delete'}}]
@@ -212,7 +212,7 @@ class TestSwaggerAPIErrorHandlingPOST(object):
             }
         }
 
-    def test_model_base_error_handling_with_put_and_with_nested_remove(self, client, model1):
+    def test_model_base_error_handling_with_put_and_with_nested_remove(self, model1, client):
         data = [{'model2_': {'id': 1, '_operation': 'remove'}}]
         resp = client.post('/model1/', data=json.dumps(data))
 
@@ -224,7 +224,7 @@ class TestSwaggerAPIErrorHandlingPOST(object):
             }
         }
 
-    def test_model_base_error_handling_with_put_and_with_nested_update(self, client, model1):
+    def test_model_base_error_handling_with_put_and_with_nested_update(self, model1, client):
         data = [{'model2_': {'id': 1, '_operation': 'update'}}]
         resp = client.post('/model1/', data=json.dumps(data))
 
@@ -236,7 +236,7 @@ class TestSwaggerAPIErrorHandlingPOST(object):
             }
         }
 
-    def test_generic_error_handling(self, client, model1):
+    def test_generic_error_handling(self, model1, client):
         model1.insert = mock.MagicMock(side_effect=Exception)
         resp = client.post('/model1/', data='[{}]')
 

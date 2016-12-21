@@ -34,8 +34,14 @@ from falconswagger.models.orm.sqlalchemy_redis import ModelSQLAlchemyRedisFactor
 
 
 @pytest.fixture
-def model_base():
-    return ModelSQLAlchemyRedisFactory.make()
+def model_base(request):
+    base = ModelSQLAlchemyRedisFactory.make()
+
+    def fin():
+        type(base).__all_models__.clear()
+    request.addfinalizer(fin)
+
+    return base
 
 
 @pytest.fixture
